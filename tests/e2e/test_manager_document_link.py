@@ -17,6 +17,7 @@ from apps.vendors import engine
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
 from tests.e2e.login import verify_with_totp
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -36,9 +37,9 @@ def test_the_owner_links_an_external_address_and_has_no_document_link(
     page.add_init_script(RECORD_CSP_VIOLATIONS)
 
     page.goto(f"{live_server.url}/account/login/")
-    page.get_by_label("Email").fill("owner@example.com")
-    page.get_by_label("Password").fill(password)
-    page.get_by_role("button", name="Sign in").click()
+    page.get_by_label(translated("Email")).fill("owner@example.com")
+    page.get_by_label(translated("Password")).fill(password)
+    page.get_by_role("button", name=translated("Sign in")).click()
     verify_with_totp(page, totp_token(device))
     page.goto(f"{live_server.url}/manager/shop/profile/")
 
@@ -46,21 +47,21 @@ def test_the_owner_links_an_external_address_and_has_no_document_link(
     content = editor.locator(".public-DraftEditor-content")
     content.click()
     # No document link until private storage (ARC.15, owner decision).
-    expect(page.get_by_role("button", name="Document")).to_have_count(0)
+    expect(page.get_by_role("button", name=translated("Document"))).to_have_count(0)
     content.press_sequentially("Read our site")
     content.press("Shift+Control+ArrowLeft")
     content.press("Shift+Control+ArrowLeft")
     page.get_by_role("button", name="Link").first.click()
     dialog = page.locator(".modal-body")
-    dialog.get_by_label("Web address").fill("javascript:alert(1)")
-    dialog.get_by_role("button", name="Insert link").click()
+    dialog.get_by_label(translated("Web address")).fill("javascript:alert(1)")
+    dialog.get_by_role("button", name=translated("Insert link")).click()
     expect(dialog.get_by_text("https://")).to_be_visible()
     shot("link-refused")
-    dialog.get_by_label("Web address").fill("https://example.com/")
-    dialog.get_by_role("button", name="Insert link").click()
+    dialog.get_by_label(translated("Web address")).fill("https://example.com/")
+    dialog.get_by_role("button", name=translated("Insert link")).click()
     expect(editor.locator("a")).to_have_count(1)
     shot("link-inserted")
-    page.get_by_role("button", name="Save", exact=True).click()
-    expect(page.get_by_text("Storefront profile saved.")).to_be_visible()
+    page.get_by_role("button", name=translated("Save"), exact=True).click()
+    expect(page.get_by_text(translated("Storefront profile saved."))).to_be_visible()
     noise = "style-src-elem blocked inline"
     assert [v for v in csp_violations(page) if noise not in v] == []

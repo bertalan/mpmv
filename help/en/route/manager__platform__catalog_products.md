@@ -1,7 +1,7 @@
 # Products
 last-checked: 2026-11-18
 
-This page lists the products of every shop, for the Catalog and moderation role. The platform owner and the Support role can read it but cannot change anything: for them the page shows a notice and no change controls, and any attempt to change a product is refused (access denied).
+This page lists the products of every shop, for the Catalogue and moderation role. The platform owner and the Support role can read it but cannot change anything: for them the page shows a notice and no change controls, and any attempt to change a product is refused (access denied).
 
 ## Find products
 - **Search** looks at the SKU and at the titles in every language.

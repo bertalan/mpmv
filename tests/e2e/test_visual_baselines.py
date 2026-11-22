@@ -34,7 +34,9 @@ from apps.orders.tests.integration.test_checkout_views import vendor
 from apps.tax import engine as tax
 from apps.tax.tests.factories import TaxRateFactory
 from apps.vendors.tests.factories import CommissionRuleFactory
+from tests.e2e.palette import PALETTE_LINK, PALETTES, assert_palette_applied, choose_palette
 from tests.e2e.visual import WIDTHS, assert_matches_baseline, require_visual_mode
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -119,8 +121,10 @@ def test_key_page_matches_its_visual_baseline(
     page.set_viewport_size({"width": 1280, "height": 900})
     if name == "cart":
         page.goto(f"{live_server.url}/product/blue-vase/")
-        page.get_by_role("button", name="Add to cart").click()
-        expect(page.locator("#add-to-cart-result")).to_contain_text("Added to your cart.")
+        page.get_by_role("button", name=translated("Add to cart")).click()
+        expect(page.locator("#add-to-cart-result")).to_contain_text(
+            translated("Added to your cart.")
+        )
     response = page.goto(f"{live_server.url}{PAGES[name].format(**paths)}")
     assert response is not None
     assert response.status == (404 if name == "not-found" else 200)
@@ -131,3 +135,36 @@ def test_key_page_matches_its_visual_baseline(
     page.wait_for_function("() => [...document.images].every((img) => img.complete)", timeout=5000)
     for width in WIDTHS:
         assert_matches_baseline(page, theme=theme, name=name, width=width)
+
+
+PALETTE_PAGES = ("home", "product")
+PALETTE_WIDTHS = (375, 1280)
+
+
+@pytest.mark.parametrize("name", PALETTE_PAGES)
+@pytest.mark.parametrize("palette", PALETTES)
+def test_palette_page_matches_its_visual_baseline(
+    palette: str,
+    name: str,
+    page: Page,
+    live_server: LiveServer,
+    settings: SettingsWrapper,
+    paths: dict,  # type: ignore[type-arg]
+) -> None:
+    """THM.31: the Blue and Petrol palettes of `ride`, baselines in `ride-<palette>/`."""
+    require_visual_mode()
+    choose_palette(palette)
+    page.emulate_media(reduced_motion="reduce")
+    page.clock.set_fixed_time(utc(2026, 11, 18, 10))
+    page.set_viewport_size({"width": 1280, "height": 900})
+    response = page.goto(f"{live_server.url}{PAGES[name].format(**paths)}")
+    assert response is not None
+    assert response.status == 200
+    page.wait_for_load_state("load")
+    expect(page.locator("html")).to_have_attribute("data-theme", "ride")
+    expect(page.locator(PALETTE_LINK)).to_have_count(1)
+    assert_palette_applied(page, palette)
+    page.evaluate("() => [...document.images].forEach((img) => { img.loading = 'eager'; })")
+    page.wait_for_function("() => [...document.images].every((img) => img.complete)", timeout=5000)
+    for width in PALETTE_WIDTHS:
+        assert_matches_baseline(page, theme=f"ride-{palette}", name=name, width=width)

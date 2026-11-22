@@ -41,8 +41,9 @@ def order_paid_on_payment(sender: type[Payment], payment: Payment, **kwargs: Any
         duplicates.flag_duplicate(payment, ctx=ctx)
         tasks.enqueue(refund_duplicate_payment, payment_id=payment.pk)
         return
-    # PAY.4 (owner decision 2026-11-21): a capture on a cancelled order, or of another amount or
-    # currency, is not refunded automatically: staff are alerted and support refunds it by hand.
+    # PAY.4 (owner decisions 2026-11-21): a capture on a cancelled order, of another amount or
+    # currency, with a wrong order reference or matching no order is not refunded automatically:
+    # staff are alerted and support refunds it by hand.
     reason = stray_capture_reason(
         payment.order_ref,
         amount=payment.amount,

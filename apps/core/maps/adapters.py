@@ -2,10 +2,11 @@
 
 import urllib.error
 import urllib.request
-from typing import Any
 
 from django.conf import settings
 from django.utils.module_loading import import_string
+
+from apps.core.outbound import no_redirect_opener
 
 from . import TileNotAvailable, TileUpstream, TileUpstreamError, TileUpstreamTimeout, UpstreamTile
 
@@ -13,19 +14,13 @@ MAX_TILE_BYTES = 512 * 1024
 _HEADERS = ("Cache-Control", "Expires")
 
 
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    """A 3xx is an upstream error: never follow it (also not to http:// or another host)."""
-
-    def redirect_request(self, *args: Any, **kwargs: Any) -> None:
-        return None
-
-
 def _extra_handlers() -> list[urllib.request.BaseHandler]:
     return []
 
 
 def _opener() -> urllib.request.OpenerDirector:
-    return urllib.request.build_opener(_NoRedirect(), *_extra_handlers())
+    """A 3xx is an upstream error: never follow it (SEC.5, `apps.core.outbound`)."""
+    return no_redirect_opener(*_extra_handlers())
 
 
 class HttpTileUpstream:

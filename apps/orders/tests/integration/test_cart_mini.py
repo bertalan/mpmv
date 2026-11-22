@@ -71,6 +71,7 @@ def test_an_anonymous_visitor_gets_no_cart_and_no_session(client: Client) -> Non
     assert not client.session.keys()
 
 
+@pytest.mark.usefixtures("consumer_prices")  # a buyable item shows a consumer price (#757)
 def test_a_queued_message_is_neither_shown_nor_consumed(client: Client) -> None:
     add(client, 1)
     line = Cart.objects.get().lines.get()

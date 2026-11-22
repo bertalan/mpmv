@@ -149,6 +149,7 @@ def _preview(request: HttpRequest, cart: Cart, data: dict[str, Any]) -> Checkout
         customer_vat=validation,
         shipping_choices=state.shipping_choices(data),
         commission_snapshots=snapshots,
+        prices=cart_services.price_check(request),  # before the address: the shop's estimate
     )
 
 
@@ -326,9 +327,15 @@ def cart_add(request: HttpRequest) -> HttpResponse:
         try:
             if cart is None:
                 raise ValidationError(_("We could not open your cart."))
-            cart_services.add_to_cart(cart, product, variant=variant, quantity=quantity)
+            prices = cart_services.price_check(request)  # the destination the page priced for
+            cart_services.add_to_cart(
+                cart, product, variant=variant, quantity=quantity, prices=prices
+            )
         except ValidationError as error:
-            problems.extend(error.messages)
+            if getattr(error, "code", None) == cart_services.NO_PRICE:
+                problems.append(str(present.NO_PRICE_TO_BUY))
+            else:
+                problems.extend(error.messages)
     ok = not problems
     count = sum(line.quantity for line in cart.lines.all()) if cart is not None else 0
     if _htmx(request):

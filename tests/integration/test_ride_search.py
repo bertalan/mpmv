@@ -33,6 +33,7 @@ from apps.core.models import TranslationStatus
 from apps.events.tests.factories import EventPageFactory
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db
 
@@ -94,7 +95,7 @@ def test_the_banner_holds_the_only_h1_and_the_form_is_a_search_landmark(
     client: Client, settings: SettingsWrapper
 ) -> None:
     soup = ride_page(client, settings, {"s": "mango"})
-    assert [h.get_text(strip=True) for h in soup.find_all("h1")] == ["Search"]
+    assert [h.get_text(strip=True) for h in soup.find_all("h1")] == [translated("Search")]
     assert soup.select_one(".page-banner h1")
     form = soup.select_one(".search-page form[role=search][method=get]")
     assert form is not None
@@ -164,6 +165,7 @@ def search_data(
         "controls": sorted(
             (c["name"], c.get("type", c.name), c.get("value", ""))
             for c in main.select("form input[name], form select[name]")
+            if c["name"] != "csrfmiddlewaretoken"  # random per render (the garage line's form)
         ),
         "labels": [label.get_text(strip=True) for label in main.select("form label")],
         "h2": [(h.get("id"), h.get_text(strip=True)) for h in main.select("h2")],

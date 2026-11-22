@@ -18,6 +18,7 @@ from django.contrib.sessions.models import Session
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.html import escape
 from django_otp.plugins.otp_totp.models import TOTPDevice
 
 from apps.accounts import levels, services
@@ -32,6 +33,7 @@ from apps.accounts.tests.factories import (
 from apps.accounts.tests.mfa import totp_token, verified_login
 from apps.core.audit import AuditContext, user_context
 from apps.core.models import AuditLog
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db
 
@@ -396,9 +398,10 @@ def test_the_page_lists_the_users_own_sessions_only() -> None:
     UserSessionFactory.create(user=other, browser="Opera", system="Windows")
     page = client.get(LIST)
     assert page.status_code == 200
-    assert b"Safari on iOS" in page.content
+    on = translated("%(browser)s on %(system)s") % {"browser": "Safari", "system": "iOS"}
+    assert on.encode() in page.content
     assert b"Opera" not in page.content
-    assert b"this session" in page.content
+    assert escape(translated("this session")).encode() in page.content
 
 
 def test_an_anonymous_visitor_is_sent_to_sign_in() -> None:

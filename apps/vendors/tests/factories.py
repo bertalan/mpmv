@@ -208,6 +208,8 @@ class VendorFactory(DjangoModelFactory[Vendor]):
     country = "IT"
     vat_number = factory.Sequence(lambda n: f"IT{italian_vat(n)}")
     contact_email = factory.LazyAttribute(lambda o: f"{slugify(o.display_name)}@example.com")
+    # CMP.41 follow-up: a seller to consumers needs one to publish. Fictional: UK drama range.
+    phone = "+44 20 7946 0000"
     status = Vendor.Status.APPLICANT
 
     @factory.post_generation

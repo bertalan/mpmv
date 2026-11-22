@@ -10,6 +10,7 @@ cross-language fallback; a fixed number of queries.
 import datetime as dt
 import json
 import re
+from decimal import Decimal
 from typing import Any
 
 import pytest
@@ -301,3 +302,44 @@ def test_hostile_text_cannot_break_out_of_the_json_ld_script() -> None:
     assert node["name"] == payload
     assert node["description"] == payload
     assert node["location"]["name"] == payload
+
+
+def test_a_postponed_event_has_status_and_previous_start_in_rome_time() -> None:
+    previous = dt.datetime(2027, 2, 10, 8, 0, tzinfo=dt.UTC)
+    node = event_of(create(located=True, postponed=True, previous_start=previous))
+    assert node["eventStatus"] == "https://schema.org/EventPostponed"
+    assert node["previousStartDate"] == "2027-02-10T09:00:00+01:00"
+
+
+def test_a_postponed_event_without_previous_start() -> None:
+    node = event_of(create(located=True, postponed=True))
+    assert node["eventStatus"] == "https://schema.org/EventPostponed"
+    assert "previousStartDate" not in node
+
+
+def test_cancelled_wins_over_postponed_in_the_page_graph() -> None:
+    page = create(located=True, postponed=True)
+    EventPage.objects.filter(pk=page.pk).update(
+        status=EventPage.Status.CANCELLED, cancelled_at=dt.datetime(2027, 1, 1, tzinfo=dt.UTC)
+    )
+    assert event_of(page)["eventStatus"] == "https://schema.org/EventCancelled"
+
+
+def test_offers_from_price_link_and_free() -> None:
+    priced = event_of(
+        create(located=True, price=Decimal("9"), ticket_url="https://tickets.example/a")
+    )
+    assert priced["offers"] == {
+        "@type": "Offer",
+        "url": "https://tickets.example/a",
+        "price": "9.00",
+        "priceCurrency": "EUR",
+    }
+    free = event_of(create(located=True, is_free=True))
+    assert free["offers"] == {"@type": "Offer", "price": "0", "priceCurrency": "EUR"}
+    link = event_of(create(located=True, ticket_url="https://tickets.example/b"))
+    assert link["offers"] == {"@type": "Offer", "url": "https://tickets.example/b"}
+
+
+def test_no_offers_key_without_data() -> None:
+    assert "offers" not in event_of(create(located=True))

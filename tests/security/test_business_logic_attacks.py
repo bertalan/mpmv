@@ -17,8 +17,8 @@ Left out on purpose, with the test that already proves it:
 - hostile text in shipping files (formulas, markup, control characters):
   `tests/integration/test_hostile_input_outputs.py`.
 
-Coupons, refunds, payouts and payments are lane A's (orders, payments, ledger); their attack
-scenarios are listed on the PR as 3a-2 and are not written here.
+Payments and refunds are in `test_payment_attacks.py` (3a-2); coupons and payouts are still to
+do.
 """
 
 import threading
@@ -66,6 +66,13 @@ def sellable(**fields: Any) -> Product:
         **fields,
     }
     return ProductFactory.create(**values)
+
+
+@pytest.fixture(autouse=True)
+def _consumer_prices(request: pytest.FixtureRequest) -> None:
+    """Items in a cart need a consumer price (TAX.12, #757): the database tests get one."""
+    if request.node.get_closest_marker("django_db"):
+        request.getfixturevalue("consumer_prices")
 
 
 def guest_cart(key: str = "attacker-session") -> Cart:

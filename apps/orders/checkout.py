@@ -29,6 +29,7 @@ from apps.core.services import flag_enabled
 from apps.shipping import engine as shipping_engine
 from apps.shipping.services import quote_shipping
 from apps.tax import engine as tax_engine
+from apps.tax import prices as tax_prices
 from apps.tax import services as tax_services
 from apps.tax.models import VatValidation
 from apps.vendors import services as vendors_services
@@ -171,6 +172,7 @@ def build_checkout(
     shipping_choices: Mapping[int, str] | None = None,
     commission_snapshots: Mapping[int, dict[str, Any]] | None = None,
     quotes_enabled: bool = True,
+    prices: tax_prices.PriceCheck | None = None,
     now: dt.datetime | None = None,
 ) -> CheckoutPreview:
     """Preview the checkout of `cart` for the delivery address (`line1`, `city`, `postcode`,
@@ -183,7 +185,9 @@ def build_checkout(
     valid, fresh one makes a reverse-charge business. Blocking messages are in `preview.blocks`
     and on each package; `preview.placeable` is true when nothing blocks. A package whose
     shipping needs a quote (over the last weight band, special area, no weight, SHP.3) is
-    `quote`, not priced, with a `needs_quote` message. Reads only."""
+    `quote`, not priced, with a `needs_quote` message. Before the address, a line without a
+    consumer price for the destination of `prices` (the view passes the visitor's, as the product
+    page uses; default `price_check()`) is a `no_price` block (#757). Reads only."""
     now = now or timezone.now()
     billing = dict(billing_address) if billing_address else dict(shipping_address)
     delivery = dict(shipping_address)
@@ -214,6 +218,16 @@ def build_checkout(
             )
         )
 
+    unpriced: set[int] = set()  # cart line ids without a consumer price, before the address
+    if destination is None and cart_packages:
+        prices = prices or cart_services.price_check()  # the tax tables, read once per cart
+        unpriced = {
+            line.item.pk
+            for package in cart_packages
+            for line in package.lines
+            if not cart_services.has_price(line.item.product, line.item.variant, prices)
+        }
+
     summaries: list[engine.PackageSummary] = []
     ready: list[PlaceVendor] = []
     customer_ctx: tax_engine.TaxContext | None = None
@@ -230,6 +244,7 @@ def build_checkout(
             commission=(commission_snapshots or {}).get(vendor.pk, {}),
             quotes_enabled=quotes_enabled,
             language=language,
+            unpriced=unpriced,
             now=now,
         )
         if not flag_enabled(flags.CHECKOUT, vendor=vendor):
@@ -306,6 +321,7 @@ def _package(
     commission: dict[str, Any],
     quotes_enabled: bool,
     language: str,
+    unpriced: set[int],
     now: dt.datetime,
 ) -> tuple[engine.PackageSummary, PlaceVendor | None, tax_engine.TaxContext | None]:
     """Check, tax, quote and price one vendor package: (summary, placeable vendor or None, the
@@ -335,7 +351,14 @@ def _package(
     if found:
         return stop(engine.BLOCKED, *found)
     if destination is None:
-        return stop(engine.BLOCKED)  # the cart-level address message says why
+        # Before the address the buyer sees estimated consumer prices (TAX.12): a line without
+        # one says so and blocks (#757). With the address, the tax engine decides below.
+        no_price = [
+            _block(engine.NO_PRICE, "This item has no price yet.", vid, product_id=line.product_id)
+            for line in cart_lines
+            if line.pk in unpriced
+        ]
+        return stop(engine.BLOCKED, *no_price)  # the cart-level address message says why
 
     # Goods VAT per line (tax engine). A blocking tax error stops this package only.
     try:

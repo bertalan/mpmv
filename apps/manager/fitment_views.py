@@ -3,7 +3,7 @@
 Thin adapters over `apps.fitment.services`, which hold the rules (no reorder or removal of a level
 that has nodes, name clashes, merge with references moved) and write the ChangeSet and the
 AuditLog. The scheme and the categories are operator settings (Configuration and tax); the nodes
-are the vocabulary (Catalog and moderation). A change of the scheme shows its dry-run ChangeSet
+are the vocabulary (Catalogue and moderation). A change of the scheme shows its dry-run ChangeSet
 first and is written only on confirmation, behind the session level of `operator_config` (CORE.25).
 """
 
@@ -359,7 +359,7 @@ class CategoryList(ManagerListView):
         return context
 
 
-# --- Nodes (Catalog and moderation)
+# --- Nodes (Catalogue and moderation)
 
 
 def _each(service: Callable[..., ChangeSet]) -> BulkRun:

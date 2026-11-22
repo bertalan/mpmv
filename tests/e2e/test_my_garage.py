@@ -23,6 +23,7 @@ from apps.fitment.tests.factories import (
 )
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -56,23 +57,25 @@ def test_a_customer_manages_the_garage(
     page.add_init_script(RECORD_CSP_VIOLATIONS)
 
     page.goto(f"{live_server.url}/account/garage/")
-    expect(page.get_by_role("heading", level=1, name="My garage")).to_be_visible()
+    expect(page.get_by_role("heading", level=1, name=translated("My garage"))).to_be_visible()
     expect(page.locator("[data-garage-active]")).to_contain_text("Weekend bike")
     _accessible(page)
     shot("list")
 
     page.locator("[data-garage-profile]", has_text="Old car").get_by_role(
-        "button", name="Make active"
+        "button", name=translated("Make active")
     ).click()
     expect(page.locator("[data-garage-active]")).to_contain_text("Old car")
     assert page.url == f"{live_server.url}/account/garage/"
 
     page.locator("[data-garage-profile]", has_text="Weekend bike").get_by_role(
-        "link", name="Delete"
+        "link", name=translated("Delete")
     ).click()
-    expect(page.get_by_role("heading", level=1, name="Delete this vehicle?")).to_be_visible()
+    expect(
+        page.get_by_role("heading", level=1, name=translated("Delete this vehicle?"))
+    ).to_be_visible()
     _accessible(page)
     shot("delete")
-    page.get_by_role("button", name="Yes, delete it").click()
-    expect(page.get_by_role("heading", level=1, name="My garage")).to_be_visible()
+    page.get_by_role("button", name=translated("Yes, delete it")).click()
+    expect(page.get_by_role("heading", level=1, name=translated("My garage"))).to_be_visible()
     assert GarageProfile.objects.filter(user=user).count() == 1

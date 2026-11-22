@@ -102,7 +102,7 @@ def test_support_reads_but_never_writes_the_products_section_cat30() -> None:
 
 
 def test_return_policy_approval_is_its_own_cell_ven40() -> None:
-    """Catalog and moderation and the owner approve; no other role, and the superuser none."""
+    """Catalogue and moderation and the owner approve; no other role, and the superuser none."""
     for key in roles.ROLE_KEYS:
         expected = key in (roles.CATALOG, roles.OWNER)
         assert roles.allows("platform.return_policy", [key], write=True) is expected

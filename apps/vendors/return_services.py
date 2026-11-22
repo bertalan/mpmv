@@ -129,7 +129,7 @@ def review_return_policy(
     """Platform staff approve or reject a pending version (never a vendor member as such).
 
     Raises `PermissionDenied` (see `vendors.services.can_approve_return_policy`: the CORE.18
-    return-policy cell, Catalog and moderation and the owner) and `ValidationError` for a
+    return-policy cell, Catalogue and moderation and the owner) and `ValidationError` for a
     version that is not pending.
     """
     if not can_approve_return_policy(actor):

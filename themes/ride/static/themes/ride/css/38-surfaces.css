@@ -1,0 +1,167 @@
+/* Ride: section surfaces and decoration (THM.20). Four surface variants, an eyebrow line, two own
+   SVG textures and the image scrim, as utilities on the palette tokens (--surface-*, --scrim-*
+   in tokens.toml). Colours only through tokens. A surface sets background-color only, so a
+   texture class can add a background-image on the same element. */
+@layer utilities {
+  /* Nesting: every surface class sets ALL the --s-* variables, so a surface nested in another
+     one resets them. A white card inside a band needs .surface-light, or it inherits the band's
+     white headings and links (white on white). */
+  .surface-light,
+  .surface-muted,
+  .surface-band,
+  .surface-primary {
+    background-color: var(--s-bg);
+    color: var(--s-text);
+    --button-bg: var(--s-button-bg);
+    --button-fg: var(--s-button-fg);
+    --button-bg-hover: var(--s-button-hover);
+  }
+
+  .surface-light {
+    --s-bg: var(--surface-light-bg);
+    --s-text: var(--surface-light-text);
+    --s-heading: var(--surface-light-heading);
+    --s-link: var(--surface-light-link);
+    --s-focus: var(--surface-light-focus);
+    --s-button-bg: var(--surface-light-button-bg);
+    --s-button-fg: var(--surface-light-button-fg);
+    --s-button-hover: var(--surface-light-button-hover);
+  }
+
+  .surface-muted {
+    --s-bg: var(--surface-muted-bg);
+    --s-text: var(--surface-muted-text);
+    --s-heading: var(--surface-muted-heading);
+    --s-link: var(--surface-muted-link);
+    --s-focus: var(--surface-muted-focus);
+    --s-button-bg: var(--surface-muted-button-bg);
+    --s-button-fg: var(--surface-muted-button-fg);
+    --s-button-hover: var(--surface-muted-button-hover);
+  }
+
+  .surface-band {
+    --s-bg: var(--surface-band-bg);
+    --s-text: var(--surface-band-text);
+    --s-heading: var(--surface-band-heading);
+    --s-link: var(--surface-band-link);
+    --s-focus: var(--surface-band-focus);
+    --s-button-bg: var(--surface-band-button-bg);
+    --s-button-fg: var(--surface-band-button-fg);
+    --s-button-hover: var(--surface-band-button-hover);
+  }
+
+  .surface-primary {
+    --s-bg: var(--surface-primary-bg);
+    --s-text: var(--surface-primary-text);
+    --s-heading: var(--surface-primary-heading);
+    --s-link: var(--surface-primary-link);
+    --s-focus: var(--surface-primary-focus);
+    --s-button-bg: var(--surface-primary-button-bg);
+    --s-button-fg: var(--surface-primary-button-fg);
+    --s-button-hover: var(--surface-primary-button-hover);
+  }
+
+  /* Headings read --s-heading (10-type-shapes.css, in overrides), so no heading rule here. */
+
+  :is(.surface-light, .surface-muted, .surface-band, .surface-primary) a:not(.button) {
+    color: var(--s-link);
+  }
+
+  :is(.surface-light, .surface-muted, .surface-band, .surface-primary) :focus-visible {
+    outline-color: var(--s-focus);
+  }
+
+  /* Vertical room of a section on a surface, from the section rhythm tokens. */
+  .surface-pad {
+    padding-block: var(--space-section-end);
+    padding-inline: var(--space-m);
+  }
+
+  /* --- Eyebrow: a short line and a small caps label above a section title. */
+
+  .eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-block: 0 var(--space-xs);
+    color: var(--s-link, var(--color-link));
+    font-family: var(--font-display);
+    font-size: var(--step-0);
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .eyebrow::before {
+    content: "";
+    flex: none;
+    inline-size: 2.5rem;
+    block-size: 0.125rem;
+    background-color: currentcolor;
+  }
+
+  /* --- Textures: own SVG files, same origin. */
+
+  .texture-topo {
+    background-image: url(images/texture-topo.svg);
+    background-size: 15rem;
+  }
+
+  /* The torn edge sits on top of the section, in the colour of its surface, over the section above. */
+  .edge-torn {
+    position: relative;
+  }
+
+  .edge-torn::before {
+    content: "";
+    position: absolute;
+    inset-block-end: 100%;
+    inset-inline: 0;
+    block-size: 1.5rem;
+    background-color: var(--s-bg);
+    mask: url(images/edge-torn.svg) center bottom / 100% 100% no-repeat;
+    pointer-events: none;
+  }
+
+  /* --- Image scrim: a dark gradient over an image, strong or soft, under the text. */
+
+  .scrim-host {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .scrim-host > img {
+    display: block;
+    inline-size: 100%;
+    block-size: 12rem;
+    object-fit: cover;
+  }
+
+  .scrim {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      to top,
+      color-mix(in srgb, var(--color-overlay) calc(var(--scrim-opacity) * 100%), transparent),
+      transparent 90%
+    );
+    pointer-events: none;
+  }
+
+  .scrim--soft {
+    background: linear-gradient(
+      to top,
+      color-mix(in srgb, var(--color-overlay) calc(var(--scrim-soft) * 100%), transparent),
+      transparent 90%
+    );
+  }
+
+  .scrim-caption {
+    position: absolute;
+    inset-inline: 0;
+    inset-block-end: 0;
+    margin: 0;
+    padding: var(--space-m);
+    color: var(--color-text-inverse);
+  }
+}

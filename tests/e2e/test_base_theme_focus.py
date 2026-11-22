@@ -18,6 +18,7 @@ from playwright.sync_api import Page
 from pytest_django.live_server_helper import LiveServer
 
 from tests.e2e.test_base_theme_keyboard import MARK_CONTROLS
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -105,6 +106,6 @@ def test_shift_tab_from_the_bottom_never_hides_the_focus_at_375px(
         stop = page.evaluate(FOCUS_VISIBLE_AT_CENTRE)
         if stop is not None:
             stops.append(stop)
-    assert any(stop["label"] == "Go to the home page" for stop in stops)
+    assert any(stop["label"] == translated("Go to the home page") for stop in stops)
     hidden = [stop for stop in stops if not stop["visible"]]
     assert hidden == [], hidden

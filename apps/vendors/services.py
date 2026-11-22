@@ -247,6 +247,32 @@ def trader_contact(vendor: Vendor) -> engine.TraderContact:
     )
 
 
+def sells_to_consumers(vendor: Vendor) -> bool:
+    """Whether `vendor` sells to consumers (B2C). True for every vendor: no business-only seller
+    flag exists yet, and the checkout sells to consumers by default. Such a flag, when one is
+    added, is read here and nowhere else."""
+    return True
+
+
+def consumer_phone_missing(vendor: Vendor) -> bool:
+    """A seller to consumers without a phone (CMP.41 follow-up, owner decision 2026-11-19): it
+    cannot be activated nor publish products, and its shop area says so."""
+    return engine.consumer_phone_missing(
+        vendor.phone, sells_to_consumers=sells_to_consumers(vendor)
+    )
+
+
+CONSUMER_PHONE_MESSAGE = gettext_lazy(
+    "Please give us a phone number for your shop before you publish products: sellers who sell "
+    "to consumers must show one in the withdrawal information. Send it to the platform staff."
+)
+
+
+def consumer_phone_publish_messages(vendor: Vendor) -> list[str]:
+    """The publish-gate messages of `vendor`'s products, registered by the catalog."""
+    return [str(CONSUMER_PHONE_MESSAGE)] if consumer_phone_missing(vendor) else []
+
+
 def vendor_snapshot(vendor: Vendor) -> dict[str, Any]:
     """The audited fields of `vendor`, with the encrypted ones masked (SEC.3)."""
     snapshot = {name: getattr(vendor, name) for name in VENDOR_FIELDS}
@@ -1378,7 +1404,8 @@ def is_self_certified(vendor: Vendor) -> bool:
 
 def platform_duties_missing(vendor: Vendor) -> tuple[str, ...]:
     """What the stored vendor still lacks for activation under CMP.25: the `activation`
-    requirement fields, then the self-certification (`engine.platform_duties_missing`).
+    requirement fields, the phone of a seller to consumers (CMP.41 follow-up), then the
+    self-certification (`engine.platform_duties_missing`).
 
     The self-certification is asked of every vendor while the field rules are EU-only; that is
     harmless while D-21 admits only EU vendors (follow-up: scope it to the EU if that changes)."""
@@ -1387,6 +1414,7 @@ def platform_duties_missing(vendor: Vendor) -> tuple[str, ...]:
         stored.legal_identity().values(),
         requirement_rules(engine.ACTIVATION),
         certified=is_self_certified(stored),
+        phone_required=sells_to_consumers(stored),
     )
 
 
@@ -2111,7 +2139,7 @@ def _require_approval_permission(ctx: AuditContext) -> None:
 
 APPROVAL_DENIED = (
     "Granting the owner role needs the vendor approval permission "
-    "(Catalog and moderation, or the platform owner)."
+    "(Catalogue and moderation, or the platform owner)."
 )
 
 

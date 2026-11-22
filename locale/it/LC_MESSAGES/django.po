@@ -37,6 +37,12 @@ msgstr "%(amount)s rimborsati."
 msgid "%(browser)s on %(system)s"
 msgstr "%(browser)s su %(system)s"
 
+#: apps/fitment/views.py
+msgid "%(count)d profile added to your account."
+msgid_plural "%(count)d profiles added to your account."
+msgstr[0] "%(count)d profilo aggiunto al tuo account."
+msgstr[1] "%(count)d profili aggiunti al tuo account."
+
 #: themes/ride/templates/components/gallery.html themes/ride/templates/components/hero_slider.html
 #: themes/ride/templates/components/strip.html
 msgid "%(count)s of %(total)s"
@@ -169,13 +175,21 @@ msgstr[1] "%(n)s prodotti selezionati."
 msgid "%(name)s is deleted."
 msgstr "%(name)s è stato eliminato."
 
-#: apps/fitment/garage_views.py
+#: apps/fitment/garage_views.py apps/fitment/views.py
 msgid "%(name)s is now your active vehicle."
 msgstr "%(name)s è ora il tuo veicolo attivo."
 
 #: apps/accounts/mfa_views.py
 msgid "%(name)s removed."
 msgstr "%(name)s rimosso."
+
+#: themes/base/templates/components/garage_menu.html
+msgid "%(noun)s: %(name)s"
+msgstr "%(noun)s: %(name)s"
+
+#: themes/base/templates/components/garage_menu.html
+msgid "%(noun)s: generic"
+msgstr "%(noun)s: generico"
 
 #: apps/manager/amendment_views.py
 msgid "%(qty)s x %(unit)s"
@@ -1041,6 +1055,7 @@ msgid "Active"
 msgstr "Attivo"
 
 #: apps/manager/templates/manager/shop/_event_blocks.html
+#: themes/base/templates/components/garage_merge_notice.html
 msgid "Add"
 msgstr "Aggiungi"
 
@@ -1134,6 +1149,11 @@ msgstr "Aggiungi al carrello"
 msgid "Add translation"
 msgstr "Aggiungi traduzione"
 
+#: themes/base/templates/components/garage_banner.html
+#: themes/base/templates/components/garage_menu.html
+msgid "Add your garage"
+msgstr "Aggiungi il tuo garage"
+
 #: apps/accounts/templates/accounts/mfa/setup.html themes/ride/templates/accounts/mfa/setup.html
 msgid "added %(created)s"
 msgstr "aggiunta il %(created)s"
@@ -1202,6 +1222,10 @@ msgid ""
 msgstr ""
 "Dopo aver confermato l’email, accede e configura un’app di autenticazione: è obbligatoria per ogni"
 " venditore."
+
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "Age in days"
+msgstr "Età in giorni"
 
 #: apps/core/templates/email/core/ops_alert/body.html
 #: apps/core/templates/email/core/ops_alert/body.txt
@@ -1291,9 +1315,17 @@ msgstr "Testo alternativo"
 msgid "Alt text %(number)d"
 msgstr "Testo alternativo %(number)d"
 
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "Amount"
+msgstr "Importo"
+
 #: apps/manager/templates/manager/shop/_money_table.html
 msgid "Amount (EUR)"
 msgstr "Importo (EUR)"
+
+#: apps/manager/stray_views.py
+msgid "Amount or currency mismatch"
+msgstr "Importo o valuta non corrispondenti"
 
 #: apps/orders/amendment_engine.py
 msgid "an added line needs the customer's acceptance"
@@ -1493,6 +1525,10 @@ msgstr "Filtri applicati"
 #: apps/cms/models.py
 msgid "applies to"
 msgstr "si applica a"
+
+#: apps/fitment/templates/fitment/garage_choose.html
+msgid "Apply"
+msgstr "Applica"
 
 #: apps/catalog/templates/catalog/includes/listing_filters.html
 #: themes/ride/templates/catalog/includes/listing_filters.html
@@ -1879,6 +1915,7 @@ msgstr "Indirizzo del calendario da copiare"
 msgid "Call to action"
 msgstr "Invito all'azione"
 
+#: apps/fitment/templates/fitment/garage_choose.html
 #: apps/manager/templates/manager/bulk_preview.html
 #: apps/manager/templates/manager/platform/fitment_preview.html
 #: apps/manager/templates/manager/platform/product.html
@@ -2079,6 +2116,7 @@ msgid "Cause: the shop cannot fulfil the order."
 msgstr "Causa: il negozio non può evadere l’ordine."
 
 #: apps/manager/templates/manager/platform/fitment_node.html
+#: themes/base/templates/components/garage_banner.html
 msgid "Change"
 msgstr "Modifica"
 
@@ -2115,6 +2153,10 @@ msgstr ""
 msgid "Change this order"
 msgstr "Modifica questo ordine"
 
+#: themes/base/templates/components/garage_menu.html
+msgid "Change vehicle"
+msgstr "Cambia veicolo"
+
 #: apps/manager/templates/manager/amendment.html apps/manager/templates/manager/platform/orders.html
 msgid "Changes are disabled."
 msgstr "Le modifiche sono disattivate."
@@ -2149,6 +2191,10 @@ msgstr "Chat o messaggio"
 msgid "check"
 msgstr "da verificare"
 
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "Check now"
+msgstr "Verifica ora"
+
 #: apps/orders/customer_views.py
 msgid ""
 "Check the cart, then go to checkout: nothing is ordered or paid until you place the order and pay."
@@ -2167,6 +2213,10 @@ msgstr "Controlla l'ortografia, prova con meno parole o con una parte del codice
 #: apps/vendors/templates/vendors/apply/sent.html
 msgid "Check your email"
 msgstr "Controlli la Sua email"
+
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "Checked"
+msgstr "Verificato"
 
 #: apps/orders/templates/orders/checkout.html themes/ride/templates/orders/checkout.html
 msgid "Checkout"
@@ -2245,7 +2295,13 @@ msgstr ""
 msgid "Choose a time zone such as Europe/Rome."
 msgstr "Scegli un fuso orario, per esempio Europe/Rome."
 
+#: apps/fitment/templates/fitment/garage_choose.html
+#: themes/base/templates/components/garage_menu.html
+msgid "Choose a vehicle"
+msgstr "Scegli un veicolo"
+
 #: apps/fitment/templates/fitment/garage_account.html
+#: apps/fitment/templates/fitment/garage_choose.html
 #: themes/ride/templates/fitment/garage_account.html
 msgid "Choose a vehicle while you browse the shop and save it: the shop then shows what fits it."
 msgstr ""
@@ -2431,6 +2487,10 @@ msgstr "Chiudi"
 #: apps/accounts/templates/accounts/levels/_banner.html
 msgid "Close now"
 msgstr "Chiudi ora"
+
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "Close the alert"
+msgstr "Chiudi l'avviso"
 
 #: apps/manager/templates/manager/shop/money_statement.html
 msgid "Closing balance"
@@ -2836,6 +2896,10 @@ msgstr ""
 "Giorni di un evento ripetuto che dura tutto il giorno e che vengono saltati, per esempio un giorno"
 " festivo. Se lo lasci vuoto, non si salta nessun giorno."
 
+#: apps/manager/fitment_forms.py
+msgid "Days of notice before deletion"
+msgstr "Giorni di preavviso prima della cancellazione"
+
 #: apps/manager/templates/manager/shop/money_statement.html
 msgid "Debits"
 msgstr "Addebiti"
@@ -3046,8 +3110,8 @@ msgstr "Scarta la bozza"
 msgid "Discover it"
 msgstr "Scoprilo"
 
-#: themes/base/templates/components/alert.html themes/base/templates/components/toast.html
-#: themes/ride/templates/components/alert.html
+#: themes/base/templates/components/alert.html themes/base/templates/components/garage_banner.html
+#: themes/base/templates/components/toast.html themes/ride/templates/components/alert.html
 msgid "Dismiss"
 msgstr "Chiudi"
 
@@ -3149,7 +3213,7 @@ msgid ""
 "Due to a technical issue on our platform, your order %(order_number)s with seller %(vendor_name)s "
 "cannot be processed. The order has been cancelled at no cost to you, and we have immediately "
 "issued a full refund of EUR %(refund)s to your original payment method (credited within 5–10 "
-"business days, and in any event within the statutory 14-day limit). We apologize for the "
+"business days, and in any event within the statutory 14-day limit). We apologise for the "
 "inconvenience."
 msgstr ""
 "Ti informiamo che a causa di un’anomalia tecnica della piattaforma non è possibile dare seguito al"
@@ -3707,7 +3771,7 @@ msgstr "Campi del modulo"
 msgid "form page"
 msgstr "pagina con modulo"
 
-#: apps/manager/event_forms.py
+#: apps/events/templates/events/event_page.html apps/manager/event_forms.py
 msgid "Free entry"
 msgstr "Ingresso gratuito"
 
@@ -3753,6 +3817,10 @@ msgstr "Galleria"
 msgid "Garage noun"
 msgstr "Nome del garage"
 
+#: apps/fitment/views.py
+msgid "Garage reset: showing all items."
+msgstr "Garage azzerato: vengono mostrati tutti gli articoli."
+
 #: apps/cms/models.py
 msgid "General (every other screen)"
 msgstr "Generale (ogni altra schermata)"
@@ -3767,10 +3835,18 @@ msgstr "Genera nuovi codici"
 msgid "Generating new codes makes every previous code stop working."
 msgstr "Generando nuovi codici, tutti i codici precedenti smettono di funzionare."
 
+#: apps/fitment/templates/fitment/garage_choose.html
+msgid "Generic (show all)"
+msgstr "Generico (mostra tutto)"
+
 #: apps/compliance/templates/compliance/privacy_account.html
 #: themes/ride/templates/compliance/privacy_account.html
 msgid "Get a copy of the data we hold about you as a JSON file."
 msgstr "Ottieni una copia dei dati che conserviamo su di te come file JSON."
+
+#: apps/events/templates/events/event_page.html
+msgid "Get tickets"
+msgstr "Acquista i biglietti"
 
 #: apps/manager/event_fields.py
 msgid "Give a number from -%(limit)d to %(limit)d, for example 45.464200."
@@ -3905,6 +3981,10 @@ msgstr "GTIN"
 msgid "Guest"
 msgstr "Ospite"
 
+#: apps/manager/staff_draft_views.py apps/orders/customer_views.py
+msgid "has no price yet"
+msgstr "non ha ancora un prezzo"
+
 #: apps/manager/event_block_forms.py
 msgid "Heading"
 msgstr "Titolo"
@@ -4033,7 +4113,7 @@ msgstr ""
 
 #: apps/catalog/models.py
 msgid ""
-"How buyers get this product. Buy: they order and pay on the site, so it needs a price. Catalog "
+"How buyers get this product. Buy: they order and pay on the site, so it needs a price. Catalogue "
 "only: it is shown but cannot be bought. On request: buyers ask you about it."
 msgstr ""
 "Come chi compra ottiene questo prodotto. Acquisto: ordina e paga sul sito, quindi serve un prezzo."
@@ -5175,6 +5255,10 @@ msgstr "Mese"
 msgid "Month calendar"
 msgstr "Calendario del mese"
 
+#: apps/manager/fitment_forms.py
+msgid "Months without use before deletion"
+msgstr "Mesi senza uso prima della cancellazione"
+
 #: themes/base/templates/components/help_entry.html
 msgid "More help"
 msgstr "Altro aiuto"
@@ -5196,7 +5280,9 @@ msgstr "Sposta su"
 msgid "MPN"
 msgstr "MPN"
 
-#: apps/fitment/templates/fitment/garage_account.html apps/manager/site_map.py
+#: apps/fitment/templates/fitment/garage_account.html
+#: apps/fitment/templates/fitment/garage_choose.html apps/manager/site_map.py
+#: themes/base/templates/components/garage_menu.html
 #: themes/ride/templates/fitment/garage_account.html
 msgid "My garage"
 msgstr "Il mio garage"
@@ -5355,6 +5441,7 @@ msgstr "Diapositiva successiva"
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
 #: apps/manager/fitment_views.py apps/manager/templates/manager/platform/fitment_scheme.html
+#: apps/manager/templates/manager/platform/stray_payments.html
 msgid "No"
 msgstr "No"
 
@@ -5406,6 +5493,10 @@ msgstr "Nessun livello."
 #: apps/manager/templates/manager/shop/profile.html
 msgid "No logo yet."
 msgstr "Nessun logo per ora."
+
+#: apps/manager/stray_views.py
+msgid "No matching order"
+msgstr "Nessun ordine corrispondente"
 
 #: apps/manager/templates/manager/amendment.html
 msgid "No money moves"
@@ -5496,6 +5587,10 @@ msgstr "Nessuna sessione registrata."
 msgid "No storefront changes yet."
 msgstr "Nessuna modifica al negozio per ora."
 
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "No stray-payment alert is open."
+msgstr "Nessun avviso di pagamento anomalo è aperto."
+
 #: apps/manager/templates/manager/platform/trust_rule_preview.html
 msgid "No threshold differs from the version in force."
 msgstr "Nessuna soglia differisce dalla versione in vigore."
@@ -5540,6 +5635,10 @@ msgstr "Non aggiunto: %(item)s, %(reason)s."
 msgid "Not available in your language: shown in %(name)s."
 msgstr "Non disponibile nella tua lingua: mostrato in %(name)s."
 
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "Not checked yet"
+msgstr "Non ancora verificato"
+
 #: apps/manager/templates/manager/shop/payments.html
 msgid "Not connected"
 msgstr "Non collegato"
@@ -5568,6 +5667,10 @@ msgstr "Non in vigore"
 #: apps/manager/amendment_views.py
 msgid "not in the order"
 msgstr "non nell'ordine"
+
+#: themes/base/templates/components/garage_merge_notice.html
+msgid "Not now"
+msgstr "Non ora"
 
 #: apps/manager/staff_draft_views.py apps/manager/templates/manager/platform/order_draft.html
 msgid "Not sent, or no longer usable"
@@ -5940,6 +6043,10 @@ msgstr "Si può scartare solo una bozza; questa è %(state)s."
 msgid "Only a draft can be edited; this one is %(state)s."
 msgstr "Si può modificare solo una bozza; questa è %(state)s."
 
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "Only a fingerprint of the reason is kept in the audit log; do not write personal data in it."
+msgstr "Il registro di audit conserva solo un'impronta del motivo: non vi scriva dati personali."
+
 #: apps/manager/termination_views.py
 msgid "Only a pending notice can be withdrawn."
 msgstr "Si può ritirare solo un preavviso in corso."
@@ -6067,6 +6174,14 @@ msgstr ""
 "Solo su richiesta del cliente, nello stesso paese e nello stesso territorio fiscale. Registra come"
 " e quando lo ha chiesto il cliente e le sue parole."
 
+#: apps/payments/stray.py
+msgid "Only Support or the platform owner may check this refund."
+msgstr "Solo l'assistenza o il titolare della piattaforma possono verificare questo rimborso."
+
+#: apps/payments/stray.py
+msgid "Only Support or the platform owner may close this alert."
+msgstr "Solo l'assistenza o il titolare della piattaforma possono chiudere questo avviso."
+
 #: apps/orders/staff_drafts.py
 msgid "Only Support or the platform owner may prepare a cart."
 msgstr "Solo l'assistenza o il titolare della piattaforma possono preparare un carrello."
@@ -6130,6 +6245,10 @@ msgstr "Apri la finestra passkey"
 #: apps/manager/templates/manager/platform/order_drafts.html
 msgid "Open prepared carts"
 msgstr "Carrelli preparati aperti"
+
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "Open stray-payment alerts"
+msgstr "Avvisi di pagamento anomalo aperti"
 
 #: apps/orders/templates/email/orders/staff_draft_link/body.html
 #: apps/orders/templates/orders/draft_link.html
@@ -6329,6 +6448,10 @@ msgstr ""
 msgid "Order drafts"
 msgstr "Bozze d'ordine"
 
+#: apps/manager/stray_views.py
+msgid "Order no longer awaiting payment"
+msgstr "Ordine non più in attesa di pagamento"
+
 #: apps/compliance/forms.py apps/manager/templates/manager/platform/order_drafts.html
 #: apps/manager/templates/manager/platform/orders.html
 msgid "Order number"
@@ -6349,6 +6472,10 @@ msgstr "Ordine effettuato e pagato"
 #: apps/orders/templates/orders/confirmation.html themes/ride/templates/orders/confirmation.html
 msgid "Order received"
 msgstr "Ordine ricevuto"
+
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "Order reference"
+msgstr "Riferimento dell'ordine"
 
 #: themes/base/templates/components/order_summary.html
 #: themes/ride/templates/components/order_summary.html
@@ -6659,10 +6786,24 @@ msgstr ""
 msgid "Payment received. Thank you."
 msgstr "Pagamento ricevuto. Grazie."
 
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "Payment reference"
+msgstr "Riferimento del pagamento"
+
 #: apps/manager/sections.py apps/manager/site_map.py
 #: apps/manager/templates/manager/shop/payments.html
 msgid "Payments"
 msgstr "Pagamenti"
+
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid ""
+"Payments that succeeded but were not used for an order. Refund each one by hand at the payment "
+"provider, then close its alert with a reason. An open alert 14 days old is reminded every day "
+"until it is closed."
+msgstr ""
+"Pagamenti andati a buon fine ma non usati per un ordine. Rimborsi ciascuno a mano presso il "
+"fornitore di pagamento, poi chiuda il suo avviso con un motivo. Un avviso aperto da 14 giorni "
+"viene ricordato ogni giorno finché non viene chiuso."
 
 #: apps/manager/money_views.py
 msgid "Payout"
@@ -6932,6 +7073,18 @@ msgstr ""
 "Indichi a cosa è adatto questo prodotto prima di pubblicarlo: scelga gli articoli compatibili "
 "nella scheda Compatibilità, oppure dichiari che è adatto a tutto."
 
+#: apps/payments/stray.py
+msgid "Please give the reason for closing this alert."
+msgstr "Indichi il motivo per cui chiude questo avviso."
+
+#: apps/vendors/services.py
+msgid ""
+"Please give us a phone number for your shop before you publish products: sellers who sell to "
+"consumers must show one in the withdrawal information. Send it to the platform staff."
+msgstr ""
+"Ci comunichi un numero di telefono del Suo negozio prima di pubblicare prodotti: chi vende a "
+"consumatori deve indicarlo nelle informazioni sul recesso. Lo invii allo staff della piattaforma."
+
 #: apps/manager/fitment_forms.py
 msgid "Plural label"
 msgstr "Etichetta al plurale"
@@ -6973,6 +7126,7 @@ msgstr "Posizione"
 msgid "Postcode"
 msgstr "CAP"
 
+#: apps/events/templates/events/_summary.html apps/events/templates/events/event_page.html
 #: apps/manager/event_forms.py
 msgid "Postponed"
 msgstr "Rinviato"
@@ -7087,6 +7241,10 @@ msgstr "Inizio precedente"
 #: apps/cms/templates/cms/legal_page.html themes/ride/templates/cms/legal_page.html
 msgid "Previous versions"
 msgstr "Versioni precedenti"
+
+#: apps/events/templates/events/event_page.html
+msgid "Previously"
+msgstr "Prima"
 
 #: apps/catalog/templates/catalog/includes/listing_filters.html
 #: themes/ride/templates/catalog/includes/listing_filters.html
@@ -7393,6 +7551,10 @@ msgstr "Motivazione"
 msgid "Reason (sent to the owners)"
 msgstr "Motivo (inviato ai titolari)"
 
+#: apps/manager/stray_views.py apps/manager/templates/manager/platform/stray_payments.html
+msgid "Reason for closing"
+msgstr "Motivo della chiusura"
+
 #: apps/manager/amendment_forms.py
 msgid "Reason for the cancellation"
 msgstr "Motivo dell'annullamento"
@@ -7504,6 +7666,10 @@ msgstr ""
 #: apps/manager/money_views.py
 msgid "Refund"
 msgstr "Rimborso"
+
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "Refund confirmed"
+msgstr "Rimborso confermato"
 
 #: apps/manager/money_views.py
 msgid "Refund fee"
@@ -7986,6 +8152,12 @@ msgstr ""
 msgid "Save your changes first: the latest saved draft is the one that is submitted."
 msgstr "Salvi prima le modifiche: viene inviata l'ultima bozza salvata."
 
+#: apps/manager/fitment_forms.py
+msgid "Saved items unused for this long are deleted from customer accounts. At most 36."
+msgstr ""
+"Gli elementi salvati non usati per questo periodo vengono cancellati dagli account dei clienti. Al"
+" massimo 36."
+
 #: apps/manager/fitment_views.py apps/manager/views.py
 msgid "Saved."
 msgstr "Salvato."
@@ -8366,6 +8538,7 @@ msgstr[0] "Mostra altri %(count)s"
 msgstr[1] "Mostra altri %(count)s"
 
 #: apps/manager/templates/manager/platform/profile_changes.html
+#: themes/base/templates/components/garage_banner.html
 msgid "Show all"
 msgstr "Mostra tutto"
 
@@ -8416,6 +8589,10 @@ msgstr "Mostra i prodotti più recenti di questo negozio."
 #: apps/manager/templates/manager/platform/profile_changes.html
 msgid "Showing %(vendor)s only."
 msgstr "Solo %(vendor)s."
+
+#: themes/base/templates/components/garage_banner.html
+msgid "Showing items for: %(label)s"
+msgstr "Articoli per: %(label)s"
 
 #: apps/cms/forms_pages.py
 msgid ""
@@ -8807,6 +8984,11 @@ msgstr "Profilo del negozio"
 msgid "Storefront profile saved."
 msgstr "Profilo del negozio salvato."
 
+#: apps/manager/sections.py apps/manager/site_map.py
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "Stray payments"
+msgstr "Pagamenti anomali"
+
 #: apps/manager/event_forms.py
 msgid "Street"
 msgstr "Via"
@@ -9056,6 +9238,10 @@ msgid ""
 msgstr ""
 "L’indirizzo che hai indicato quando hai ordinato. Dimostra che l’ordine è tuo e la conferma del "
 "tuo recesso viene inviata lì. Obbligatorio."
+
+#: apps/manager/stray_views.py
+msgid "The alert is closed. Support gets no more reminders."
+msgstr "L'avviso è chiuso. Il Supporto non riceverà altri promemoria."
 
 #: apps/ingest/models.py
 msgid "The answer, e.g. 404."
@@ -9343,6 +9529,13 @@ msgstr ""
 "delle tue condizioni che richiedono l'approvazione specifica degli acquirenti professionali (art. "
 "1341, secondo comma, del Codice civile), una per riga nella forma: numero dell'articolo | titolo. "
 "Per esempio: 7 | Limitazione di responsabilità. Obbligatorio."
+
+#: apps/themes/models.py
+msgid ""
+"The colour palette of the whole site. Leave it empty for the theme's own colours (Red for ride)."
+msgstr ""
+"La palette di colori dell'intero sito. Lasciala vuota per usare i colori del tema (Rosso per "
+"ride)."
 
 #: apps/catalog/taxonomy.py
 msgid ""
@@ -10833,6 +11026,10 @@ msgstr "la passkey non è stata accettata"
 msgid "The payment form could not be loaded. Please reload this page in a moment."
 msgstr "Impossibile caricare il modulo di pagamento. Ricarica la pagina tra un momento."
 
+#: apps/manager/stray_views.py
+msgid "The payment provider could not be reached. Please try again later."
+msgstr "Non è stato possibile contattare il fornitore di pagamento. Riprovi più tardi."
+
 #: apps/vendors/admin.py
 msgid ""
 "The payment provider's fixed fee per payment, in euro, for example 2.00. Enter 0 if there is none."
@@ -11201,6 +11398,10 @@ msgstr ""
 msgid "The refund fee is charged to your shop."
 msgstr "Il costo di rimborso è addebitato al tuo negozio."
 
+#: apps/manager/stray_views.py
+msgid "The refund state is checked and recorded."
+msgstr "Lo stato del rimborso è stato verificato e registrato."
+
 #: apps/events/models.py
 msgid "The region or province of the place, for example 'Lombardia'. Optional."
 msgstr "La regione o la provincia del luogo, per esempio 'Lombardia'. Facoltativo."
@@ -11382,6 +11583,10 @@ msgstr ""
 msgid "The seller."
 msgstr "Il venditore."
 
+#: apps/manager/fitment_forms.py
+msgid "The service email goes out this many days before. Shorter than the months."
+msgstr "L'e-mail di servizio parte tanti giorni prima. Più breve dei mesi."
+
 #: apps/compliance/templates/email/compliance/termination_notice/body.html
 #: apps/compliance/templates/email/compliance/termination_notice/body.txt
 #: apps/manager/templates/manager/platform/termination_detail.html
@@ -11426,6 +11631,15 @@ msgstr "Il prezzo della spedizione per questa fascia, IVA esclusa."
 #: apps/manager/staff_draft_views.py
 msgid "the shop cannot deliver it to the order's country"
 msgstr "il negozio non può consegnarlo nel paese dell'ordine"
+
+#: apps/vendors/models.py
+msgid ""
+"The shop name when this version was published, so an old version keeps the name it was published "
+"under. Empty on versions published before it was recorded."
+msgstr ""
+"Il nome del negozio quando questa versione è stata pubblicata, così una versione vecchia conserva "
+"il nome con cui è stata pubblicata. Vuoto per le versioni pubblicate prima che il nome venisse "
+"registrato."
 
 #: apps/vendors/models.py
 msgid ""
@@ -12228,6 +12442,10 @@ msgstr ""
 msgid "This action changes nothing."
 msgstr "Questa azione non modifica nulla."
 
+#: apps/manager/stray_views.py
+msgid "This alert was already closed."
+msgstr "Questo avviso era già chiuso."
+
 #: apps/orders/amendment_engine.py
 msgid ""
 "This amendment changes nothing: the lines, the shipping and the address would stay as they are."
@@ -12339,7 +12557,7 @@ msgstr "Questa è una versione archiviata."
 #: apps/manager/templates/manager/platform/order_draft.html
 msgid ""
 "This is not an order. The customer opens the link, checks the cart and pays at checkout; the "
-"prices are the catalog prices of that moment. You never place or pay the order for the customer."
+"prices are the catalogue prices of that moment. You never place or pay the order for the customer."
 msgstr ""
 "Questo non è un ordine. Il cliente apre il link, controlla il carrello e paga alla cassa; i prezzi"
 " sono quelli del catalogo in quel momento. Lei non effettua né paga mai l'ordine al posto del "
@@ -12372,6 +12590,10 @@ msgstr ""
 #: apps/orders/ui/present.py
 msgid "This item cannot be bought right now."
 msgstr "Questo articolo non si può acquistare in questo momento."
+
+#: apps/catalog/templates/catalog/product.html apps/orders/ui/present.py
+msgid "This item has no price yet, so you can't buy it online."
+msgstr "Questo articolo non ha ancora un prezzo, quindi non puoi acquistarlo online."
 
 #: apps/orders/ui/present.py
 msgid "This item has no price yet."
@@ -12821,6 +13043,10 @@ msgstr "Link ai biglietti"
 msgid "Ticket price (EUR)"
 msgstr "Prezzo del biglietto (EUR)"
 
+#: apps/events/templates/events/event_page.html
+msgid "Tickets"
+msgstr "Biglietti"
+
 #: apps/manager/event_forms.py
 msgid "Tickets and changes"
 msgstr "Biglietti e modifiche"
@@ -12950,7 +13176,8 @@ msgstr ""
 "dati del venditore nella conferma d'ordine (pagina ed e-mail) e nel riepilogo dell'ordine al "
 "momento dell'acquisto)"
 
-#: apps/accounts/action_link_views.py apps/accounts/decorators.py apps/orders/customer_views.py
+#: apps/accounts/action_link_views.py apps/accounts/decorators.py apps/manager/stray_views.py
+#: apps/orders/customer_views.py
 msgid "Too many attempts. Please try again later."
 msgstr "Troppi tentativi. Riprova più tardi."
 
@@ -13156,6 +13383,10 @@ msgstr "Prezzo unitario oggi"
 msgid "Units the supplier states, empty if unknown."
 msgstr "Unità dichiarate dal fornitore, vuoto se sconosciute."
 
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "Unknown"
+msgstr "Sconosciuto"
+
 #: apps/orders/amendment_engine.py
 msgid "unknown"
 msgstr "sconosciuto"
@@ -13198,8 +13429,8 @@ msgstr ""
 
 #: apps/manager/templates/manager/shop/payments.html
 msgid ""
-"Until your payout account is active, your products are shown in the catalog and sold on request: "
-"customers cannot add them to the cart."
+"Until your payout account is active, your products are shown in the catalogue and sold on request:"
+" customers cannot add them to the cart."
 msgstr ""
 "Finché il Suo account per i pagamenti non è attivo, i Suoi prodotti compaiono nel catalogo e si "
 "vendono su richiesta: i clienti non possono aggiungerli al carrello."
@@ -13532,7 +13763,7 @@ msgstr ""
 #: apps/orders/templates/email/orders/package_cancelled/body.html
 #: apps/orders/templates/email/orders/package_cancelled/body.txt
 msgctxt "(L)"
-msgid "We apologize for the inconvenience."
+msgid "We apologise for the inconvenience."
 msgstr "Ci scusiamo per l’inconveniente."
 
 #: apps/orders/messages.py
@@ -14410,6 +14641,10 @@ msgstr ""
 "Perché serve una persona: salto di prezzo, saldo, cambio di identità, articolo vecchio o SKU "
 "ambiguo."
 
+#: apps/manager/templates/manager/platform/stray_payments.html
+msgid "Why it is stray"
+msgstr "Perché è anomalo"
+
 #: apps/vendors/models.py
 msgid "Why it was switched, for example the incident or request reference. Up to 200 characters."
 msgstr ""
@@ -14577,9 +14812,14 @@ msgstr ""
 msgid "Written in the admin"
 msgstr "Scritto nell'area di amministrazione"
 
+#: apps/manager/stray_views.py
+msgid "Wrong payment reference"
+msgstr "Riferimento del pagamento errato"
+
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
 #: apps/manager/fitment_views.py apps/manager/templates/manager/platform/fitment_scheme.html
+#: apps/manager/templates/manager/platform/stray_payments.html
 msgid "Yes"
 msgstr "Sì"
 
@@ -14597,7 +14837,7 @@ msgstr ""
 
 #: apps/accounts/templates/accounts/admin/login.html
 msgid ""
-"You are authenticated as %(username)s, but are not authorized to access this page. Would you like "
+"You are authenticated as %(username)s, but are not authorised to access this page. Would you like "
 "to login to a different account?"
 msgstr ""
 "Hai effettuato l’accesso come %(username)s, ma non sei autorizzato ad accedere a questa pagina. "
@@ -14656,7 +14896,7 @@ msgid "You can read the scheme but not change it."
 msgstr "Può leggere lo schema ma non modificarlo."
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/product.html
-msgid "You can view this section; changes need the Catalog role."
+msgid "You can view this section; changes need the Catalogue role."
 msgstr "Può consultare questa sezione; per le modifiche serve il ruolo Catalogo."
 
 #: apps/compliance/templates/compliance/withdrawal_choose.html
@@ -14674,6 +14914,12 @@ msgstr "Non puoi modificare questo evento."
 #: themes/base/templates/403.html
 msgid "You do not have permission to open this page."
 msgstr "Non hai il permesso di aprire questa pagina."
+
+#: themes/base/templates/components/garage_merge_notice.html
+msgid "You have %(counter)s profile saved on this device. Add it to your account?"
+msgid_plural "You have %(counter)s profiles saved on this device. Add them to your account?"
+msgstr[0] "Hai %(counter)s profilo salvato su questo dispositivo. Vuoi aggiungerlo al tuo account?"
+msgstr[1] "Hai %(counter)s profili salvati su questo dispositivo. Vuoi aggiungerli al tuo account?"
 
 #: apps/accounts/templates/accounts/mfa/recovery_codes.html
 #: themes/ride/templates/accounts/mfa/recovery_codes.html
@@ -14727,6 +14973,7 @@ msgid "You have no orders yet"
 msgstr "Non hai ancora ordini"
 
 #: apps/fitment/templates/fitment/garage_account.html
+#: apps/fitment/templates/fitment/garage_choose.html
 #: themes/ride/templates/fitment/garage_account.html
 msgid "You have no saved vehicles yet"
 msgstr "Non hai ancora veicoli salvati"
@@ -15109,6 +15356,26 @@ msgstr "Le tue sessioni"
 msgid "Your shop cancelled order %(order_number)s and the customer was refunded in full."
 msgstr ""
 "Il tuo negozio ha annullato l’ordine %(order_number)s e il cliente è stato rimborsato per intero."
+
+#: apps/manager/templates/manager/shop/dashboard.html
+msgid ""
+"Your shop has no phone number. Sellers who sell to consumers must give one: buyers see it in the "
+"withdrawal information and the order confirmation. Please send it to %(support_email)s; until then"
+" you cannot publish products."
+msgstr ""
+"Il Suo negozio non ha un numero di telefono. Chi vende a consumatori deve indicarlo: gli "
+"acquirenti lo vedono nelle informazioni sul recesso e nella conferma d’ordine. Lo invii a "
+"%(support_email)s; fino ad allora non può pubblicare prodotti."
+
+#: apps/manager/templates/manager/shop/dashboard.html
+msgid ""
+"Your shop has no phone number. Sellers who sell to consumers must give one: buyers see it in the "
+"withdrawal information and the order confirmation. Please send it to the platform staff; until "
+"then you cannot publish products."
+msgstr ""
+"Il Suo negozio non ha un numero di telefono. Chi vende a consumatori deve indicarlo: gli "
+"acquirenti lo vedono nelle informazioni sul recesso e nella conferma d’ordine. Lo invii allo staff"
+" della piattaforma; fino ad allora non può pubblicare prodotti."
 
 #: apps/manager/event_views.py
 msgid "Your shop is not active yet, so events cannot be changed."

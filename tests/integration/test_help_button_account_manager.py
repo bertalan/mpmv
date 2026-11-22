@@ -173,6 +173,7 @@ def _manager_pages() -> dict[str, str]:
         "manager:platform:orders": "platform",
         "manager:platform:order": "platform",
         "manager:platform:order_drafts": "platform",  # ORD.32
+        "manager:platform:stray_payments": "platform",  # PAY.4
         "manager:platform:order_draft": "platform",
         "manager:platform:amendment_settings": "platform",
         "manager:platform:trust_rules": "platform",  # TRU.1 part 2

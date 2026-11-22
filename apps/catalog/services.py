@@ -368,7 +368,7 @@ PLATFORM_ROLE_PERMISSIONS = (
 def may_edit_catalog(ctx: AuditContext) -> bool:
     """Whether the actor of `ctx` may write to the platform catalog (CAT.30, CORE.18).
 
-    Platform staff must hold the Catalog and moderation role or the owner role (or be a technical
+    Platform staff must hold the Catalogue and moderation role or the owner role (or be a technical
     superuser): Support reads the catalog section (MQ-52) and Finance and Configuration do not
     write it. Anyone else passes: a vendor member (scoped elsewhere), a command or a pipeline
     without a user."""
@@ -877,7 +877,7 @@ def duplicate_product_to_vendor(
     Raises PermissionDenied for non-staff and ValidationError for an empty reason, the same
     vendor or a SKU the target vendor already uses.
     """
-    # The Catalog and moderation role or the platform owner (spec 02 CORE.18 matrix); another
+    # The Catalogue and moderation role or the platform owner (spec 02 CORE.18 matrix); another
     # role's platform-wide vendor read is not enough.
     if not (
         is_platform_staff(actor)

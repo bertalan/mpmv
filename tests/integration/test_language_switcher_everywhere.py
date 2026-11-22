@@ -302,12 +302,10 @@ def legal_page_untranslated() -> Case:
 def blog_index_translated() -> Case:
     seed_site()
     index = BlogIndexPageFactory.create()
-    _translate(index, other_language(), "fr")
-    found = {
-        primary_language(): index.url,
-        other_language(): _translated_url(index, other_language()),
-        "fr": _translated_url(index, "fr"),
-    }
+    others = [code for code in LANGUAGES if code != primary_language()]
+    _translate(index, *others)
+    found = {primary_language(): index.url}
+    found.update({code: _translated_url(index, code) for code in others})
     return Case(index.url, _expect_pages(index, found))
 
 

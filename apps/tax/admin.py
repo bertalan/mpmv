@@ -31,6 +31,7 @@ from apps.accounts.decorators import requires_level, step_up_required
 from apps.accounts.models import User
 from apps.core.admin import step_up
 from apps.core.audit import audit_context
+from apps.core.nfc_forms import NFCAdminForm, NFCFormMixin
 from apps.vendors.admin import VendorAdmin
 from apps.vendors.models import Vendor
 
@@ -106,9 +107,17 @@ class TaxRateAdmin(HistoryAdmin[TaxRate]):
         return step_up(lambda req: parent(req, form_url, extra_context))(request)
 
 
+class TerritoryForm(NFCAdminForm[Territory]):
+    """The name in NFC (I18N.10); the code and postcode patterns stay as typed."""
+
+    nfc_exact_fields = ("code",)
+
+
 @admin.register(Territory)
 class TerritoryAdmin(NoDeleteAdmin[Territory]):
     """Rates point at territories (PROTECT), so they are changed, never deleted."""
+
+    form = TerritoryForm
 
     list_display = ("code", "name", "country", "vat_status", "postcode_patterns")
     list_filter = ("vat_status", "country")
@@ -209,10 +218,16 @@ class VendorTaxProfileAdmin(HistoryAdmin[VendorTaxProfile]):
         return super().changelist_view(request, extra_context)
 
 
+class LegalNoteForm(NFCAdminForm[VendorTaxProfileTranslation]):
+    """The legal note in NFC (I18N.10)."""
+
+
 @admin.register(VendorTaxProfileTranslation)
 class VendorTaxProfileTranslationAdmin(NoDeleteAdmin[VendorTaxProfileTranslation]):
     """Legal notes per language; the profile version they belong to never changes, and the
     notes of a version whose period has ended are view-only (`services.legal_note_error`)."""
+
+    form = LegalNoteForm
 
     list_display = ("profile", "language", "status")
     list_filter = ("language", "status")
@@ -272,7 +287,7 @@ class VatValidationAdmin(HistoryAdmin[VatValidation]):
 REVIEW_TEMPLATE = "admin/tax/taxregimechangerequest/review.html"
 
 
-class ApproveForm(forms.Form):
+class ApproveForm(NFCFormMixin, forms.Form):
     reason = forms.CharField(
         label="Reason",
         required=False,
@@ -281,7 +296,7 @@ class ApproveForm(forms.Form):
     )
 
 
-class RejectForm(forms.Form):
+class RejectForm(NFCFormMixin, forms.Form):
     reason = forms.CharField(
         label="Reason",
         widget=forms.Textarea(attrs={"rows": 4}),
