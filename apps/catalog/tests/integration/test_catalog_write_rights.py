@@ -1,7 +1,7 @@
 """CAT.30 (MQ-52): Support reads the platform catalog; every write service refuses it.
 
 Per role and per write service: Support, Finance and Configuration are refused with
-PermissionDenied before anything is written or audited; Catalog and moderation and the platform
+PermissionDenied before anything is written or audited; Catalogue and moderation and the platform
 owner role pass the service check (the Manager still lets the owner only read), and so does a
 pipeline without a user.
 """

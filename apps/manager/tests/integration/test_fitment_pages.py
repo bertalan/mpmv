@@ -1,7 +1,7 @@
 """FIT.1 part 2: the Manager pages of the fitment scheme, its nodes and its categories.
 
 The scheme is Configuration and tax (step-up, dry-run preview first), the nodes and the
-categories are Catalog and moderation. The rules live in `apps.fitment.services`; these tests
+categories are Catalogue and moderation. The rules live in `apps.fitment.services`; these tests
 prove the pages are thin adapters over them.
 """
 

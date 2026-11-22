@@ -1,11 +1,11 @@
-"""Manager platform space: the Catalog section for the Catalog and moderation role (CAT.11).
+"""Manager platform space: the Catalog section for the Catalogue and moderation role (CAT.11).
 
 Thin adapters over `apps.catalog.services` (`set_products_status` for the bulk publish, retire and
 unpublish, `save_product` for the audited fields) and `apps.catalog.engine` (the per-language
 translation state). The list filters by vendor, status, category, translation status and a text
 search; a bulk action shows its dry-run ChangeSet first and writes only on confirmation, behind the
 session level of CORE.25. Finance is not in the matrix row (404); Support and the platform owner
-read (CAT.30: the write actions stay with Catalog and moderation).
+read (CAT.30: the write actions stay with Catalogue and moderation).
 """
 
 from collections.abc import Sequence

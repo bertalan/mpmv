@@ -5,7 +5,7 @@ these functions. Every mutation takes the actor's `AuditContext`, accepts `dry_r
 `ChangeSet` is returned and nothing is written) and writes one `AuditLog` entry per change.
 Refusals raise `FitmentError`, whose message is safe to show to staff.
 
-Who may call them (Configuration and tax with step-up for the scheme, Catalog and moderation for
+Who may call them (Configuration and tax with step-up for the scheme, Catalogue and moderation for
 the nodes) is the adapter's job (CORE.18), never decided here.
 
 Other parts of the garage add what points at a node (product rows, customer profiles) through

@@ -664,7 +664,7 @@ def flag_overdue_safety_cases(
     transactional outbox), `overdue_alerted_at` set and an audit entry. A case already flagged
     is left alone. With no compliance or support address configured the case is still flagged
     (the log error is the alert): setting an address later does not resend it. The in-app
-    notice for the Catalog and moderation role is a follow-up (it needs the Manager notices)."""
+    notice for the Catalogue and moderation role is a follow-up (it needs the Manager notices)."""
     moment = now or timezone.now()
     changes = ChangeSet()
     recipient = "" if dry_run else staff_alert_address(moment)

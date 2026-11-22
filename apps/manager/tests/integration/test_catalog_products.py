@@ -3,7 +3,9 @@
 from datetime import UTC, datetime
 
 import pytest
+from django.conf import settings
 from django.test import Client
+from django.utils.translation import gettext, override
 
 from apps.accounts import levels
 from apps.accounts.tests.factories import UserFactory
@@ -272,7 +274,13 @@ def test_staff_set_the_product_role_override_with_an_audit_entry(client: Client)
     assert client.post(detail(product), data).status_code == 200  # refused by the form
 
 
-NOTICE = "You can view this section; changes need the Catalog role."
+def _shown(msgid: str) -> str:
+    """The text as the page shows it: the pages render in the first configured language."""
+    with override(settings.LANGUAGE_CODE):
+        return gettext(msgid)
+
+
+NOTICE = "You can view this section; changes need the Catalogue role."
 WRITE_CONTROLS = (
     'name="selected"',
     'name="action"',
@@ -290,9 +298,9 @@ def test_a_read_only_role_sees_no_write_controls(client: Client, role: str) -> N
     sign_in(client, role)
     for url in (LIST, detail(product)):
         html = client.get(url).content.decode()
-        assert NOTICE in html
+        assert _shown(NOTICE) in html
         for control in WRITE_CONTROLS:
-            assert control not in html, (url, control)
+            assert _shown(control) not in html, (url, control)
     assert product.sku in client.get(LIST).content.decode()
 
 
@@ -301,9 +309,9 @@ def test_the_catalog_role_keeps_its_controls_and_has_no_notice(client: Client) -
     sign_in(client, "catalog")
     listing = client.get(LIST).content.decode()
     page = client.get(detail(product)).content.decode()
-    assert NOTICE not in listing + page
+    assert _shown(NOTICE) not in listing + page
     assert 'name="selected"' in listing
-    assert "Preview" in page
+    assert _shown("Preview") in page
 
 
 @pytest.mark.parametrize("role", ["support", "owner"])

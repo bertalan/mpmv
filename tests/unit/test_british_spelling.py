@@ -38,9 +38,11 @@ def test_every_app_and_theme_is_checked() -> None:
         assert british.in_scope([f"apps/{app}/models.py:3"]), app
 
 
-def test_exception_keeps_the_role_notice() -> None:
-    msgid = "You can view this section; changes need the Catalog role."
+def test_the_role_notice_needs_no_exception() -> None:
+    msgid = "You can view this section; changes need the Catalogue role."
+    assert msgid not in british.EXCEPTIONS
     assert british.violations({(msgid, None): (None, ["apps/manager/list.html"])}) == []
+    assert len(british.EXCEPTIONS) == 1  # only the URL name is left
 
 
 def test_swept_apps_are_clean_now() -> None:
@@ -67,3 +69,24 @@ def test_i18n_24_apps_are_in_scope() -> None:
         "compliance",
     ):
         assert british.in_scope([f"apps/{app}/models.py:3"]), app
+
+
+def test_help_markdown_scan_finds_prose_and_ignores_code(tmp_path: Path) -> None:
+    """I18N.25 follow-up: a US word in help prose is found; in code, URLs, identifiers not."""
+    (tmp_path / "a.md").write_text("The catalog price.\n", encoding="utf-8")
+    assert british.help_violations(tmp_path) == ["a.md:1: ['catalog']"]
+    (tmp_path / "a.md").write_text(
+        "Use `catalog` here, see https://x.test/catalog/ and [l](/catalog/), "
+        "the catalog:brand page, role Catalogue and moderation.\n\n"
+        "```\ncatalog color\n```\n",
+        encoding="utf-8",
+    )
+    assert british.help_violations(tmp_path) == []
+
+
+def test_help_has_no_exceptions_left() -> None:
+    assert not hasattr(british, "HELP_EXCEPTIONS")
+
+
+def test_help_en_prose_is_british() -> None:
+    assert british.help_violations() == []

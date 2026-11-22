@@ -192,7 +192,7 @@ BUILT_IN = (
         order=43,
         allowed=platform_role(NODES_SECTION),
     ),
-    # CAT.11: the products, for Catalog and moderation (the owner reads).
+    # CAT.11: the products, for Catalogue and moderation (the owner reads).
     Section(
         PRODUCTS_SECTION,
         Space.PLATFORM,
