@@ -21,6 +21,7 @@ from apps.accounts.tests.mfa import totp_token
 from apps.core.models import MediaImage
 from apps.core.tests.factories import ImageLicenceFactory
 from tests.e2e.login import verify_with_totp
+from tests.i18n import translated
 from tests.upload_corpus import HTML_PAGE, SECRET_PLACE, jpeg_with_gps
 
 pytestmark = pytest.mark.django_db(transaction=True)
@@ -43,7 +44,7 @@ def test_the_multiple_uploader_refuses_html_and_strips_a_photos_location(
     page.goto(f"{live_server.url}/admin/login/")
     page.locator("input[name=username]").fill("editor@example.com")
     page.locator("input[name=password]").fill(password)
-    page.get_by_role("button", name="Sign in").click()
+    page.get_by_role("button", name=translated("Sign in")).click()
     verify_with_totp(page, totp_token(device))
 
     page.goto(f"{live_server.url}/admin/images/multiple/add/")
@@ -54,11 +55,12 @@ def test_the_multiple_uploader_refuses_html_and_strips_a_photos_location(
     refused = uploads.filter(has_text="photo.jpg")
     expect(refused.locator(".error-message")).not_to_be_empty()
     pending = uploads.filter(has_text="holiday.jpg")
+    # The image model's licence and author fields have no translated verbose name yet.
     pending.get_by_label("Licence").select_option(label="Own work")
     pending.get_by_label("Author").fill("Ada Lovelace")
     shot("pending-and-refused")
     with page.expect_response(lambda r: "create_from_uploaded_image" in r.url) as answer:
-        pending.get_by_role("button", name="Update").click()
+        pending.get_by_role("button", name=translated("Update")).click()
     assert answer.value.json()["success"], answer.value.json()
     shot("stored")
 

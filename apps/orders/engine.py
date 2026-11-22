@@ -635,6 +635,7 @@ def vehicle_line(snapshot: Mapping[str, str], language: str) -> str:
 REORDER_RETIRED = "retired"
 REORDER_OUT_OF_STOCK = "out_of_stock"
 REORDER_NOT_DELIVERABLE = "not_deliverable"
+REORDER_NO_PRICE = "no_price"  # no consumer price can be decided today (#757)
 
 
 @dataclass(frozen=True)
@@ -650,6 +651,7 @@ class ReorderWish:
     in_cart: int
     limit: int | None
     undeliverable: bool = False
+    unpriced: bool = False
 
 
 @dataclass(frozen=True)
@@ -671,7 +673,8 @@ class ReorderOutcome:
 def plan_reorder(wishes: Sequence[ReorderWish]) -> list[ReorderOutcome]:
     """Decide, per item of a past order, what goes into the cart (ORD.31). Today's data only.
 
-    An item that cannot be bought any more is skipped as retired, one with no stock as out of
+    An item that cannot be bought any more is skipped as retired, one without a consumer price
+    as no price, one with no stock as out of
     stock, one the vendor cannot ship to the current address as not deliverable. Otherwise the
     units are added to the ones already in the cart, capped at the limit. A line already above
     the limit is never reduced here (the checkout re-checks it)."""
@@ -680,6 +683,8 @@ def plan_reorder(wishes: Sequence[ReorderWish]) -> list[ReorderOutcome]:
         requested = wish.in_cart + wish.quantity
         if wish.limit is None:
             outcomes.append(ReorderOutcome(wish.key, skipped=REORDER_RETIRED))
+        elif wish.unpriced:
+            outcomes.append(ReorderOutcome(wish.key, skipped=REORDER_NO_PRICE))
         elif wish.limit <= 0:
             outcomes.append(ReorderOutcome(wish.key, skipped=REORDER_OUT_OF_STOCK))
         elif wish.undeliverable:

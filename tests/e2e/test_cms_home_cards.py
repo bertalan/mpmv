@@ -23,12 +23,14 @@ from apps.catalog.tests.factories import (
     TermTranslationFactory,
 )
 from apps.cms.models import HomePage
+from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 from tests.e2e.login import verify_with_totp
-from tests.e2e.test_cms_home_blocks import _add_block, _axe_helper_style, _label
+from tests.e2e.test_cms_home_blocks import _add_block, _axe_helper_style, _label, insert_a_block
 from tests.e2e.test_cms_pages import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import localized, translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -43,48 +45,52 @@ def test_an_editor_adds_a_term_card_and_a_vendor_card_to_the_home_page(
     device = TOTPDeviceFactory.create(user=editor)
     taxonomy = TaxonomyFactory.create(code="occasion", hierarchical=False)
     TaxonomyTranslationFactory.create(
-        taxonomy=taxonomy, language="en", name="Occasion", slug="occasion", status=PUBLISHED
+        taxonomy=taxonomy,
+        language=primary_language(),
+        name="Occasion",
+        slug="occasion",
+        status=PUBLISHED,
     )
     term = TermFactory.create(taxonomy=taxonomy)
     TermTranslationFactory.create(
-        term=term, language="en", name="Weddings", slug="weddings", status=PUBLISHED
+        term=term, language=primary_language(), name="Weddings", slug="weddings", status=PUBLISHED
     )
     VendorFactory.create(
         display_name="Pottery Studio", slug="pottery-studio", status=Vendor.Status.ACTIVE
     )
-    home = HomePage.objects.get(locale__language_code="en")
+    home = HomePage.objects.get(locale__language_code=primary_language())
     page.add_init_script(RECORD_CSP_VIOLATIONS)
 
     page.goto(f"{live_server.url}/admin/login/")
     page.locator("input[name=username]").fill("editor@example.com")
     page.locator("input[name=password]").fill(password)
-    page.get_by_role("button", name="Sign in").click()
+    page.get_by_role("button", name=translated("Sign in")).click()
     verify_with_totp(page, totp_token(device))
     page.goto(f"{live_server.url}/admin/pages/{home.pk}/edit/")
 
     featured = _add_block(page, "Featured links")
-    featured.get_by_role("textbox", name=_label("Heading")).fill("Start here")
+    featured.get_by_role("textbox", name=_label("featured.heading")).fill("Start here")
     modal = page.locator(".modal")
 
     cards = page.locator('input[name$="-value-cards-count"]')
-    featured.get_by_role("button", name="Insert a block").last.click()
-    page.get_by_role("option", name="Term", exact=True).click()
+    featured.get_by_role("button", name=insert_a_block()).last.click()
+    page.get_by_role("option", name=translated("Term"), exact=True).click()
     expect(cards).to_have_value("1")
     featured.get_by_role("button", name="Choose a term").click()
     modal.get_by_role("link", name="occasion: Weddings").click()
     expect(modal).to_be_hidden()
 
-    featured.get_by_role("button", name="Insert a block").last.click()
-    page.get_by_role("option", name="Vendor", exact=True).click()
+    featured.get_by_role("button", name=insert_a_block()).last.click()
+    page.get_by_role("option", name=translated("Vendor"), exact=True).click()
     expect(cards).to_have_value("2")
-    featured.get_by_role("button", name="Choose a vendor").click()
+    featured.get_by_role("button", name=translated("Choose a vendor")).click()
     modal.get_by_role("link", name="Pottery Studio").click()
     expect(modal).to_be_hidden()
     shot("admin-cards")
 
-    page.get_by_role("button", name="More actions").click()
-    page.get_by_role("button", name="Publish").click()
-    expect(page.locator(".messages")).to_contain_text("published")
+    page.get_by_role("button", name=translated("More actions")).click()
+    page.get_by_role("button", name=translated("Publish")).click()
+    expect(page.locator(".messages")).to_contain_text(translated("published"))
 
     page.goto(f"{live_server.url}/")
     expect(page.get_by_role("heading", name="Start here")).to_be_visible()
@@ -92,7 +98,7 @@ def test_an_editor_adds_a_term_card_and_a_vendor_card_to_the_home_page(
         "href", "/occasion/weddings/"
     )
     expect(page.get_by_role("link", name="Pottery Studio")).to_have_attribute(
-        "href", "/shop/pottery-studio/"
+        "href", localized("/shop/pottery-studio/")
     )
     shot("public-home")
 

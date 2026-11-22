@@ -45,7 +45,8 @@ def _png(color: str) -> SimpleUploadedFile:
 
 
 @pytest.fixture
-def mug() -> Product:
+def mug(consumer_prices: None) -> Product:
+    """The variant choices are in the buy form, shown only with a consumer price (ORD.19)."""
     vendor = VendorFactory.create(status=Vendor.Status.ACTIVE, sells_online=True)
     product = ProductFactory.create(status="published", vendor=vendor, kind="variable")
     ProductTranslationFactory.create(

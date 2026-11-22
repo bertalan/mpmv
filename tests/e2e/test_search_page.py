@@ -16,6 +16,7 @@ from pytest_django.live_server_helper import LiveServer
 from apps.catalog.models import Product
 from apps.catalog.tests.factories import ProductFactory, ProductTranslationFactory
 from apps.cms.tests.factories import BlogPostPageFactory
+from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
@@ -36,7 +37,7 @@ def _content(
     product = ProductFactory.create(vendor=vendor, status=Product.Status.PUBLISHED)
     ProductTranslationFactory.create(
         product=product,
-        language="en",
+        language=primary_language(),
         title="Leather bag",
         slug="leather-bag",
         status=TranslationStatus.PUBLISHED,

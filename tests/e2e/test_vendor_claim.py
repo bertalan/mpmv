@@ -20,6 +20,7 @@ from apps.core.models import AuditLog, OutboxEmail
 from apps.vendors import services
 from apps.vendors.models import Vendor, VendorClaim
 from apps.vendors.tests.factories import VendorFactory
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -47,11 +48,12 @@ def test_claim_an_imported_vendor(
     services.send_claim_link(vendor, ctx=SYSTEM)
 
     page.goto(f"{live_server.url}{emailed_link_path()}")
-    expect(page.get_by_role("button", name="Continue")).to_be_visible()
+    expect(page.get_by_role("button", name=translated("Continue"))).to_be_visible()
     shot("claim-continue")
     assert not ActionLinkUse.objects.exists()  # the GET spent nothing
 
-    page.get_by_role("button", name="Continue").click()
+    page.get_by_role("button", name=translated("Continue")).click()
+    # The claim pages themselves are not translated yet: their text is English in every language.
     expect(page.get_by_role("heading", name=re.compile("Claim"))).to_be_visible()
     page.get_by_label("VAT number or TIN").fill("IT00000000000")
     page.get_by_role("button", name="Confirm").click()

@@ -16,6 +16,7 @@ from pytest_django.live_server_helper import LiveServer
 from apps.accounts.models import PasskeyDevice
 from apps.accounts.tests.factories import UserFactory
 from tests.e2e.login import admin_login
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -43,7 +44,9 @@ def virtual_authenticator(page: Page) -> Iterator[CDPSession]:
 
 def _logged_in(page: Page) -> None:
     expect(
-        page.get_by_role("link", name="Log out").or_(page.get_by_role("button", name="Log out"))
+        page.get_by_role("link", name=translated("Log out")).or_(
+            page.get_by_role("button", name=translated("Log out"))
+        )
     ).to_be_visible()
 
 
@@ -59,12 +62,12 @@ def test_staff_enrol_a_passkey_and_sign_in_with_it(
     admin_login(page, live_server.url, "staff@example.com", password)
     expect(page).to_have_url(re.compile(r"/account/mfa/setup/"))
     expect(page.locator("form[data-passkey-ready]")).to_have_count(1)  # passkey.js is deferred
-    page.get_by_role("button", name="Register a passkey").click()
+    page.get_by_role("button", name=translated("Register a passkey")).click()
     expect(page.locator("ol.recovery-codes li")).to_have_count(10)
     shot("passkey-registered")
     assert PasskeyDevice.objects.count() == 1
 
-    page.get_by_role("link", name="Continue").click()
+    page.get_by_role("link", name=translated("Continue")).click()
     _logged_in(page)
 
     page.context.clear_cookies()
@@ -72,7 +75,7 @@ def test_staff_enrol_a_passkey_and_sign_in_with_it(
     expect(page).to_have_url(re.compile(r"/account/mfa/verify/"))
     shot("verify")
     expect(page.locator("form[data-passkey-ready]")).to_have_count(1)
-    page.get_by_role("button", name="Use a passkey").click()
+    page.get_by_role("button", name=translated("Use a passkey")).click()
     _logged_in(page)
     shot("signed-in-with-passkey")
     assert PasskeyDevice.objects.get().last_used_at is not None
@@ -81,12 +84,12 @@ def test_staff_enrol_a_passkey_and_sign_in_with_it(
 def _sign_in_with_a_new_passkey(page: Page, base_url: str, email: str, password: str) -> None:
     admin_login(page, base_url, email, password)
     expect(page.locator("form[data-passkey-ready]")).to_have_count(1)
-    page.get_by_role("button", name="Register a passkey").click()
+    page.get_by_role("button", name=translated("Register a passkey")).click()
     expect(page.locator("ol.recovery-codes li")).to_have_count(10)
     page.context.clear_cookies()
     admin_login(page, base_url, email, password)
     expect(page.locator("form[data-passkey-ready]")).to_have_count(1)
-    page.get_by_role("button", name="Use a passkey").click()
+    page.get_by_role("button", name=translated("Use a passkey")).click()
     page.wait_for_url(lambda url: "/account/mfa/verify" not in url)
 
 
@@ -108,15 +111,20 @@ def test_the_banner_opens_the_passkey_window(
 
     page.goto(f"{live_server.url}/manager/platform/")
     banner = page.locator(".session-level--closed")
-    expect(banner).to_contain_text("open a passkey window to cover several in a row")
+    expect(banner).to_contain_text(
+        translated(
+            "Sensitive actions ask for your passkey once, or open a passkey window to cover "
+            "several in a row."
+        )
+    )
     expect(banner.locator("form[data-passkey-ready]")).to_have_count(1)
     shot("banner-passkey-window-closed")
-    banner.get_by_role("button", name="Open passkey window").click()
+    banner.get_by_role("button", name=translated("Open passkey window")).click()
     expect(page.locator(".session-level--open")).to_be_visible()
     shot("banner-passkey-window-open")
     # A sensitive page that asked for a passkey now passes without the prompt.
     page.goto(f"{live_server.url}/django-admin/accounts/user/")
-    expect(page.get_by_text("This needs your passkey")).to_have_count(0)
+    expect(page.get_by_text(translated("This needs your passkey"))).to_have_count(0)
 
 
 def test_the_security_page_shows_the_passkey(
@@ -130,7 +138,11 @@ def test_the_security_page_shows_the_passkey(
     _sign_in_with_a_new_passkey(page, live_server.url, "staff2@example.com", password)
 
     page.goto(f"{live_server.url}/account/mfa/setup/?from=security")
-    expect(page.get_by_text("Your account is protected with a passkey")).to_be_visible()
-    expect(page.get_by_text("Your role requires a second factor")).to_have_count(0)
-    expect(page.get_by_role("button", name="Add another passkey")).to_be_visible()
+    expect(
+        page.get_by_text(translated("Your account is protected with a passkey."))
+    ).to_be_visible()
+    expect(
+        page.get_by_text(translated("Your role requires a second factor before you can continue."))
+    ).to_have_count(0)
+    expect(page.get_by_role("button", name=translated("Add another passkey"))).to_be_visible()
     shot("security-page-with-passkey")

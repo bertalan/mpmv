@@ -27,12 +27,14 @@ from apps.catalog.tests.factories import (
     VariantTranslationFactory,
 )
 from apps.core.audit import AuditContext
+from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.core.tests.factories import ImageLicenceFactory
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.test_cms_pages import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.i18n import other_language, product_url
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -40,7 +42,8 @@ PUBLISHED = TranslationStatus.PUBLISHED
 
 
 @pytest.fixture
-def product_page() -> None:
+def product_page(consumer_prices: None) -> None:
+    """The variant choices are in the buy form, shown only with a consumer price (ORD.19)."""
     vendor = VendorFactory.create(
         status=Vendor.Status.ACTIVE, sells_online=True, display_name="Rossi Ceramics"
     )
@@ -56,8 +59,13 @@ def product_page() -> None:
         required_companion=companion,
     )
     for language, title, slug, text in (
-        ("en", "Hand-made mug", "hand-made-mug", "Thrown and glazed by hand."),
-        ("it", "Tazza fatta a mano", "tazza-fatta-a-mano", "Tornita e smaltata a mano."),
+        (primary_language(), "Hand-made mug", "hand-made-mug", "Thrown and glazed by hand."),
+        (
+            other_language(),
+            "Tazza fatta a mano",
+            "tazza-fatta-a-mano",
+            "Tornita e smaltata a mano.",
+        ),
     ):
         ProductTranslationFactory.create(
             product=product,
@@ -70,26 +78,25 @@ def product_page() -> None:
     for sku, label, default in (("MUG-S", "Small", False), ("MUG-L", "Large", True)):
         variant = VariantFactory.create(product=product, sku=sku, is_default=default)
         VariantTranslationFactory.create(
-            variant=variant, language="en", label=label, status=PUBLISHED
+            variant=variant, language=primary_language(), label=label, status=PUBLISHED
         )
 
 
 @pytest.mark.usefixtures("product_page")
 @pytest.mark.parametrize(
-    ("path", "language", "title"),
-    [
-        ("/product/hand-made-mug/", "en", "Hand-made mug"),
-        ("/it/prodotto/tazza-fatta-a-mano/", "it", "Tazza fatta a mano"),
-    ],
+    ("second", "slug", "title"),
+    [(False, "hand-made-mug", "Hand-made mug"), (True, "tazza-fatta-a-mano", "Tazza fatta a mano")],
 )
 def test_a_product_page_shows_its_content_and_structured_data(
     page: Page,
     live_server: LiveServer,
     shot: Callable[[str], Path],
-    path: str,
-    language: str,
+    second: bool,
+    slug: str,
     title: str,
 ) -> None:
+    language = other_language() if second else primary_language()
+    path = product_url(language, slug)
     page.add_init_script(RECORD_CSP_VIOLATIONS)
     response = page.goto(f"{live_server.url}{path}")
     assert response is not None
@@ -138,7 +145,7 @@ def test_the_gallery_and_related_products_pass_axe_and_csp(
         )
     page.add_init_script(RECORD_CSP_VIOLATIONS)
     page.set_viewport_size({"width": width, "height": 900})
-    page.goto(f"{live_server.url}/product/hand-made-mug/")
+    page.goto(f"{live_server.url}{product_url(primary_language(), 'hand-made-mug')}")
     expect(page.locator(".gallery").first).to_be_visible()
     expect(page.locator(".gallery picture").first).to_be_attached()
     shot(f"gallery-{theme}-{width}")
