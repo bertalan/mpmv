@@ -34,6 +34,7 @@ register = template.Library()
 class MenuLink:
     label: str
     url: str
+    network: str = ""  # social profiles only: the closed list of CMS.17, for the icon
 
 
 def _menu(location: str) -> NavigationMenu | None:
@@ -113,6 +114,24 @@ def footer_chrome(context: dict[str, Any]) -> dict[str, Any]:
     return cached
 
 
+FOOTER_VENDOR_LOGOS = 12
+
+
+@register.simple_tag
+def footer_vendor_logos() -> list[dict[str, Any]]:
+    """The strip above the `ride` footer (THM.22): active vendors with a logo, by display name,
+    at most 12, one query. The alt text is the vendor's display name; the logo is not a link."""
+    from apps.vendors.services import storefront_vendors
+
+    vendors = (
+        storefront_vendors()
+        .filter(logo__isnull=False)
+        .select_related("logo")
+        .order_by("display_name", "id")[:FOOTER_VENDOR_LOGOS]
+    )
+    return [{"name": vendor.display_name, "image": vendor.logo} for vendor in vendors]
+
+
 def _footer_content(request: HttpRequest | None, site: Site, language: str) -> dict[str, Any]:
     footer = FooterSettings.objects.filter(site=site).first()
     if footer is None:
@@ -125,7 +144,7 @@ def _footer_content(request: HttpRequest | None, site: Site, language: str) -> d
     profiles = engine.footer_profiles(((p.language, p) for p in footer.profiles.all()), language)
     return {
         "widgets": widgets,
-        "social_links": [MenuLink(label=p.label, url=p.url) for p in profiles],
+        "social_links": [MenuLink(label=p.label, url=p.url, network=p.network) for p in profiles],
     }
 
 

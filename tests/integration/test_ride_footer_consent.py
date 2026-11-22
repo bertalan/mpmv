@@ -103,3 +103,57 @@ def test_the_footer_and_the_card_paint_text_and_links_with_their_surface(css: st
 
 def test_the_footer_has_a_torn_top_edge_from_the_own_svg(css: str) -> None:
     assert re.search(r"\.site-footer::before \{[^}]*edge-torn\.svg", css)
+
+
+def test_social_links_show_a_hidden_brand_icon_before_the_text_label() -> None:
+    social = [{"label": "Mastodon", "url": "https://example.org/@ride", "network": "mastodon"}]
+    html = render("components/footer.html", site_name="Ride", social_links=social)
+    link = re.search(r'<a[^>]*rel="me noopener"[^>]*>(.*?)</a>', html, re.S)
+    assert link is not None
+    assert 'aria-hidden="true"' in link.group(1)
+    assert "#social-mastodon" in link.group(1)
+    assert re.search(r"</svg>\s*Mastodon$", link.group(1).strip())
+
+
+def test_the_sprite_has_a_glyph_for_every_social_network_of_cms_17() -> None:
+    from apps.cms.engine import SOCIAL_NETWORKS
+
+    sprite = (SHIPPED_THEMES / "ride/static/themes/ride/icons/sprite.svg").read_text()
+    for network in SOCIAL_NETWORKS:
+        assert f'<symbol id="social-{network}"' in sprite
+
+
+@pytest.mark.django_db
+def test_the_footer_vendor_logos_are_active_alphabetical_capped_and_one_query(
+    django_assert_num_queries: Any,
+) -> None:
+    from apps.catalog.tests.factories import brand_logo_image
+    from apps.cms.templatetags.cms_tags import footer_vendor_logos
+    from apps.vendors.models import Vendor
+    from apps.vendors.tests.factories import VendorFactory
+
+    def make(name: str, *, active: bool = True, logo: bool = True) -> Vendor:
+        vendor = VendorFactory.create(
+            display_name=name,
+            status=Vendor.Status.ACTIVE if active else Vendor.Status.SUSPENDED,
+        )
+        if logo:
+            Vendor.objects.filter(pk=vendor.pk).update(logo=brand_logo_image())
+        return vendor
+
+    for index in range(14):
+        make(f"Shop {index:02d}")
+    make("Aaa Suspended", active=False)
+    make("Aaa No logo", logo=False)
+    with django_assert_num_queries(1):
+        logos = footer_vendor_logos()
+    names = [logo["name"] for logo in logos]
+    assert names == [f"Shop {i:02d}" for i in range(12)]
+    assert all(logo["image"] is not None for logo in logos)
+
+
+@pytest.mark.django_db
+def test_no_vendor_logos_means_an_empty_list() -> None:
+    from apps.cms.templatetags.cms_tags import footer_vendor_logos
+
+    assert footer_vendor_logos() == []

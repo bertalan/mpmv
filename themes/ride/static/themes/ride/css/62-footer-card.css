@@ -73,6 +73,12 @@
     min-inline-size: 0;
   }
 
+  .site-footer__social .icon {
+    flex: none;
+    inline-size: 1.25rem;
+    block-size: 1.25rem;
+  }
+
   .site-footer__bar {
     box-sizing: border-box;
   }
