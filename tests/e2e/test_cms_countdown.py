@@ -206,3 +206,27 @@ def test_after_the_target_the_server_shows_the_expired_text_and_link(
     expect(block.locator("[data-countdown-pause]")).to_have_count(0)
     expect(page.locator("#live-region")).to_be_empty()
     assert csp_violations(page) == [], "\n".join(csp_violations(page))
+
+
+DELETE_INTL = "delete window.Intl;"
+
+
+def test_without_intl_the_server_text_stays_and_the_module_throws_nothing(
+    page: Page, live_server: LiveServer
+) -> None:
+    _publish_countdown(TARGET)
+    errors: list[str] = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.add_init_script(DELETE_INTL)
+    page.goto(f"{live_server.url}/")
+    block = page.locator(".launch-countdown")
+    time = block.locator("time")
+    expect(time).to_be_visible()
+    assert page.evaluate("typeof window.Intl") == "undefined"
+    server_text = time.inner_text()
+    assert server_text.strip()
+    page.wait_for_timeout(300)
+    assert time.inner_text() == server_text
+    expect(block.locator("[data-countdown-counter]")).to_be_hidden()
+    expect(block.locator("[data-countdown-pause]")).to_be_hidden()
+    assert errors == [], "\n".join(errors)
