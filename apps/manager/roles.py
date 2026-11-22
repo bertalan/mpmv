@@ -68,7 +68,7 @@ ROLES: Final[tuple[Role, ...]] = (
     ),
     Role(
         CATALOG,
-        "Platform: catalog and moderation",
+        "Platform: catalogue and moderation",
         "Catalogue and moderation",
         (
             "manager.platform_catalog",

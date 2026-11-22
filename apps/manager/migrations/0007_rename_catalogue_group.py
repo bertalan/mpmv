@@ -1,4 +1,4 @@
-"""I18N.23 follow-up: the role group "Catalog and moderation" becomes "Catalogue and moderation".
+"""I18N.23 follow-up: the role group "Platform: catalog ..." is renamed "Platform: catalogue ...".
 
 A rename of the group row only: its id, permissions and members stay. Idempotent in both
 directions (a missing group, or one already renamed, is left alone). If a database that was
@@ -9,8 +9,8 @@ old group move into it and the old group goes.
 
 from django.db import migrations
 
-OLD = "Catalog and moderation"
-NEW = "Catalogue and moderation"
+OLD = "Platform: catalog and moderation"
+NEW = "Platform: catalogue and moderation"
 
 
 def _rename(apps, source: str, target: str) -> None:  # type: ignore[no-untyped-def]
