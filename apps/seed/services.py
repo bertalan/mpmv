@@ -106,7 +106,7 @@ from apps.vendors.models import (
     VendorTranslation,
 )
 
-from . import data
+from . import data, demo_home
 from .images import placeholder_webp
 
 PUBLISHED = translations.PUBLISHED
@@ -1240,11 +1240,23 @@ def _cms(run: _Run, images: dict[str, MediaImage], vendors: list[Vendor]) -> Non
         for node in data.TERMS
     ]
 
+    blog, posts = demo_home.seed_blog(run, home, locales, images)
+
     def shop_body(language: str) -> list[Any]:
-        local_how = how.get_translation_or_none(locales[language]) or how
-        return _shop_body(language, images, local_how, vendors, terms)
+        locale = locales[language]
+        return demo_home.shop_home_body(
+            language,
+            images,
+            how=how.get_translation_or_none(locale) or how,
+            blog=blog.get_translation_or_none(locale) or blog,
+            posts=[post.get_translation_or_none(locale) or post for post in posts],
+            vendors=vendors,
+            term=terms[0],
+            notice=_text(data.DEMO_NOTICE, language),
+        )
 
     shop = _standard_page(run, home, locales, images["home-hero"], data.SHOP, shop_body)
+    demo_home.seed_navigation(run, locales, [("shop", shop), ("blog", blog), ("about", how)])
     _recruitment_home(run, home, images, shop)
 
 
