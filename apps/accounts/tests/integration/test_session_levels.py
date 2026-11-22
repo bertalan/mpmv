@@ -26,6 +26,18 @@ from apps.accounts.tests.fake_authenticator import FakeAuthenticator
 from apps.accounts.tests.mfa import password_login, verified_login
 from apps.core.models import AuditLog
 from apps.core.tests.factories import PlatformOperatorFactory
+from tests.i18n import translated as _t
+
+SENSITIVE_NOTE = (
+    "Sensitive actions ask for your passkey once, or open a passkey window "
+    "to cover several in a row."
+)
+SHOP_NOTE = (
+    "This window covers only the sensitive actions of this shop that its owner confirms. "
+    "It never covers another shop."
+)
+CANNOT_ELEVATE_NOTE = "Your role cannot open a passkey window."
+NO_ROLE_NOTE = "Your role may not open a passkey window or do this once. Ask a platform owner."
 
 pytestmark = [pytest.mark.django_db, pytest.mark.urls("apps.accounts.tests.integration.urls")]
 
@@ -107,8 +119,8 @@ def test_the_refusal_offers_do_it_once_and_switching(client: Client) -> None:
     user, _ = _staff_with_passkey()
     _no_window_session(client, user)
     text = client.get(reverse("test-export")).content.decode()
-    assert "Do it once" in text
-    assert "Open passkey window" in text
+    assert _t("Do it once") in text
+    assert _t("Open passkey window") in text
     for old in ("Secure mode", "Operational mode", "restricted mode"):
         assert old not in text
 
@@ -270,9 +282,10 @@ def test_the_banner_shows_the_open_window_and_a_close_now_button(client: Client)
     banner = Template("{% load session_levels %}{% session_level_banner %}").render(
         Context({"request": request})
     )
-    assert "Passkey window open:" in banner
-    assert "min left" in banner
-    assert "Close now" in banner
+    before, after = _t("Passkey window open: %(minutes_left)s min left").split("%(minutes_left)s")
+    assert before in banner
+    assert after in banner
+    assert _t("Close now") in banner
     assert "Operational mode" not in banner
 
 
@@ -291,12 +304,12 @@ def test_the_no_window_banner_offers_the_passkey_window_to_who_may_elevate(
     user, _ = _staff_with_passkey()
     _no_window_session(client, user)
     banner = _no_window_banner(client)
-    assert "Sensitive actions ask for your passkey once, or open a passkey window" in banner
+    assert _t(SENSITIVE_NOTE) in banner
     assert 'data-passkey="elevate"' in banner
-    assert "Open passkey window" in banner
+    assert _t("Open passkey window") in banner
     assert reverse("levels:window") in banner
-    assert "Passkeys need JavaScript." in banner  # the no-JavaScript fallback
-    assert "Add a passkey" not in banner
+    assert _t("Passkeys need JavaScript.") in banner  # the no-JavaScript fallback
+    assert _t("Add a passkey") not in banner
 
 
 def test_the_no_window_banner_offers_enrolment_to_who_holds_elevate_without_a_passkey(
@@ -306,11 +319,11 @@ def test_the_no_window_banner_offers_enrolment_to_who_holds_elevate_without_a_pa
     user.user_permissions.add(Permission.objects.get(codename=levels.ELEVATE_CODENAME))
     verified_login(client, user, level=levels.NO_WINDOW)
     banner = _no_window_banner(client)
-    assert "Add a passkey" in banner
+    assert _t("Add a passkey") in banner
     assert reverse("mfa:setup") in banner
     assert "next=" in banner
     assert 'data-passkey="elevate"' not in banner
-    assert "cannot open a passkey window" not in banner
+    assert _t(CANNOT_ELEVATE_NOTE) not in banner
 
 
 @pytest.mark.parametrize(
@@ -330,18 +343,18 @@ def test_a_non_superuser_platform_role_with_a_passkey_sees_the_passkey_window_bu
     user.groups.add(Group.objects.get(name=group))
     _no_window_session(client, user)
     banner = _no_window_banner(client)
-    assert "Open passkey window" in banner
+    assert _t("Open passkey window") in banner
     assert 'data-passkey="elevate"' in banner
-    assert "cannot open a passkey window" not in banner
+    assert _t(CANNOT_ELEVATE_NOTE) not in banner
 
 
 def test_the_no_window_banner_says_plainly_when_the_role_cannot_elevate(client: Client) -> None:
     user, _ = _staff_with_passkey(elevate=False)
     _no_window_session(client, user)
     banner = _no_window_banner(client)
-    assert "Your role cannot open a passkey window" in banner
+    assert _t(CANNOT_ELEVATE_NOTE) in banner
     assert 'data-passkey="elevate"' not in banner
-    assert "Add a passkey" not in banner
+    assert _t("Add a passkey") not in banner
 
 
 # --- Do it once
@@ -453,7 +466,7 @@ def test_critical_is_refused_with_no_window_and_offers_do_it_once(client: Client
     _no_window_session(client, user)
     refused = client.get(reverse("test-payout"))
     assert refused.status_code == 403
-    assert "Do it once" in refused.content.decode()
+    assert _t("Do it once") in refused.content.decode()
 
 
 def _critical_options(client: Client, refusal: Any) -> Any:
@@ -535,7 +548,7 @@ def test_a_critical_one_off_needs_the_elevate_permission(client: Client) -> None
     user, _ = _staff_with_passkey(elevate=False)
     _no_window_session(client, user)
     refused = client.get(reverse("test-payout"))
-    assert "Do it once" not in refused.content.decode()
+    assert _t("Do it once") not in refused.content.decode()
     assert _critical_options(client, refused).status_code == 403
 
 
@@ -1264,6 +1277,26 @@ def test_an_expired_unspent_grant_does_not_block_a_new_one() -> None:
 # --- D-32 amendment (owner 2026-11-14): shop owners confirm their own shop's owner actions
 
 
+def test_the_shop_note_text_is_the_one_the_prompt_template_shows() -> None:
+    """Positive control for the `not in` check below: the sentence is found when it is shown."""
+    from django.contrib.auth.models import AnonymousUser
+    from django.template.loader import render_to_string
+    from django.test import RequestFactory
+
+    request = RequestFactory().get("/")
+    request.user = AnonymousUser()
+    context = {
+        "can_elevate": True,
+        "can_do_once": False,
+        "shop_window": True,
+        "action": "export",
+        "group": 2,
+        "replay_url": "/",
+        "replay_method": "GET",
+    }
+    assert _t(SHOP_NOTE) in render_to_string("accounts/levels/prompt.html", context, request)
+
+
 def test_staff_with_elevate_keep_the_full_prompt_with_no_shop_note(client: Client) -> None:
     user, _ = _staff_with_passkey()
     _no_window_session(client, user)
@@ -1271,7 +1304,7 @@ def test_staff_with_elevate_keep_the_full_prompt_with_no_shop_note(client: Clien
     assert refused.context["can_do_once"]
     assert refused.context["can_elevate"]
     assert not refused.context["shop_window"]
-    assert "never covers another shop" not in refused.content.decode()
+    assert _t(SHOP_NOTE) not in refused.content.decode()
     assert not client.session.get(levels.SHOP_OFFERS_KEY)
 
 
@@ -1282,7 +1315,7 @@ def test_a_user_without_elevate_and_without_a_shop_is_never_offered_a_confirmati
     _no_window_session(client, user)
     refused = client.get(reverse("test-export"))
     assert not refused.context["can_do_once"]
-    assert "Your role may not open a passkey window" in refused.content.decode()
+    assert _t(NO_ROLE_NOTE) in refused.content.decode()
     for action in sorted(levels.SHOP_OWNER_ACTIONS):
         assert not levels.may_confirm(user, action, None)
 
