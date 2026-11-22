@@ -136,6 +136,10 @@ PUBLIC: dict[str, str] = {
         "Anonymous garage cookie control (FIT.7): a POST that only writes the visitor's own "
         "technical cookie or, signed in, activates one of their own profiles; CSRF-checked."
     ),
+    "garage_line_dismiss": (
+        "The Add your garage line's Dismiss (FIT.7): a POST that sets one boolean in the "
+        "visitor's own session and redirects by a checked same-host Referer; CSRF-checked."
+    ),
     "dsa_notice": (
         "Public report form for illegal content (DSA art. 16, CMP.5): the page is public by "
         "design; the POST is CSRF-checked, behind Turnstile and rate limited per address, and "

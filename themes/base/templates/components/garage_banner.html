@@ -4,6 +4,9 @@ names the vehicle the list is for, with *Change* (the chooser) and *Show all* (t
 post with `generic`). Shown only with an active vehicle, never on an error page. Neither control
 carries the page's URL, as it can hold a secret token: *Show all* returns by the Referer, checked on
 the server. The "N of M items" count waits for the filter (FIT.8).
+
+Without a vehicle the same slot shows the discreet *Add your garage* line (4/n): a plain paragraph,
+not a live region, no focus move, dismissed by a post that the server remembers in the session.
 {% endcomment %}{% garage_banner as banner %}{% if banner %}<section class="garage-banner site-messages" role="region" aria-label="{{ banner.noun }}" data-garage-banner>
   <p>{% blocktranslate with label=banner.label %}Showing items for: {{ label }}{% endblocktranslate %}</p>
   {% translate "Change" as change_label %}{% translate "Show all" as all_label %}{% url 'garage_choose' as choose_url %}
@@ -13,4 +16,11 @@ the server. The "N of M items" count waits for the filter (FIT.8).
     <input type="hidden" name="choice" value="generic">
     {% include "components/button.html" with label=all_label type="submit" variant="ghost" only %}
   </form>
-</section>{% endif %}
+</section>{% else %}{% garage_line as show_line %}{% if show_line %}<div class="garage-line site-messages" data-garage-line>
+  {% translate "Add your garage" as add_label %}{% translate "Dismiss" as dismiss_label %}{% url 'garage_choose' as choose_url %}
+  {% include "components/button.html" with label=add_label url=choose_url variant="link" only %}
+  <form method="post" action="{% url 'garage_line_dismiss' %}">
+    {% csrf_token %}
+    {% include "components/button.html" with label=dismiss_label type="submit" variant="ghost" only %}
+  </form>
+</div>{% endif %}{% endif %}

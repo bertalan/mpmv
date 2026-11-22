@@ -51,6 +51,15 @@ def _declared_fit7[T](view: T, *, purpose: str, reason: str, no_rate_limit: str)
     )(view)
 
 
+def _declared_fit7_line[T](view: T) -> T:
+    return _declared_fit7(
+        view,
+        purpose="Dismiss the Add your garage line (a flag in the visitor's own session)",
+        reason="it stores one boolean in the visitor's session and redirects; nothing is logged",
+        no_rate_limit="no server-side work beyond one session write and a redirect",
+    )
+
+
 def _back(request: HttpRequest) -> HttpResponseRedirect:
     target = request.POST.get("next", "")
     if not url_has_allowed_host_and_scheme(
@@ -167,6 +176,16 @@ def _return_target(request: HttpRequest) -> HttpResponseRedirect:
     if path_carries_secret(urlsplit(referer).path):
         return HttpResponseRedirect("/")  # a single-use link is never a return target
     return _back_to_referer(request)
+
+
+@_declared_fit7_line
+@require_POST
+def dismiss_garage_line(request: HttpRequest) -> HttpResponse:
+    """*Dismiss* on the *Add your garage* line: a flag in the session, then back to the page the
+    visitor came from (the Referer, kept off secret-token URLs and the chooser). No `next` is
+    read or written: the page URL can hold a secret."""
+    request.session[garage_state.LINE_DISMISSED_KEY] = True
+    return _return_target(request)
 
 
 @require_http_methods(["GET", "HEAD"])

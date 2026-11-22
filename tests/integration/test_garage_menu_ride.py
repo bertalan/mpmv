@@ -132,6 +132,7 @@ def test_the_ride_and_base_lists_carry_the_add_your_garage_line_without_the_page
         with translation.override(primary_language()):
             assert translation.gettext("Add your garage") in html
     request.session = {"fitment_garage_line_dismissed": True}  # type: ignore[assignment]
+    request.COOKIES["sessionid"] = "x"  # a session exists once the visitor has one
     with use_theme("ride"):
         assert "data-garage-line" not in render_to_string(
             "components/garage_banner.html", {}, request=request

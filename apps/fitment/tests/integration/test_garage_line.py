@@ -106,7 +106,8 @@ def test_dismiss_is_post_only_and_csrf_checked() -> None:
 def test_dismiss_never_returns_to_a_foreign_or_secret_url(client: Client) -> None:
     foreign = client.post(reverse(DISMISS), headers={"Referer": "https://evil.example/x"})
     assert foreign["Location"] == "/"
-    secret = client.post(reverse(DISMISS), headers={"Referer": "/pay/top-secret-marker/"})
+    link = reverse("staff_draft_link", kwargs={"token": "top-secret-marker"})
+    secret = client.post(reverse(DISMISS), headers={"Referer": link})
     assert "top-secret-marker" not in secret["Location"]
     assert (
         client.post(reverse(DISMISS), headers={"Referer": reverse("garage_choose")})["Location"]
