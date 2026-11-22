@@ -30,6 +30,8 @@ from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.e2e.test_ride_catalog import PAGINATION_NAV
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -85,7 +87,7 @@ def test_the_results_page_passes_the_gates(
     page.set_viewport_size({"width": width, "height": 900})
     page.goto(f"{live_server.url}/?s={query}")
     expect(page.locator("html")).to_have_attribute("data-theme", "ride")
-    expect(page.get_by_role("heading", level=1, name="Search")).to_be_visible()
+    expect(page.get_by_role("heading", level=1, name=translated("Search"))).to_be_visible()
     expect(page.locator("#search-page-input")).to_be_visible()
     if query == "mango":
         expect(page.locator(".product-card")).to_have_count(2)
@@ -112,10 +114,10 @@ def test_the_search_submits_with_the_keyboard_only(page: Page, live_server: Live
 
 def test_the_pagination_works_with_the_keyboard_only(page: Page, live_server: LiveServer) -> None:
     page.goto(f"{live_server.url}/?s=mango")
-    page.locator("nav[aria-label=Pagination] a[rel=next]").focus()
+    page.locator(f"{PAGINATION_NAV} a[rel=next]").focus()
     page.keyboard.press("Enter")
     expect(page).to_have_url(f"{live_server.url}/?s=mango&page=2")
-    expect(page.locator("nav[aria-label=Pagination] [aria-current=page]")).to_have_text("2")
+    expect(page.locator(f"{PAGINATION_NAV} [aria-current=page]")).to_have_text("2")
 
 
 def test_the_targets_are_at_least_44_px(page: Page, live_server: LiveServer) -> None:

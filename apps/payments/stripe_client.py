@@ -16,6 +16,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
+from apps.core.outbound import open_url
+
 API_BASE = "https://api.stripe.com/v1"
 TIMEOUT_SECONDS = 20
 
@@ -208,7 +210,7 @@ Transport = Callable[[urllib.request.Request], bytes]
 
 
 def _urlopen(request: urllib.request.Request) -> bytes:
-    with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:  # noqa: S310 (fixed https API_BASE)
+    with open_url(request, timeout=TIMEOUT_SECONDS) as response:  # never follows a redirect
         return bytes(response.read())
 
 

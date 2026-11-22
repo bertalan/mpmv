@@ -1,14 +1,19 @@
-"""Login steps shared by e2e tests: password on the admin form, then the second factor (CORE.4)."""
+"""Login steps shared by e2e tests: password on the admin form, then the second factor (CORE.4).
+
+The labels follow the primary language (I18N.15): the steps look them up in its catalog.
+"""
 
 from playwright.sync_api import Page
+
+from tests.i18n import translated
 
 
 def admin_login(page: Page, base_url: str, email: str, password: str) -> None:
     """Sign in on the staff admin login form (first factor only)."""
     page.goto(f"{base_url}/django-admin/login/")
-    page.get_by_label("Email").fill(email)
-    page.get_by_label("Password").fill(password)
-    page.get_by_role("button", name="Log in").click()
+    page.get_by_label(translated("Email")).fill(email)
+    page.get_by_label(translated("Password")).fill(password)
+    page.get_by_role("button", name=translated("Log in")).click()
 
 
 def verify_with_totp(page: Page, token: str, *, window: bool = False) -> None:
@@ -16,8 +21,8 @@ def verify_with_totp(page: Page, token: str, *, window: bool = False) -> None:
 
     `window=True` then opens the passkey window (see `open_passkey_window`).
     """
-    page.get_by_label("Authentication code").fill(token)
-    page.get_by_role("button", name="Verify", exact=True).click()
+    page.get_by_label(translated("Authentication code")).fill(token)
+    page.get_by_role("button", name=translated("Verify"), exact=True).click()
     if window:
         page.wait_for_url(lambda url: "/account/mfa/verify" not in url)
         open_passkey_window(page)

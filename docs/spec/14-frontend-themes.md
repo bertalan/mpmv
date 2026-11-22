@@ -142,11 +142,13 @@ contrast pairs that every theme must satisfy:
 Every background role has its own foreground token (`on-accent`, `on-secondary`), so a light
 secondary such as an orange can carry dark text; the vendor palettes of §14.12 use the same roles.
 
-`ride` defaults to the **operator palette** (§14.12), the colours of the platform's own LIVE site
-adjusted for AA: accent `#046BD2` with white text, accent hover `#035AB1`, accent tint `#EEF6FF`,
-secondary `#FBA926` (background only) with `#1A1A1A` text, secondary hover `#E89A1E`, secondary
-text `#BE5900`, and `#0580FA` as the dark-mode accent. Layout, type scale and component shapes
-still follow the reference template's visual language. `base` keeps a neutral palette.
+`ride` defaults to the **Red** palette (§14.12, owner decision 2026-11-21), a red accent on dark
+slate like the owner's reference template (kept in private/): accent `#C40417` with white text,
+accent hover `#9E0312`, accent tint `#FDECEE`, secondary `#2B3138` with white text, band
+(`surface-inverse`) `#30373F`, and `#FF6B6B` as the dark-mode accent. The operator can switch the
+site to another predefined palette or a builder palette (§14.12) without a rebuild. Layout, type
+scale and component shapes follow its visual language. `base` keeps a
+neutral palette.
 
 **Tokens and Bootstrap.** Tokens stay the single source of colours, type, space, radii and
 shadows. For a theme that declares `foundation = "bootstrap-5.3"` (§14.5) the build also emits a
@@ -505,83 +507,124 @@ Checklist for the person adding a theme:
 - [ ] Manual keyboard and screen-reader pass on checkout (CMP.7 procedure).
 - [ ] Owner approval of the visual result on STAGE before selecting it for a LIVE site.
 
-## 14.12 Vendor branding (P2)
+## 14.12 Colour palettes and vendor branding
 
-Owner decision Q-64: vendor branding is a paid option of the vendor's plan. It is **P2** and
-depends on plan entitlements (VEN.19, [04](04-vendors-commissions-ledger.md) §4.2): the option is
-the `vendor_branding` key in `VendorPlan.features`, checked with `plan_allows(vendor,
-"vendor_branding")`. The plan fee is charged and documented with a non-fiscal statement; the
+Owner decisions of 2026-11-21 replace the earlier blue and amber default and the nine editable
+vendor presets:
+
+- **Site palette.** The operator chooses the palette of the whole site. Three predefined palettes
+  ship, each contrast-verified for WCAG 2.2 AA; the default is **Red**, a red accent on dark slate
+  like the owner's reference template (kept in private/). The operator may also build its own
+  palette with the palette builder below.
+- **Palette builder.** A colour picker for two or three base colours (primary, Secondary (accent),
+  band). The
+  system derives every other role, checks every pair live, blocks saving while a pair fails, and
+  offers the nearest compliant shade with a "Use this" action. The predefined palettes are starting
+  points of the builder. The server runs the same validation on save, so the interface cannot be
+  bypassed.
+- **Vendor storefront palette (P2, top plan).** A vendor whose plan grants the
+  `storefront_palette` entitlement may give its own storefront pages a palette: a predefined one
+  or one made with the same builder. Every other vendor uses the site palette, and a vendor that
+  loses the entitlement falls back to the site palette.
+- **Vendor branding images (P2, Q-64).** The logo and banner image of the storefront stay the
+  `vendor_branding` entitlement of Q-64.
+
+Entitlements are keys of `VendorPlan.features` checked with `plan_allows(vendor, feature)`
+(VEN.19, [04](04-vendors-commissions-ledger.md) §Plan entitlements). The operator decides which
+plans include them; the owner's intent is that `storefront_palette` is in the top plan only. Code
+never tests a plan code. A plan fee is charged and documented with a non-fiscal statement; the
 marketplace issues no invoice for it, and the operator invoices outside the platform.
+
+Tokens stay configurable for other operators: the three palettes are data, a theme's
+`tokens.toml` still sets the build-time default (for `ride`, the Red values below), and a child
+theme may override any token, always through the token contract (§14.4).
 
 ### Scope
 
-- Where: the vendor storefront and that vendor's product pages only. Listings, cart, checkout,
-  the customer area and every other page keep the site theme, so a shopper never sees one vendor's
-  colours on a mixed page.
-- What: a palette (an accent colour, optionally a secondary colour), a logo and a banner image.
-  Logo and banner are CMS.8 images with their licence metadata. Fonts, layout and templates stay
-  the theme's.
-- Gate: without the entitlement the storefront renders with the theme only; the stored branding is
-  kept, not deleted, and comes back if the vendor returns to a plan that includes it.
+- **Site palette:** every page of the Wagtail Site, checkout and the customer area included.
+- **Vendor storefront palette:** that vendor's storefront pages only (the storefront and its
+  listing and about sub-pages): the store header band, buttons and accents. Product pages,
+  listings, search, cart, checkout, the customer area and every other page keep the site palette,
+  so a shopper never sees one vendor's colours on a mixed page or in the purchase flow.
+- **Vendor branding images:** a logo and a banner image on the storefront (CMS.8 images with their
+  licence metadata). Fonts, layout and templates stay the theme's.
+- **Gate and downgrade:** without the entitlement the storefront renders with the site palette and
+  without the images; the stored palette and images are kept, not deleted, and come back if the
+  vendor returns to a plan that includes them. The fallback is decided at render time, so it takes
+  effect on the plan change's effective date with no job.
 
 ### Palette roles
 
 A palette is a set of roles. Every role used as a background has an explicit foreground ("on")
-colour, so an orange background can carry dark text instead of white.
+colour, so an orange background can carry dark text instead of white. The builder's three base
+colours are the **primary**, the **Secondary (accent)** (the `secondary` tokens) and the **band**; every other
+role is derived and can be overridden in the builder's advanced view.
 
-| Role | Token | Used as | Foreground |
-|---|---|---|---|
-| Primary | `--color-accent` | Button and badge background, link text, non-text UI (borders, icons, selected states) | `on_primary` (`--color-on-accent`) |
-| Primary hover | `--color-accent-hover` | Hover and pressed background | `on_primary` |
-| Primary tint | `--color-accent-tint` | Tinted section background | primary as text |
-| Primary, dark mode | dark token set (§14.4) | Accent on the dark surface `#121417` | — |
-| Secondary (optional) | `--color-secondary` | Background only, always with text | `on_secondary` (`--color-on-secondary`) |
-| Secondary hover | `--color-secondary-hover` | Hover background | `on_secondary` |
-| Secondary text | `--color-secondary-text` | Secondary colour used as text or icon on the surface | — |
+| Role | Token | Used as | Foreground | Source |
+|---|---|---|---|---|
+| Primary | `--color-accent` | Button and badge background, link text, non-text UI (borders, icons, selected states) | `on_primary` (`--color-on-accent`) | Base colour 1 |
+| Primary hover | `--color-accent-hover` | Hover and pressed background | `on_primary` | Derived |
+| Primary tint | `--color-accent-tint` | Tinted section background | primary as text | Derived |
+| Primary, dark mode | dark token set (§14.4) | Accent on the dark surface `#121417` | — | Derived |
+| Secondary (accent), optional | `--color-secondary` | Background only, always with text | `on_secondary` (`--color-on-secondary`) | Base colour 2 |
+| Accent hover | `--color-secondary-hover` | Hover background | `on_secondary` | Derived |
+| Accent text | `--color-secondary-text` | Accent colour used as text or icon on the surface | — | Derived |
+| Band (optional) | `--color-surface-inverse` | Header band, footer, dark sections | `--color-text-inverse` | Base colour 3 |
+| Focus | `--color-focus` | Focus ring | — | Derived |
+| Control border | `--color-border-control` | Inputs, checkboxes, outlined buttons | — | Derived |
 
-### Presets
+An empty optional base colour takes the starting palette's value.
 
-The vendor starts from one of nine preset palettes or from empty fields. Presets are data
-(`BrandPalette` rows seeded by a data migration in THM.11), not code; staff can add more, and
-every row goes through the same validator.
+Naming warning: the builder's "Secondary (accent)" colour sets the `--color-secondary-*` tokens; the
+`--color-accent-*` tokens belong to the **primary**, whatever their name suggests.
 
-The **operator** palette is the colour set of the platform's own LIVE site, adjusted for WCAG AA,
-and it is also the default token set of `ride` (§14.4):
+### Predefined palettes
 
-| Role | Value | Measured pair |
-|---|---|---|
-| Primary / on primary | `#046BD2` / `#FFFFFF` | 5.20:1 |
-| Primary hover | `#035AB1` | white on it 6.77:1 |
-| Secondary / on secondary | `#FBA926` / `#1A1A1A` (background only, always dark text) | 8.95:1 |
-| Secondary hover | `#E89A1E` | `#1A1A1A` on it 7.52:1 |
-| Secondary text | `#BE5900` | on white 4.55:1 |
-| Primary tint | `#EEF6FF` | primary on it 4.77:1 |
-| Primary, dark mode | `#0580FA` | on `#121417` 4.81:1 |
+Presets are data (`BrandPalette` rows in `themes`, seeded by a data migration in THM.31), not
+code; staff can add more, and every row goes through the same validator. Measured with the WCAG
+2.x formula against white (`#FFFFFF`), the dark surface `#121417` and the band:
 
-The legacy values `#C65D00` as text (4.23:1 on white) and `#046BD2` on the dark surface (3.55:1)
-fail AA; the values above are the nearest compliant fixes. White on `#FBA926` is 1.94:1, which is
-why the secondary carries its own dark foreground. The other eight presets use white on primary
-and on secondary, their secondary is also their secondary text colour, and their secondary hover
-is derived:
+| Palette | Primary / hover / tint | On primary | Accent / hover / text | On accent | Band / text on band | Primary, dark mode |
+|---|---|---|---|---|---|---|
+| **Red** (default) | `#C40417` / `#9E0312` / `#FDECEE` | `#FFFFFF` (6.22:1, on hover 8.48:1; primary on tint 5.45:1) | `#2B3138` / `#1B2026` / `#2B3138` | `#FFFFFF` (13.13:1) | `#30373F` / `#FFFFFF` (12.04:1) | `#FF6B6B` (6.65:1) |
+| Blue | `#046BD2` / `#035AB1` / `#EEF6FF` | `#FFFFFF` (5.20:1, on hover 6.77:1; primary on tint 4.77:1) | `#FBA926` / `#E89A1E` / `#BE5900` | `#1A1A1A` (8.95:1, on hover 7.52:1; accent text on white 4.55:1) | `#30373F` / `#FFFFFF` | `#0580FA` (4.81:1) |
+| Petrol | `#0B5C7A` / `#08465D` / `#E6F2F6` | `#FFFFFF` (7.43:1, on hover 10.27:1; primary on tint 6.51:1) | `#C2410C` / `#9A3412` / `#C2410C` | `#FFFFFF` (5.18:1, on hover 7.31:1) | `#30373F` / `#FFFFFF` | `#7CC8E3` (9.87:1) |
 
-| Preset | Primary | Hover | Secondary | Tint | Primary, dark mode |
-|---|---|---|---|---|---|
-| Racing red | `#B3261E` | `#8C1D18` | `#1F2A37` | `#FCEBEA` | `#FF8A80` |
-| Petrol blue | `#0B5C7A` | `#08465D` | `#C2410C` | `#E6F2F6` | `#7CC8E3` |
-| Forest green | `#2F6B3A` | `#23522C` | `#7A4E12` | `#EAF4EC` | `#8FD19E` |
-| Night blue | `#1D4ED8` | `#1E3A8A` | `#B45309` | `#EAF0FE` | `#93B4FF` |
-| Workshop orange | `#B54708` | `#8F3806` | `#1E3A5F` | `#FEF0E6` | `#FDB07A` |
-| Plum violet | `#6B2C91` | `#53216F` | `#0F766E` | `#F3EAF8` | `#D2A8F0` |
-| Graphite | `#374151` | `#1F2937` | `#B91C1C` | `#F1F2F4` | `#C9CED6` |
-| Teal | `#0F766E` | `#0B5953` | `#9D174D` | `#E6F4F2` | `#5EEAD4` |
+Blue is the former operator palette (the legacy LIVE colours fixed for AA: the legacy `#C65D00`
+as text is 4.23:1 on white and `#046BD2` on the dark surface 3.55:1, so `#BE5900` and `#0580FA`
+replace them; white on `#FBA926` is 1.94:1, which is why that accent carries a dark foreground).
+The primary is never used as text on the band (Red on `#30373F` is 1.94:1): on the band, links and
+icons use the text-on-band colour, and buttons keep their own filled background.
 
-Every preset, the operator palette included, is only a **proposal**: the vendor can edit any
-colour. Empty roles are derived by a pure function (`derive_palette`, fixed OKLCH lightness steps
-from the primary and secondary) and stay editable. Every edit goes through the validator below.
+### Palette builder
 
-Models live in `vendors`: `BrandPalette` (code, translated name, the role colours) and
-`VendorBranding` (vendor, starting preset, the role colours as edited, logo, banner, generated
-file name, updated by and at). The pure functions below live in `apps/themes/engine.py`.
+One component serves the operator (site palette, in the Wagtail settings of the Site) and an
+entitled vendor (storefront palette, in the vendor's shop space):
+
+- Three colour inputs (`<input type="color">` with a hex text field beside it, so the value can be
+  typed and read by a screen reader) labelled "Primary", "Secondary (accent)" and "Band", and a "start from" choice of
+  the predefined palettes.
+- `derive_palette(base)` (pure) fills every other role: the on colours by `suggest_foreground`,
+  hover and tint by fixed OKLCH lightness steps, the dark-mode primary by `nearest_compliant`
+  against `#121417`, focus and control border by `nearest_compliant` at 3:1 against the surface
+  and the band.
+- A **live check** lists every pair of the table below with its measured ratio and a pass or
+  fail mark, updated on each change (an `aria-live="polite"` summary announces the number of
+  failing pairs, not every keystroke).
+- A **live preview** shows a primary button, a link in body text, a product card with price and
+  badge, and the menu on the band, rendered with the candidate palette in a scoped container (the
+  preview CSS is a generated same-origin file, as below, never an inline style).
+- Each failing pair offers the **nearest compliant shade** with a **"Use this"** button; the user
+  can also pick another colour.
+- **Save is disabled** while any pair fails, and the reason is in the text next to the button,
+  not only in its state.
+- **Server side**, the save service runs `check_brand_palette` again and refuses a failing
+  palette with the pair and its ratio, whatever the request says (a crafted POST cannot store a
+  failing palette). Saving is audited (`AuditLog`) with the old and new values.
+
+The JavaScript of the builder only computes the same functions for speed; the server result is
+the one that counts, and the builder works without JavaScript as a plain form that is validated on
+submit.
 
 ### Contrast validation and nearest compliant colour
 
@@ -593,19 +636,19 @@ contract (§14.4). Pairs, measured with the WCAG 2.x relative luminance formula:
 | `on_primary` on primary; `on_primary` on primary hover | 4.5:1 | Buttons |
 | primary on primary tint | 4.5:1 | Accent text on tinted sections |
 | primary as link text on the surface | 4.5:1 | `--color-link` (1.4.3) |
-| `on_secondary` on secondary; `on_secondary` on secondary hover | 4.5:1 | Secondary buttons and badges |
-| secondary text on the surface | 4.5:1 | Secondary text and icons |
+| `on_secondary` on accent; `on_secondary` on accent hover | 4.5:1 | Secondary buttons and badges |
+| accent text on the surface | 4.5:1 | Accent text and icons |
+| text on the band | 4.5:1 | Header band, footer, dark sections |
 | dark-mode primary on `#121417` | 4.5:1 | Ready for the later dark token set (§14.4) |
 | primary as non-text UI against the surface and the tint | 3:1 | Borders, icons, selected states (1.4.11) |
+| focus against the surface and the band; control border against the surface | 3:1 | Focus ring and control boundaries (1.4.11) |
 
-The secondary is background-only and always carries text, which identifies the component, so it
-has no 3:1 rule against the surface; it is never used alone for borders or icons (the secondary
-text role is). "The surface" is `#FFFFFF` and the resolved `--color-surface` of every registered
-theme, so a palette stays valid whatever theme the site uses. A stored palette that fails after a
-theme change is not applied, and a system check warning lists the vendors concerned.
-
-When a pair fails, the form names the pair and its measured ratio and offers the **nearest
-compliant colour**, which the vendor accepts in one click or replaces with another colour:
+The accent is background-only and always carries text, which identifies the component, so it has
+no 3:1 rule against the surface; it is never used alone for borders or icons (the accent text role
+is). "The surface" is `#FFFFFF` and the resolved `--color-surface` of every registered theme, so a
+palette stays valid whatever theme the site uses. A stored palette that fails after a theme change
+is not applied (the site falls back to the theme's token default, a storefront to the site
+palette), and a system check warning lists the palettes concerned.
 
 ```python
 def nearest_compliant(colour: str, against: str, min_ratio: float) -> str | None
@@ -615,41 +658,63 @@ def nearest_compliant(colour: str, against: str, min_ratio: float) -> str | None
     # far as needed to stay inside sRGB. Returns `colour` unchanged if it already passes, and None
     # if no lightness in that direction passes.
 def suggest_foreground(background: str, min_ratio: float) -> str | None
-    # For a background the vendor keeps: `on` colour `#FFFFFF` or `#1A1A1A`, whichever passes
+    # For a background the user keeps: `on` colour `#FFFFFF` or `#1A1A1A`, whichever passes
     # with the higher ratio; None if neither does.
 ```
 
-When `nearest_compliant` returns None, the form says so plainly (for example: white text cannot
+When `nearest_compliant` returns None, the builder says so plainly (for example: white text cannot
 reach 4.5:1 on this orange) and, for a foreground role, proposes `suggest_foreground` for the
-background the vendor locked.
+background the user locked.
 
-Unit tests (THM.11):
+Unit tests (THM.31 and THM.33):
 
-- every one of the nine presets passes `check_brand_palette`;
+- each of the three predefined palettes passes `check_brand_palette` (one test per palette);
 - `nearest_compliant("#C65D00", "#FFFFFF", 4.5)` returns a colour of at least 4.5:1 close to
   `#BE5900`;
 - `nearest_compliant("#046BD2", "#121417", 4.5)` returns a lighter colour of at least 4.5:1;
 - a colour that already passes is returned unchanged;
 - `nearest_compliant("#FFFFFF", "#FBA926", 4.5)` returns None, and `suggest_foreground("#FBA926",
-  4.5)` returns `#1A1A1A`.
+  4.5)` returns `#1A1A1A`;
+- `derive_palette` on each predefined palette's base colours gives a palette that passes.
+
+### Models
+
+- `themes`: `BrandPalette` (code, translated name, the role colours, `is_preset`) and a
+  `palette` field on `ThemeSettings` (per Wagtail Site; empty means the theme's token default).
+- `vendors`: `VendorBranding` (vendor, starting palette code, the role colours as saved, logo,
+  banner, generated file name, updated by and at). `vendors` imports only the pure functions of
+  `apps/themes/engine.py`; `themes` never imports `vendors`.
 
 ### Delivery and CSP
 
-- `render_brand_css(palette, vendor_slug)` (pure) writes only custom-property overrides of the
-  role tokens above, plus `--color-link`, in `@layer overrides`, scoped to
-  `[data-vendor-brand="<slug>"]`. Component CSS is unchanged.
-- The file is generated when the branding is saved, stored under a content hash, and served from
-  the site's own origin (`/brand/<slug>.<hash>.css`, `Cache-Control: immutable`), so `style-src`
-  stays `'self'`. No inline `<style>` and no `style` attributes.
-- The storefront and product templates add the `<link rel="stylesheet">` and the
-  `data-vendor-brand` attribute only when `plan_allows` is true and the palette is valid.
-- Every change is audited (`AuditLog`) and the vendor sees a preview before publishing.
+- `render_palette_css(palette, scope)` (pure) writes only custom-property overrides of the role
+  tokens above, plus `--color-link` and the generated Bootstrap map variables (§14.4), in
+  `@layer overrides`. The scope is `:root` for the site palette and
+  `[data-vendor-brand="<slug>"]` for a storefront palette. Component CSS is unchanged.
+- The file is generated when the palette is saved, stored under a content hash, and served from
+  the site's own origin (`/brand/site.<hash>.css`, `/brand/<slug>.<hash>.css`,
+  `Cache-Control: immutable`), so `style-src` stays `'self'`. No inline `<style>` and no `style`
+  attributes.
+- The base layout adds the site palette `<link rel="stylesheet">` after `theme.css`. The storefront
+  templates add the vendor's `<link>` and the `data-vendor-brand` attribute only when
+  `plan_allows(vendor, "storefront_palette")` is true and the palette is valid.
+- Every change is audited (`AuditLog`) and the user sees the preview before saving.
 
 ## 14.13 Tasks
 
 THM.1 to THM.5 build the system and `base`; THM.6 to THM.10 and THM.13 to THM.16 build the first
 vertical theme (THM.13 to THM.16 follow owner decision Q-98: Bootstrap 5.3 foundation and component
-parity, §14.9); THM.11 is vendor branding; THM.12 delivers the AVIF/WebP renditions of §14.7 and safe SVG logos. Both `base` and `ride` ship at go-live (Q-60), so THM.6 to THM.10 and THM.13 to THM.16 are P1.
+parity, §14.9); THM.11 is vendor branding images; THM.12 delivers the AVIF/WebP renditions of §14.7 and safe SVG logos. Both `base` and `ride` ship at go-live (Q-60), so THM.6 to THM.10 and THM.13 to THM.16 are P1.
+
+THM.19 to THM.30 bring `ride` close to the owner's reference template (kept in private/): a similar
+layout and visual identity, modernised where needed (owner decision 2026-11-21). They come from a
+private gap report and run in their numeric order; each is a PR of about 400 lines, and each
+done-when is checked on the THM.10 visual baselines at 375 and 1280 px plus the THM.5 gates. The
+home page becomes a vendor-recruitment landing at launch (CMS.19, spec 10), so THM.24 styles the
+blocks that page uses rather than a fixed home. THM.31 to THM.34 deliver the colour palettes of
+§14.12: the site palette presets, the vendor storefront palette on the top plan and the palette
+builder. THM.35 is the compact language dropdown of the `ride` header; where the switch leads is
+I18N.21 and I18N.22 (spec 09).
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---|---|---|
@@ -658,12 +723,12 @@ parity, §14.9); THM.11 is vendor branding; THM.12 delivers the AVIF/WebP rendit
 | THM.3 | `base` theme: layouts, skip link, header with disclosure navigation, language switcher, consistent help link, footer, typography, form controls, buttons, alerts, focus and target-size rules, reduced motion; vendored htmx and Alpine CSP build with `VENDORED.toml`; CMS.1 and account templates moved onto the layouts | P1 | 10 | THM.2 | Home, standard page and login render with `base`; CSP lint and the hash check of vendored files pass; keyboard-only e2e reaches every control with a visible focus |
 | THM.4 | `base` component library (§14.9) and staff-only styleguide page | P1 | 12 | THM.3 | Every component renders in every state on `/_styleguide/` with no CSP violation; e2e screenshots saved |
 | THM.5 | Theme quality gates, parametrised over registered themes: CSP template lint, axe-core (`wcag22aa`) on the styleguide, visual comparison harness with CI-only baselines, size budgets, `LICENSES.toml` check | P1 | 6 | THM.4, ARC.11 | A theme with a 3:1 text pair, an inline style, an unlicensed font or a CSS file of 50 KB compressed fails CI (the limit applies to the compressed file, owner decision MQ-14); `base` passes |
-| THM.6 | First vertical theme `ride`: colour tokens from the operator palette (§14.4, §14.12), type scale, spacing and shapes from the reference template's visual language, self-hosted Barlow and Barlow Condensed (OFL 1.1, from upstream), SVG icon subset, header, hero and home block overrides, placeholder imagery, `LICENSES.toml` | P1 | 8 | THM.4, CMS.2 | Home page renders with `ride` and passes the THM.5 gates; no file derived from the reference template (PR checklist) |
+| THM.6 | First vertical theme `ride`: colour tokens from the operator palette (§14.4, §14.12; now the Blue palette, §14.12), type scale, spacing and shapes from the reference template's visual language, self-hosted Barlow and Barlow Condensed (OFL 1.1, from upstream), SVG icon subset, header, hero and home block overrides, placeholder imagery, `LICENSES.toml` | P1 | 8 | THM.4, CMS.2 | Home page renders with `ride` and passes the THM.5 gates; no file derived from the reference template (PR checklist) |
 | THM.7 | `ride` catalog pages on Bootstrap 5.3: listings with filters and numbered pagination, search results, product card, product page (gallery carousel with thumbnails and zoom `<dialog>`, tabs, accordion, related strip), vendor storefront, page banner with breadcrumb | P1 | 8 | THM.13, THM.14, THM.15, CAT.7, CAT.8, VEN.10, TAX.12 | Catalog key pages pass the THM.5 gates (axe `wcag22aa`, CSP, budgets) at 360, 768 and 1280 px; the gallery carousel and tabs work with the keyboard only; reduced motion shows no animation |
 | THM.8 | `ride` cart, checkout and account pages: cart, checkout steps, Payment Element appearance from tokens, order confirmation, customer area, sign in and up, MFA, password reset | P1 | 6 | THM.6, ORD.5, ORD.7 | A keyboard-only e2e checkout completes in test mode with `ride`; the Payment Element uses the theme's colours and fonts |
 | THM.9 | `ride` content and system pages on Bootstrap 5.3: blog, standard, legal, contact, term and vendor landing, vendor recruitment, 404 and 500, testimonial and blog carousels, consent banner styling, consent-gated video modal | P1 | 5 | THM.13, THM.14, THM.15, CMS.3, CMS.4, CMS.5, SEO.5 | Content key pages and the consent banner pass the THM.5 gates at 360, 768 and 1280 px; focus is never hidden by the banner or the sticky header; the video modal opens only after consent |
 | THM.10 | Visual regression baselines for `base` and `ride`: styleguide and key pages at three widths (carousels on the first slide, search overlay and mini-cart open, reveal disabled for stable shots), CI job, update procedure in the developer docs | P1 | 4 | THM.5, THM.7, THM.8, THM.9, THM.14, THM.15, THM.16 | CI compares every key page with its baseline; an intentional change needs a reviewed baseline update |
-| THM.11 | Vendor branding (paid plan option): `BrandPalette` and `VendorBranding` in `vendors` with explicit foreground per role, the nine presets (operator palette included) seeded by a data migration, every preset editable, `derive_palette`, `check_brand_palette` over every registered theme's surface, `nearest_compliant` and `suggest_foreground` offered in one click, logo and banner (CMS.8 images), `render_brand_css` to a hashed same-origin file, storefront and product page hooks gated by `plan_allows`, preview, audit | P2 | 12 | VEN.19, THM.4, VEN.10, CAT.7, CMS.8 | The §14.12 unit tests pass (nine presets valid, `#C65D00` fixed close to `#BE5900`, fixed point unchanged, white on `#FBA926` gives None and `#1A1A1A` as foreground); a custom palette with a 3:1 pair is rejected with its ratio and a one-click fix; a branded vendor's storefront and product pages load its stylesheet with no CSP violation and pass axe; listings and checkout never load it; a vendor whose plan loses the entitlement renders with the theme only and keeps its stored branding |
+| THM.11 | Vendor branding images (paid plan option, Q-64): `VendorBranding` in `vendors` with a logo and a banner (CMS.8 images with licence metadata) on the vendor storefront, gated by `plan_allows(vendor, "vendor_branding")`, preview, audit; the palette part moved to THM.31 to THM.34 (owner decision 2026-11-21) | P2 | 5 | VEN.19, THM.4, VEN.10, CMS.8 | An entitled vendor's storefront shows its logo and banner with the licence credit and passes axe with no CSP violation; listings, product pages and checkout never show them; a vendor whose plan loses the entitlement renders without them and keeps the stored images |
 | THM.12 | Modern image formats: `WAGTAILIMAGES_FORMAT_CONVERSIONS` sends raster renditions to WebP (animated GIFs keep their format), `<picture>` renditions in AVIF, WebP and JPEG with `srcset`, `sizes`, width and height in CMS, catalog and theme templates, `fetchpriority="high"` on the LCP hero, AVIF dropped with a warning when the image library cannot encode it; uploads open to JPEG, PNG, WebP, AVIF and GIF, originals re-encoded without metadata (SEC.2); SVG only for logos and icons, checked at upload against an allow-list with a safe parser (no scripts, event handlers, `foreignObject`, external references, `url()` in styles, DTD or entities) and served same-origin as `image/svg+xml` with a restrictive CSP | P1 | 6 | THM.4, CMS.8 | Pages serve AVIF and WebP with a JPEG fallback and correct `srcset` and `sizes`; a PNG upload renders as WebP; a scripted SVG is refused; unit tests run the sanitiser on a corpus of malicious SVGs, integration tests cover the renditions, and an e2e test finds AVIF and WebP sources in a page's `<picture>` with no CSP violation |
 | THM.13 | Bootstrap 5.3 foundation for `ride` (owner decision Q-98): ADR-0008 addendum; vendored `bootstrap.min.css` and `bootstrap.bundle.min.js` (pinned 5.3.x, upstream MIT licence file, `VENDORED.toml` and `LICENSES.toml` entries of kind `framework`); `foundation` key in `theme.toml` with a system check; the build wraps the CSS in `@layer bootstrap`, generates the token to `--bs-*` map (§14.4) and drops `base`'s reset for the `ride` chain; every `data:` URI of the dist CSS replaced by same-origin SVG; focus ring and contrast fixes; per-theme budgets (`css_budget_kb`, `js_budget_kb`) in `gates.py` with the measured final limits written into §14.7; CSP lint rejects tooltip, popover, `data-bs-html` and `data-bs-template`; selector-collision test between `base` and Bootstrap; buttons, forms, alerts, badges, cards and pagination mapped on tokens and shown in the styleguide | P1 | 12 | THM.6, THM.5 | `ride` builds with Bootstrap 5.3 and a unit test checks the vendored hashes (a tampered file fails); the built `theme.css` has no `url(data:`; the token-map test shows no Bootstrap colour variable at its upstream default; `base` output is unchanged; the THM.5 gates pass for both themes with per-theme budgets (a `ride` over its limit fails, `base` still fails over 45 KB); axe `wcag22aa` is clean on the styleguide at 360, 768 and 1280 px; no `securitypolicyviolation` while a modal and a dropdown are opened with the keyboard |
 | THM.14 | `ride` motion and carousel components: hero slider (`layout` choice slider, single image, split), multi-item strips (products, vendors, testimonials, blog), gallery carousel with thumbnail buttons, each with pause/play, previous/next and labelled indicators and no autoplay unless the editor enables it (then paused on hover and focus, off under `prefers-reduced-motion`); `reveal.js` (IntersectionObserver, `data-reveal`); counters; `<progress>` component; section title; launch countdown restyle; consent-gated video modal; all in the styleguide; no Slick, Owl, Swiper, WOW.js, animate.css or jQuery | P1 | 12 | THM.13, THM.4, CMS.2, CMS.9 | Carousels operate with Tab, Enter, Space and arrow keys only and expose `aria-roledescription="carousel"` and labelled slides; with `prefers-reduced-motion: reduce` nothing animates or autoplays and every revealed element is visible; with JavaScript off all slides and counter values are readable; axe `wcag22aa` clean and zero CSP violations on the styleguide and the `ride` home at 360, 768 and 1280 px; the built JS stays within the `ride` budget |
@@ -671,3 +736,20 @@ parity, §14.9); THM.11 is vendor branding; THM.12 delivers the AVIF/WebP rendit
 | THM.16 | Move the THM.8 pages (PR #502 and #503, merged as they are) onto Bootstrap 5.3 classes and components: cart, checkout steps with the step indicator, order confirmation, customer area tables, sign in and up, MFA, password reset; Payment Element appearance unchanged | P1 | 5 | THM.13, THM.8 | The keyboard-only e2e checkout of THM.8 still completes in test mode; the THM.5 gates and axe `wcag22aa` pass on every moved page at 360, 768 and 1280 px; no `securitypolicyviolation`; the diff removes the THM.8 classes that Bootstrap now provides (PRs 1/2 cart and checkout, 2/2 account and auth; customer sign-up and password-reset pages do not exist yet and carry the Bootstrap move when built) |
 | THM.17 | `ride` search results page (follow-up of THM.7 part 2 and CAT.27, coherence check 39): a `catalog/search.html` override in the ride theme, copied from the current base template (same form, `name="s"`, group ids, `noindex` head block, pagination, 429 page), with the page banner and breadcrumb, Bootstrap cards for the product, event, article and vendor groups, 44 px targets; no logic change | P2 | 3 | THM.7, CAT.27 | Under ride the results page, the empty and the no-match states pass the THM.5 gates (axe `wcag22aa`, CSP, budgets) at 360, 768 and 1280 px in both schemes; a render test under `use_theme("ride")` proves the form, the groups and `noindex, follow`; works without JavaScript |
 | THM.18 | Product card image placeholder (owner request 2026-11-18, product page "You may also like"): a product with no image shows a neutral placeholder in its card, so every card in a grid keeps the same square image area; the `ride` theme ships `images/product-placeholder.svg` (own work, CC0, listed in `LICENSES.toml`) and the base card falls back to a static one; the placeholder is decorative (`alt=""`), gets no rendition and is never written to the product | P2 | 1 | THM.7, CAT.8 | A card without an image renders the placeholder with an empty alt and the same image class as a real image, under ride and the base theme; a card with an image never shows it |
+| THM.19 | `ride` listing grid fix and gallery placeholder (ride fidelity 1/12, quick win): scope the home-block grid rule to the home block wrapper so Bootstrap `row-cols` grids (category listing, storefront, search, related strip) keep their columns; the THM.18 placeholder also in the product gallery and the related strip when a product has no image | P1 | 2 | THM.7, THM.18 | At 1280 px a category listing shows 3 cards per row and the related strip 4, each card at least 15rem wide, and at 375 px one or two cards per row with no letter-by-letter title break; a product without images shows the placeholder in the gallery with an empty `alt`; new THM.10 baselines for listing and product at 375 and 1280 px |
+| THM.20 | `ride` surfaces and decoration (ride fidelity 2/12): section surface variants (light, muted, band, primary band) as utility classes on the palette tokens, an eyebrow line style for section titles, own SVG textures (torn edge, light topographic pattern) as same-origin files, image overlay scrim tokens; all in the styleguide | P1 | 4 | THM.6, THM.31 | The styleguide shows every surface with heading, text, link and button and every pair passes the token contract under each predefined palette; each texture is an own-work SVG under 4 KB listed in `LICENSES.toml`; THM.10 baselines of the styleguide sections at 375 and 1280 px |
+| THM.21 | `ride` header refinement (ride fidelity 3/12, quick wins included): one-row mobile header (logo, search, cart, burger), the language switcher moved into the offcanvas on mobile (its compact dropdown is THM.35), transparent header over the home hero turning solid on scroll, staff-only links (the OPS.12 page) hidden from anonymous visitors | P1 | 5 | THM.15 | At 375 px the header is one row of at most 64 px; at 1280 px the home header overlays the hero and is solid once scrolled; an anonymous visitor's menu has no staff link; focus is never hidden (2.4.11) and the THM.15 keyboard e2e still passes; THM.10 baselines of the home and listing tops at 375 and 1280 px |
+| THM.22 | `ride` footer and consent card (ride fidelity 4/12, quick wins included): vendor logo strip above the footer, logo, menu and social row, CMS.17 columns, copyright row, torn-edge top texture; no empty band below the footer; the consent banner as a compact card on the band surface, equal-weight buttons kept | P1 | 5 | THM.20, CMS.17, SEO.5 | THM.10 footer baselines at 375 and 1280 px show the columns, the social icons and the strip; no blank band below the footer on any key page; the consent card covers at most 30% of a 375×812 viewport and the SEO.5 consent e2e still passes |
+| THM.23 | Demo seed for visual parity (ride fidelity 5/12, ARC.10 follow-up; owner lane: lane-a): generated product images, a home body with hero slider, product grid, strip, CTA band, blog teaser and vendor strip, a richer About page (figure, counter, video link), a contact page and contact points, a main menu (Shop, Blog, About, Contact), footer settings; the vendor-recruitment home of CMS.19 is not part of this task and is seeded there | P1 | 4 | ARC.10, CAT.4, CMS.17 | `make seed` on an empty database gives a home with at least 6 sections, every product with at least one image, a reachable blog and contact page and the four menu entries; a second run reports 0 changes; the seeded English texts use British spelling (for example colour, catalogue) and the German texts standard German, with no regional variant; THM.10 baselines of home and listing at 375 and 1280 px are regenerated on the seeded data |
+| THM.24 | `ride` home layout (ride fidelity 6/12): hero with a lead line and two calls to action, image-led term and vendor tiles with overlay titles, alternating section surfaces, primary CTA band, blog teaser cards, section rhythm tokens | P1 | 5 | THM.20, THM.23 | THM.10 home baselines at 375 and 1280 px are approved by the owner on STAGE against the owner's reference template (kept in private/); no gap between sections above `--space-section`; reveal is off in baselines; the THM.5 gates pass |
+| THM.25 | `ride` product card and listing chrome (ride fidelity 7/12): image-first card with a price block (Omnibus strike-through, indicative-price note set small), vendor line, hover lift, filter column on a card surface, page banner with optional image and scrim | P1 | 5 | THM.19, THM.20 | THM.10 baselines of a listing and a storefront at 375 and 1280 px; each card has one link target plus an optional add-to-cart; the price over every image surface passes 4.5:1; the THM.5 gates pass |
+| THM.26 | `ride` product page layout (ride fidelity 8/12): gallery card with a thumbnail row, buy box (title, meta list, large price, variant pills, full-width primary button on mobile), related strip | P1 | 5 | THM.25 | THM.10 product baselines at 375 and 1280 px for a simple, a variant and an on-request product; a render test shows the GPSR block, the tax text and the vendor link unchanged; the gallery still works with the keyboard only |
+| THM.27 | `ride` cart, checkout and sign-in layout (ride fidelity 9/12): two-column cart and checkout (packages with thumbnails left, sticky summary right, stacked on mobile), shipping options as selectable tiles, sign-in on an image background with a centred card and the show-password toggle as a link button inside the field | P1 | 5 | THM.16, THM.19 | The keyboard-only checkout e2e still completes in test mode; THM.10 baselines of cart, checkout and sign-in at 375 and 1280 px; the Payment Element appearance is unchanged; no per-vendor package border is clipped |
+| THM.28 | `ride` blog index and post templates (ride fidelity 10/12, quick win: page banner): page banner on the index and post, image-left post cards with date and author, a featured first post, post page with meta line, reading column and figure styles | P2 | 5 | THM.20 | THM.10 baselines of the blog index and a post at 375 and 1280 px; no comment or share UI; the author page uses the same card |
+| THM.29 | `ride` standard, about-style and contact pages (ride fidelity 11/12): StandardPage and LegalPage overrides with the page banner, split image and text block, icon feature row, contact page with an address column, a form card and a static map link | P2 | 5 | THM.28, CMS.2 | THM.10 baselines of About, a legal page and Contact at 375 and 1280 px; legal pages keep their section anchors and print styles |
+| THM.30 | `ride` 404 and 500 pages (ride fidelity 12/12): a full-bleed own texture or illustration, a large display "404", back-home and search; the 500 page fully static | P2 | 2 | THM.20 | THM.10 baselines of 404 and 500 at 375 and 1280 px rendered with `DEBUG=False`; the 500 template loads no database-dependent tag |
+| THM.31 | Site palette presets (owner decision 2026-11-21, §14.12): `BrandPalette` in `themes` with the Red (default), Blue and Petrol rows seeded by a data migration, `check_brand_palette` over every registered theme's surface, a `palette` choice on `ThemeSettings` per Wagtail Site with audit, `render_palette_css` to a hashed same-origin file linked after `theme.css`, the `ride` token defaults switched to the Red values, the tokens section of `docs/dev/themes.md` updated | P1 | 5 | THM.6, THM.13 | One unit test per predefined palette passes `check_brand_palette` and a palette with a 3:1 text pair fails with the pair named; a fresh site renders `ride` in Red; choosing Blue or Petrol in the settings changes home, listing and checkout with no rebuild and no CSP violation; THM.10 baselines at 375 and 1280 px for each palette on home and product; axe `wcag22aa` is clean under each palette; a stored palette that fails against the surface of a newly registered theme is not applied, the site falls back to the theme's token default and the system check warns with the palette named |
+| THM.32 | Vendor storefront palette, top-plan feature (owner decision 2026-11-21, §14.12): the `storefront_palette` plan entitlement (VEN.19, spec 04 §Plan entitlements), palette fields on `VendorBranding` (a predefined palette or a builder palette), the builder in the vendor's shop space, `render_palette_css` scoped to `[data-vendor-brand]` on that vendor's storefront pages only (store header band, buttons, accents), render-time fallback to the site palette on downgrade | P2 | 5 | THM.11, THM.31, THM.34, VEN.19 | A vendor whose plan grants `storefront_palette` saves a palette and its storefront pages load the scoped stylesheet with no CSP violation and pass axe; its product pages, listings, cart and checkout never load it; a vendor without the entitlement sees no palette form and gets 403 on the save route; the vendor's save route refuses a failing palette with the pair and its ratio and stores nothing; after a downgrade the storefront renders in the site palette and the stored palette is kept and comes back on upgrade; THM.10 storefront baselines at 375 and 1280 px with and without the entitlement |
+| THM.33 | Palette builder 1/2, engine and server validation (owner decision 2026-11-21, §14.12): pure `derive_palette` from two or three base colours (primary, accent, band), `nearest_compliant` and `suggest_foreground` in `apps/themes/engine.py`; a save service with `dry_run` that runs `check_brand_palette` and refuses any failing pair whatever the client sent, with audit; pull forward if capacity allows (owner 2026-11-21) | P2 | 5 | THM.31 | The §14.12 unit tests pass (`#C65D00` fixed close to `#BE5900`, fixed point unchanged, white on `#FBA926` gives None and `#1A1A1A` as foreground, `derive_palette` on each predefined palette's base colours passes); an integration test posting a failing palette directly to the save service stores nothing and returns the pair and its ratio; `dry_run=True` returns a `ChangeSet` and writes nothing; a save writes an `AuditLog` entry with the old and new values |
+| THM.34 | Palette builder 2/2, interface (owner decision 2026-11-21, §14.12): colour inputs with hex fields for the base colours, "start from" a predefined palette, a live pair list with ratios and an `aria-live` failure count, a live preview (button, link, product card, menu on the band) through a generated same-origin stylesheet, a "Use this" action for the nearest compliant shade, save disabled while a pair fails; used for the site palette in the Wagtail settings; works without JavaScript as a form validated on submit; pull forward if capacity allows (owner 2026-11-21) | P2 | 6 | THM.33 | A keyboard-only e2e picks a failing primary, sees the pair and ratio, uses "Use this" and saves; with a failing pair the save button is disabled and the reason is in text; with JavaScript off the same failing palette is refused on submit; no `securitypolicyviolation`; THM.10 baselines of the builder at 375 and 1280 px; axe `wcag22aa` clean |
+| THM.35 | `ride` compact language dropdown (owner request 2026-11-21): one compact toggle in the header showing the current language instead of the row of buttons, built on the disclosure pattern (a `<button>` with `aria-expanded` that shows or hides a list, no `menu` role), with an optional decorative globe or language icon from the theme's SVG sprite (`aria-hidden`); the list holds every enabled language as a small standard flag plus its endonym (English, Deutsch, Italiano, Français, Español and so on), the endonym always visible and the flag decorative; one default country per language in code: `en` the United Kingdom (the content is British English), `de` Germany, `it` Italy, `fr` France, `es` Spain, and so on; flags are plain civil flags with no coat of arms, drawn as our own SVGs (the designs are public domain) and recorded in `LICENSES.toml`, each with a 1 px outline, no CDN and no emoji (emoji flags do not render on Windows); each item stays its own CSRF POST form to `switch_language` with the same hidden fields as the THM.3 base switcher, so where it leads follows spec 09 §9.2 (the I18N.11 rule), as changed by I18N.22; the labels are "English" and "Deutsch" with no country variant, and the language codes stay as configured (no `en-gb` or `de-at` locale); `ride` only, the `base` switcher markup unchanged | P1 | 4 | THM.21, THM.31, I18N.22 | The header shows one toggle whose accessible name is "Language: " plus the current endonym (for example "Language: English") and whose `aria-expanded` follows the list; Enter or Space on the toggle opens and closes the list, Tab moves between the items, Tab out of the list closes it, and Escape closes it and returns focus to the toggle (keyboard-only e2e); the icon, when present, is `aria-hidden` and adds nothing to the accessible name; every item shows its endonym as visible text with its `lang` attribute, and its flag is decorative (`aria-hidden`, empty `alt`); a render test maps `en` to the United Kingdom flag, `de` to Germany, `it` to Italy and `fr` to France, and no flag contains a coat of arms; each flag's 1 px outline is at least 3:1 against the band colours and the surface of each predefined palette (unit test); no request leaves the origin for a flag and no emoji flag appears; without JavaScript the list is a `<details>` disclosure or shown expanded and still switches language; the existing language-switch integration tests and e2e pass unchanged; the toggle and the list pass AA contrast under each predefined palette; THM.10 header baselines at 375 and 1280 px with the list closed and open |
