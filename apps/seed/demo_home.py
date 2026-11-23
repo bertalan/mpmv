@@ -3,6 +3,9 @@
 Texts are invented. English uses British spelling and German standard German (no regional
 variant); a language without its own text shows the source text. The CMS.19 vendor-recruitment
 home is not built here: its body stays the landing, and this body lives on the demo shop page.
+
+The seed is create-if-missing: it re-creates footer columns, social profiles and blog posts that an
+editor deleted. The reset is how to remove the demo content.
 """
 
 import datetime as dt
@@ -43,7 +46,7 @@ BLOG_INTRO: Final[Texts] = {
 AUTHOR: Final = ("Demo editor", "demo-editor")
 POSTS: Final[tuple[dict[str, Any], ...]] = (
     {
-        "slug": {"en": "choosing-timber", "it": "scegliere-il-legno", "de": "holz-auswaehlen"},
+        "slug": "choosing-timber",
         "title": {
             "en": "Choosing timber for the kitchen",
             "it": "Scegliere il legno per la cucina",
@@ -66,7 +69,7 @@ POSTS: Final[tuple[dict[str, Any], ...]] = (
         "image": "home-hero",
     },
     {
-        "slug": {"en": "glaze-and-colour", "it": "smalto-e-colore", "de": "glasur-und-farbe"},
+        "slug": "glaze-and-colour",
         "title": {
             "en": "How a glaze gets its colour",
             "it": "Come lo smalto prende colore",
@@ -200,11 +203,11 @@ def seed_blog(
         run.created("cms.blogauthor", author.slug)
     posts: list[BlogPostPage] = []
     for spec in POSTS:
-        post = BlogPostPage.objects.child_of(index).filter(slug=spec["slug"]["en"]).first()
+        post = BlogPostPage.objects.child_of(index).filter(slug=spec["slug"]).first()
         if post is None:
             post = BlogPostPage(
                 title=pick(spec["title"], source),
-                slug=spec["slug"]["en"],
+                slug=spec["slug"],
                 date=spec["date"],
                 author=author,
                 summary=pick(spec["summary"], source),
