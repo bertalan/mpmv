@@ -1,15 +1,15 @@
 """THM.34 1/2: the palette builder page works as a plain form, behind the theme permission."""
 
 import re
+from collections.abc import Callable
 from typing import Any
 
 import pytest
+from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.test import Client
 from django.urls import reverse
 
-from apps.accounts.tests.factories import UserFactory
-from apps.accounts.tests.mfa import verified_login
 from apps.core.models import AuditLog
 from apps.themes.models import BrandPalette, ThemeSettings
 from apps.themes.services import PALETTE_CONFIGURED, THEME_CONFIGURED
@@ -18,10 +18,11 @@ from apps.themes.tests.factories import SiteFactory
 pytestmark = pytest.mark.django_db
 
 URL = "themes_admin:palette_builder"
+MfaLogin = Callable[[Client, Any], Client]
 
 
 def user_with(*codenames: str) -> Any:
-    user = UserFactory.create()
+    user = get_user_model().objects.create_user(email=f"{'-'.join(codenames)}@example.com")
     group = Group.objects.create(name="Palette " + ",".join(codenames))
     group.permissions.add(*Permission.objects.filter(codename__in=codenames))
     user.groups.add(group)
@@ -53,15 +54,19 @@ def test_an_anonymous_visitor_cannot_reach_the_builder(client: Client) -> None:
     assert not BrandPalette.objects.filter(name="Mine").exists()
 
 
-def test_an_editor_without_the_theme_permission_cannot_use_it(client: Client) -> None:
-    verified_login(client, user_with("access_admin"))
+def test_an_editor_without_the_theme_permission_cannot_use_it(
+    client: Client, mfa_login: MfaLogin
+) -> None:
+    mfa_login(client, user_with("access_admin"))
     assert refused(client.get(reverse(URL)))
     assert refused(post(client, action="save"))
     assert not BrandPalette.objects.filter(name="Mine").exists()
 
 
-def test_the_page_lists_every_pair_with_its_ratio_and_starts_valid(client: Client) -> None:
-    verified_login(client, builder_user())
+def test_the_page_lists_every_pair_with_its_ratio_and_starts_valid(
+    client: Client, mfa_login: MfaLogin
+) -> None:
+    mfa_login(client, builder_user())
     response = client.get(reverse(URL))
     assert response.status_code == 200
     html = response.content.decode()
@@ -74,16 +79,18 @@ def test_the_page_lists_every_pair_with_its_ratio_and_starts_valid(client: Clien
     assert "disabled" not in html.split('value="save"')[1].split(">")[0]
 
 
-def test_a_get_and_a_check_write_nothing(client: Client) -> None:
-    verified_login(client, builder_user())
+def test_a_get_and_a_check_write_nothing(client: Client, mfa_login: MfaLogin) -> None:
+    mfa_login(client, builder_user())
     client.get(reverse(URL))
     post(client, action="check", primary="#FFE600")
     assert not AuditLog.objects.filter(action=PALETTE_CONFIGURED).exists()
     assert BrandPalette.objects.count() == 3
 
 
-def test_a_failing_primary_is_refused_on_submit_with_the_pair_and_ratio(client: Client) -> None:
-    verified_login(client, builder_user())
+def test_a_failing_primary_is_refused_on_submit_with_the_pair_and_ratio(
+    client: Client, mfa_login: MfaLogin
+) -> None:
+    mfa_login(client, builder_user())
     response = post(client, action="save", primary="#FFE600")
     assert response.status_code == 200
     html = response.content.decode()
@@ -95,8 +102,10 @@ def test_a_failing_primary_is_refused_on_submit_with_the_pair_and_ratio(client: 
     assert not AuditLog.objects.filter(action=PALETTE_CONFIGURED).exists()
 
 
-def test_save_is_disabled_with_the_reason_in_text_while_a_pair_fails(client: Client) -> None:
-    verified_login(client, builder_user())
+def test_save_is_disabled_with_the_reason_in_text_while_a_pair_fails(
+    client: Client, mfa_login: MfaLogin
+) -> None:
+    mfa_login(client, builder_user())
     html = post(client, action="check", primary="#FFE600").content.decode()
     save_button = html.split('value="save"')[1].split(">")[0]
     assert "disabled" in save_button
@@ -105,8 +114,10 @@ def test_save_is_disabled_with_the_reason_in_text_while_a_pair_fails(client: Cli
     assert "Save is off while a pair fails" in html
 
 
-def test_use_this_puts_the_compliant_shade_in_the_field_without_saving(client: Client) -> None:
-    verified_login(client, builder_user())
+def test_use_this_puts_the_compliant_shade_in_the_field_without_saving(
+    client: Client, mfa_login: MfaLogin
+) -> None:
+    mfa_login(client, builder_user())
     html = post(client, action="check", primary="#FFE600").content.decode()
     offered = re.search(r'name="use" value="primary:(#[0-9A-F]{6})"', html)
     assert offered is not None
@@ -116,9 +127,9 @@ def test_use_this_puts_the_compliant_shade_in_the_field_without_saving(client: C
 
 
 def test_saving_a_passing_palette_goes_through_the_service_and_is_audited(
-    client: Client,
+    client: Client, mfa_login: MfaLogin
 ) -> None:
-    verified_login(client, builder_user())
+    mfa_login(client, builder_user())
     response = post(client, action="save", primary="#0B5C7A")
     assert response.status_code == 302
     palette = BrandPalette.objects.get(slug="mine")
@@ -129,10 +140,12 @@ def test_saving_a_passing_palette_goes_through_the_service_and_is_audited(
     assert entry.before in (None, {})
 
 
-def test_saving_for_a_site_applies_it_and_keeps_the_site_theme(client: Client) -> None:
+def test_saving_for_a_site_applies_it_and_keeps_the_site_theme(
+    client: Client, mfa_login: MfaLogin
+) -> None:
     site = SiteFactory.create()
     ThemeSettings.objects.create(site=site, theme="base")
-    verified_login(client, builder_user())
+    mfa_login(client, builder_user())
     response = post(client, action="save", primary="#0B5C7A", site=str(site.pk))
     assert response.status_code == 302
     setting = ThemeSettings.objects.get(site=site)
@@ -142,8 +155,8 @@ def test_saving_for_a_site_applies_it_and_keeps_the_site_theme(client: Client) -
     assert AuditLog.objects.filter(action=THEME_CONFIGURED).exists()
 
 
-def test_a_predefined_palette_cannot_be_overwritten(client: Client) -> None:
-    verified_login(client, builder_user())
+def test_a_predefined_palette_cannot_be_overwritten(client: Client, mfa_login: MfaLogin) -> None:
+    mfa_login(client, builder_user())
     before = BrandPalette.objects.get(slug="red").roles()
     response = post(client, action="save", name="Red", primary="#0B5C7A")
     assert response.status_code == 200
@@ -151,8 +164,10 @@ def test_a_predefined_palette_cannot_be_overwritten(client: Client) -> None:
     assert BrandPalette.objects.get(slug="red").roles() == before
 
 
-def test_a_value_that_is_not_a_colour_is_an_error_not_a_crash(client: Client) -> None:
-    verified_login(client, builder_user())
+def test_a_value_that_is_not_a_colour_is_an_error_not_a_crash(
+    client: Client, mfa_login: MfaLogin
+) -> None:
+    mfa_login(client, builder_user())
     response = post(client, action="save", primary="red")
     assert response.status_code == 200
     assert "six digit hex colour" in response.content.decode()
@@ -160,12 +175,12 @@ def test_a_value_that_is_not_a_colour_is_an_error_not_a_crash(client: Client) ->
 
 
 def test_the_builder_is_in_the_settings_menu_only_for_those_who_may_use_it(
-    client: Client,
+    client: Client, mfa_login: MfaLogin
 ) -> None:
-    verified_login(client, builder_user())
+    mfa_login(client, builder_user())
     assert reverse(URL) in client.get(reverse("wagtailadmin_home")).content.decode()
     other = Client()
-    verified_login(other, user_with("access_admin"))
+    mfa_login(other, user_with("access_admin"))
     assert reverse(URL) not in other.get(reverse("wagtailadmin_home")).content.decode()
 
 
@@ -190,23 +205,23 @@ def test_every_post_action_is_refused_to_an_anonymous_visitor(
 
 @pytest.mark.parametrize("fields", ACTIONS)
 def test_every_post_action_is_refused_to_an_editor_without_the_permission(
-    client: Client, fields: dict[str, str]
+    client: Client, fields: dict[str, str], mfa_login: MfaLogin
 ) -> None:
-    verified_login(client, user_with("access_admin"))
+    mfa_login(client, user_with("access_admin"))
     assert refused(post(client, **fields))
     assert not BrandPalette.objects.filter(slug="mine").exists()
     assert not AuditLog.objects.filter(action=PALETTE_CONFIGURED).exists()
 
 
-def test_start_from_is_refused_without_the_permission(client: Client) -> None:
+def test_start_from_is_refused_without_the_permission(client: Client, mfa_login: MfaLogin) -> None:
     assert client.get(reverse(URL), {"start": "blue"}).status_code == 302
-    verified_login(client, user_with("access_admin"))
+    mfa_login(client, user_with("access_admin"))
     assert refused(client.get(reverse(URL), {"start": "blue"}))
 
 
-def test_a_post_without_a_csrf_token_is_refused() -> None:
+def test_a_post_without_a_csrf_token_is_refused(mfa_login: MfaLogin) -> None:
     strict = Client(enforce_csrf_checks=True)
-    verified_login(strict, builder_user())
+    mfa_login(strict, builder_user())
     response = post(strict, action="save", primary="#0B5C7A")
     assert response.status_code == 403
     assert not BrandPalette.objects.filter(slug="mine").exists()
