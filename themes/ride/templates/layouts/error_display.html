@@ -1,0 +1,23 @@
+{% extends "layouts/error.html" %}
+{% load i18n %}
+{% comment %}
+Display error layout of `ride` (THM.30): the 404 and 500 pages. A full-bleed hero with our own
+illustration (images/error-road.svg), a large display code (decorative: the h1 carries the
+meaning), the heading and the message; below it the way home and, where a page fills `search`,
+a search form. Static by design: no CMS tag, no database, no request data, and nothing from
+the URL is echoed (the 404 body is the same for every unknown path). Pages fill `code`,
+`title`, `heading`, `message` and optionally `search`.
+{% endcomment %}
+{% block content %}
+  <div class="error-page error-page--display">
+    <section class="error-hero full-bleed">
+      <p class="error-hero__code" aria-hidden="true">{% block code %}{% endblock %}</p>
+      <h1 class="error-hero__title">{% block heading %}{% endblock %}</h1>
+      <div class="error-hero__text">{% block message %}{% endblock %}</div>
+    </section>
+    <div class="page-content error-page__actions">
+      {% url 'home' as home_url %}<p><a class="btn btn-primary" href="{% firstof home_url '/' %}">{% translate "Go to the home page" %}</a></p>
+      {% block search %}{% endblock %}
+    </div>
+  </div>
+{% endblock %}

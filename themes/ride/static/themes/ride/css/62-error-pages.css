@@ -1,0 +1,42 @@
+/* Ride: the 404 and 500 pages (THM.30). A full-bleed hero on the inverse surface with our own
+   illustration, a large display code and the title in the inverse text colour (contrast comes
+   from the token pair). Colours only through tokens; no animation. */
+@layer overrides {
+  .error-hero {
+    display: grid;
+    justify-items: center;
+    padding-block: var(--space-xl);
+    margin-block: 0 var(--space-l);
+    background: var(--color-surface-inverse) url(images/error-road.svg) center / cover no-repeat;
+    color: var(--color-text-inverse);
+    text-align: center;
+  }
+
+  .error-hero__code {
+    margin: 0;
+    color: var(--color-text-inverse);
+    font-family: var(--font-display);
+    font-size: clamp(6rem, 30vw, 14rem);
+    font-weight: 700;
+    line-height: 0.9;
+  }
+
+  .error-hero__title {
+    margin: var(--space-s) 0 0;
+    color: var(--color-text-inverse);
+    font-family: var(--font-display);
+    font-size: var(--step-3);
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .error-hero__text {
+    max-inline-size: 60ch;
+    margin-block-start: var(--space-s);
+    color: var(--color-text-inverse);
+  }
+
+  .error-page__actions .search-form {
+    max-inline-size: 32rem;
+  }
+}

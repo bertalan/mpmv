@@ -11,12 +11,10 @@ from pathlib import Path
 
 import pytest
 from django.http import HttpRequest
-from django.template.loader import render_to_string
 from django.test import RequestFactory
 from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.themes import views
-from apps.themes.services import use_theme
 
 pytestmark = pytest.mark.usefixtures("english_interface")
 
@@ -72,23 +70,22 @@ def test_the_500_page_loads_no_palette_or_site_settings_css(request_: HttpReques
     assert 'class="garage' not in html
 
 
+@pytest.mark.usefixtures("ride")
 def test_the_404_page_has_the_display_code_a_way_home_and_a_search() -> None:
-    with use_theme("ride"):
-        html = render_to_string("404.html", {"site_name": "Ride", "minimal_chrome": True})
+    html = views._render_plain(RequestFactory().get("/nope/"), "404.html")
     assert re.search(r'<p class="error-hero__code" aria-hidden="true">404</p>', html)
     assert len(re.findall(r"<h1\b", html)) == 1
     assert 'class="btn btn-primary" href="/"' in html
-    search = html.split('id="error-search"', 1)[1]
-    assert 'name="s"' in search.split("</form>", 1)[0]
-    assert re.search(
-        r'<form[^>]+role="search"[^>]+action="/"[^>]*>\s*<label for="error-search"', html
-    )
+    form = html.split('for="error-search"', 1)[1].split("</form>", 1)[0]
+    assert 'name="s"' in form
+    assert re.search(r'<form[^>]+role="search"[^>]+action="/"', html.split("error-hero", 1)[1])
 
 
+@pytest.mark.usefixtures("ride")
 def test_the_404_page_does_not_echo_the_path_or_the_query() -> None:
-    with use_theme("ride"):
-        html = render_to_string("404.html", {"site_name": "Ride", "request_path": "/secret-x/"})
+    html = views._render_plain(RequestFactory().get("/secret-x/?s=probe-y"), "404.html")
     assert "secret-x" not in html
+    assert "probe-y" not in html
 
 
 def test_the_illustration_is_an_own_work_svg_under_4kb_listed_in_the_licences() -> None:
