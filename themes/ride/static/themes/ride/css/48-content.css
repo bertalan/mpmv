@@ -175,15 +175,28 @@
     }
   }
 
-  /* THM.29: a legal page prints as plain text: no banner, header, footer or consent card; the
-     section anchors stay as ids and each section avoids a break after its heading. */
+  /* THM.29: a legal page prints as plain text: no header, footer, consent card, banner image or
+     breadcrumb; the banner keeps the title and the lead line (the operator on contact), as plain
+     text; section anchors stay as ids. */
   @media print {
-    .page-banner,
+    .page-banner__image,
+    .page-banner__scrim,
+    .page-banner .breadcrumb,
     .site-header,
     .site-footer,
     .consent-banner,
     .back-to-top {
       display: none;
+    }
+
+    .page-banner {
+      background: none;
+      color: CanvasText;
+    }
+
+    .page-banner__title,
+    .page-banner__text {
+      color: CanvasText;
     }
 
     .legal-page .page-content {

@@ -77,18 +77,42 @@ def test_each_legal_section_keeps_an_anchor_and_its_data_hook(
     page.save_revision().publish()
     doc = soup(client, page.url, settings)
     sections = doc.select("section.block-legal-section[data-section]")
-    assert [s["id"] for s in sections] == ["section-restrictions", "section-termination"]
+    assert [s["id"] for s in sections] == [
+        "section-restrictions-1",
+        "section-termination-2",
+    ]
     for section in sections:
-        assert section["id"] == f"section-{section['data-section']}"
+        assert section["id"].startswith(f"section-{section['data-section']}-")
         assert section.select_one("h2") is not None
+
+
+def test_two_legal_sections_with_one_tag_get_distinct_ids(
+    client: Client, settings: SettingsWrapper
+) -> None:
+    settings.MPMV_THEME_DEFAULT = "ride"
+    build_content_site()
+    section = {"section": "redress", "heading": "Redress", "text": "<p>x</p>"}
+    page = LegalPageFactory.create(
+        title="Terms again", body=[("legal_section", section), ("legal_section", section)]
+    )
+    page.save_revision().publish()
+    ids = [s["id"] for s in soup(client, page.url, settings).select("section[data-section]")]
+    assert len(ids) == 2
+    assert len(set(ids)) == 2
 
 
 def test_the_ride_bundle_prints_a_legal_page_without_the_chrome() -> None:
     css = CSS.read_text()
     block = re.search(r"@media print \{(.*?)\n  \}\n", css, re.S)
     assert block is not None
-    for selector in (".page-banner", ".legal-page"):
-        assert selector in block.group(1)
+    rules = block.group(1)
+    for hidden in (".page-banner__image", ".page-banner .breadcrumb", ".site-header"):
+        assert hidden in rules
+    # The banner holds the title and the lead (the operator on contact): never hidden in print.
+    hiding = re.findall(r"([^{}]+)\{[^}]*display:\s*none", rules)
+    for selector in ".page-banner", ".page-banner__title", ".page-banner__text":
+        assert all(selector not in [p.strip() for p in h.split(",")] for h in hiding)
+    assert re.search(r"\.page-banner__title,\s*\.page-banner__text\s*\{[^}]*color", rules)
 
 
 def test_the_featured_links_are_an_icon_feature_row() -> None:
@@ -114,7 +138,8 @@ def test_the_contact_points_are_an_address_column_and_a_form_card(
 ) -> None:
     paths = build_content_site()
     doc = soup(client, paths["contact"], settings)
-    assert doc.select_one(".contact-layout .contact-address address") is not None
+    assert doc.select_one(".contact-layout .contact-address address a") is not None
+    assert doc.select_one("address h2, address section") is None
     card = doc.select_one(".contact-layout .contact-form-card.card")
     assert card is not None
     assert card.select_one("a[href='https://example.com/contact']") is not None

@@ -14,17 +14,17 @@ operator has no street address, so there is no map link.
     {% include "components/page_banner.html" with title=heading items=trail text=operated only %}
     <div class="page-content contact-layout">
       <div class="contact-address">
-        <address>
+        <div>
           <section aria-labelledby="contact-authorities">
             <h2 id="contact-authorities" class="h4">{% translate "For authorities" %}</h2>
             {% if points.authority_email %}
-              <p><a href="mailto:{{ points.authority_email }}">{{ points.authority_email }}</a></p>
+              <address><a href="mailto:{{ points.authority_email }}">{{ points.authority_email }}</a></address>
             {% endif %}
             {% if authority_languages %}
               <p class="mb-0">{% translate "Languages:" %} {{ authority_languages|join:", " }}</p>
             {% endif %}
           </section>
-        </address>
+        </div>
       </div>
       <section class="contact-form-card card" aria-labelledby="contact-users">
         <div class="card-body">
