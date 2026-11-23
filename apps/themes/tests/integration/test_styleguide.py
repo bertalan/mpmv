@@ -125,7 +125,7 @@ def test_every_card_and_product_tile_state_is_shown(staff_client: Client) -> Non
     assert html.count('class="product-tile') >= 4
     assert "product-tile--unavailable" in html
     assert "product-tile__placeholder" in html
-    assert "Price on request" in html
+    assert gettext("Price on request") in html
     assert "<del>" in html
     # The sample image is a same-origin static file (CSP img-src 'self').
     assert re.search(r'<img[^>]*src="/static/[^"]+"', html)
@@ -229,10 +229,12 @@ def test_the_commerce_components_are_shown_in_every_state(staff_client: Client) 
     price = section_html(html, "sg-price")
     assert "<del>" in price
     assert gettext("Lowest price in the last 30 days:").rstrip(":") in price
-    assert "Price on request" in price
+    assert gettext("Price on request") in price
     rating = section_html(html, "sg-rating")
-    assert "out of 5" in rating
-    assert "No reviews yet" in rating
+    before, after = gettext("Rated %(value)s out of 5").split("%(value)s")
+    sentence = re.escape(before) + r"\d+(?:[.,]\d+)?" + re.escape(after)
+    assert re.search(r'<span class="rating__value">\s*' + sentence + r"\s*</span>", rating)
+    assert gettext("No reviews yet") in rating
     quantity = section_html(html, "sg-quantity")
     assert re.search(r'<input type="number"[^>]*\sdisabled', quantity)
     cart = section_html(html, "sg-cart")
@@ -258,7 +260,7 @@ def test_the_content_components_are_shown_in_every_state(staff_client: Client) -
     html = staff_client.get(URL).content.decode()
     assert "gallery__placeholder" in section_html(html, "sg-gallery")
     tables = section_html(html, "sg-tables")
-    assert "No returns yet." in tables
+    assert gettext("No returns yet.") in tables
     assert tables.count('tabindex="0"') == 2
     assert "hero--image" in section_html(html, "sg-hero")
     assert "cta-band--accent" in section_html(html, "sg-cta")
@@ -274,3 +276,8 @@ def test_the_image_credit_is_shown_with_and_without_links(staff_client: Client) 
     assert 'rel="license"' in credits
     assert "CC0 1.0" in credits
     assert '<details class="image-credits">' in credits
+
+
+def test_the_styleguide_countdown_loads_the_on_demand_script_once(staff_client: Client) -> None:
+    html = staff_client.get(URL).content.decode()
+    assert html.count("themes/base/js/lazy/countdown.js") == 1

@@ -22,12 +22,25 @@ into the trigger of a full-screen modal holding base's search form (same action,
 labels). Without JavaScript the link just leads to the search page. Focus moves to the field when
 the modal opens (`ride/js/mini-cart.js`); Escape closes it and focus returns to the icon.
 
+Close buttons (panels and search overlay): `btn-close--sprite` draws the X from the theme's
+same-origin sprite in currentColor; Bootstrap's own X is a data: URI, which the CSP (`img-src
+'self'`) blocks. The `aria-label` names the button.
+
 Mini-cart (THM.15 part 2): the cart icon is a link to the cart page that opens an offcanvas on the
 end side. Its body is filled by HTMX from the small fragment `orders:cart_mini` (count and lines; no
 pricing quote, no flash messages) on load and after every add to cart. `#cart-count` is the
 polite live region with the item count in words; `#cart-badge` is the visual count; both are set
 by `ride/js/mini-cart.js` from `data-cart-count` of the loaded fragment. On the cart and checkout
 pages (app `orders`) the icon stays a plain link: their own markup would repeat the panel's ids.
+
+Secondary tools (THM.21): the help link, language switcher, garage menu and user tools live once, in
+`header_more.html`: in the menu panel (the drawer below 64rem, so the bar stays one row of logo,
+search, cart and menu button; the end of the inline navigation from 64rem), or beside the icons
+when the site has no menu. The staff-only "Site links" entry is added to `links` for staff only.
+
+Overlay (THM.21): when the page's first block is a hero (not a slider) the bar is transparent over it
+with a scrim gradient behind the links, and solid once the page is scrolled (`is-away` on <html>,
+set by ride.js; without JavaScript the bar stays solid). CSS only decides it, from the header's next sibling.
 
 Context: `site_name`, `links` (label, url, optional children), `languages`, `search_url` and
 `cart_url` (default: the language home, where `?s=` is the CAT.27 search page, and `orders:cart`; an icon is left out without a
@@ -37,11 +50,10 @@ url, never rendered as a dead link), and the context of the help link.
     {% url 'home' as home_url %}<a class="site-name" href="{% firstof home_url '/' %}">{{ site_name }}</a>
     {% if links %}
       <div class="site-nav">
-        <button type="button" class="nav-toggle navbar-toggler" data-bs-toggle="offcanvas" data-bs-target="#site-offcanvas" aria-controls="site-offcanvas">{% include "components/icon.html" with name="menu" only %}{% translate "Menu" %}</button>
         <div class="offcanvas offcanvas-end" tabindex="-1" id="site-offcanvas" aria-labelledby="site-offcanvas-title">
           <div class="offcanvas-header">
             <span class="offcanvas-title" id="site-offcanvas-title">{% translate "Menu" %}</span>
-            <button type="button" class="btn-close" data-bs-theme="dark" data-bs-dismiss="offcanvas" aria-label="{% translate 'Close' %}"></button>
+            <button type="button" class="btn-close btn-close--sprite" data-bs-theme="dark" data-bs-dismiss="offcanvas" aria-label="{% translate 'Close' %}">{% include "components/icon.html" with name="close" only %}</button>
           </div>
           <div class="offcanvas-body">
             <nav id="site-nav" aria-label="{% translate 'Main' %}">
@@ -61,6 +73,7 @@ url, never rendered as a dead link), and the context of the help link.
                 {% endwith %}{% endfor %}
               </ul>
             </nav>
+            <div class="site-header__more">{% include "components/header_more.html" %}</div>
           </div>
         </div>
       </div>
@@ -72,11 +85,11 @@ url, never rendered as a dead link), and the context of the help link.
         {% if search_url %}<a class="tool" href="{{ search_url }}" data-bs-toggle="modal" data-bs-target="#search-modal">{% include "components/icon.html" with name="search" only %}<span class="visually-hidden">{% translate "Search" %}</span></a>{% endif %}
         {% if cart_url %}<a class="tool tool--cart" href="{{ cart_url }}"{% if request.resolver_match.app_name != "orders" and request.resolver_match.app_name != "mfa" and request.resolver_match.app_name != "levels" and "login" not in page_path %} data-bs-toggle="offcanvas" data-bs-target="#mini-cart-offcanvas" aria-controls="mini-cart-offcanvas"{% endif %}>{% include "components/icon.html" with name="cart" only %}<span class="tool__badge" id="cart-badge" aria-hidden="true" hidden></span><span class="visually-hidden">{% translate "Cart" %}</span><span class="visually-hidden" id="cart-count" aria-live="polite"></span></a>{% endif %}
       {% endwith %}
-      {% include "components/help_link.html" %}
-      {% if languages %}{% include "components/language_switcher.html" %}{% endif %}
-      {% include "components/garage_menu.html" %}
-      {% help_context as help %}{% include "components/user_tools.html" %}
+      {% if not links %}{% include "components/header_more.html" %}{% endif %}
     </div>
+    {% if links %}
+      <button type="button" class="nav-toggle navbar-toggler" data-bs-toggle="offcanvas" data-bs-target="#site-offcanvas" aria-controls="site-offcanvas">{% include "components/icon.html" with name="menu" only %}<span class="visually-hidden">{% translate "Menu" %}</span></button>
+    {% endif %}
   </div>
 </header>
     {% with search_url=search_href|safe_href cart_url=cart_href|safe_href %}
@@ -86,7 +99,7 @@ url, never rendered as a dead link), and the context of the help link.
             <div class="modal-content">
               <div class="modal-header">
                 <h2 class="modal-title" id="search-modal-title">{% translate "Search" %}</h2>
-                <button type="button" class="btn-close" data-bs-theme="dark" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
+                <button type="button" class="btn-close btn-close--sprite" data-bs-theme="dark" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}">{% include "components/icon.html" with name="close" only %}</button>
               </div>
               <div class="modal-body">
                 {% include "components/search_form.html" with id="site-search" action=search_url name="s" query=request.GET.s only %}
@@ -100,7 +113,7 @@ url, never rendered as a dead link), and the context of the help link.
         <div class="offcanvas offcanvas-end" tabindex="-1" id="mini-cart-offcanvas" aria-labelledby="mini-cart-title">
           <div class="offcanvas-header">
             <span class="offcanvas-title" id="mini-cart-title">{% translate "Cart" %}</span>
-            <button type="button" class="btn-close" data-bs-theme="dark" data-bs-dismiss="offcanvas" aria-label="{% translate 'Close' %}"></button>
+            <button type="button" class="btn-close btn-close--sprite" data-bs-theme="dark" data-bs-dismiss="offcanvas" aria-label="{% translate 'Close' %}">{% include "components/icon.html" with name="close" only %}</button>
           </div>
           <div class="offcanvas-body">
             <div id="mini-cart-body" hx-get="{% url 'orders:cart_mini' %}" hx-trigger="load, cart-changed from:body" hx-swap="innerHTML" hx-headers='{"X-MPMV-Poll": "1"}'></div>

@@ -31,7 +31,7 @@ from typing import Any
 
 from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import transaction
+from django.db import models, transaction
 from django.urls import reverse
 from django.utils import formats, timezone, translation
 from django.utils.translation import gettext
@@ -149,14 +149,14 @@ def recipient_of(draft: StaffDraft) -> str:
     return str(draft.source_order.email or "")
 
 
-def _snapshot(draft: StaffDraft) -> dict[str, Any]:
+def _snapshot(draft: StaffDraft, *, now: dt.datetime | None = None) -> dict[str, Any]:
     """What the audit shows of a draft: no email, no address, no token."""
     return {
         "source_order": draft.source_order.number,
         "customer": _customer_kind(draft),
         "state": draft.state,
         "version": draft.version,
-        "link": "active" if link_active(draft) else "none",
+        "link": "active" if link_active(draft, now=now) else "none",
     }
 
 
@@ -202,6 +202,28 @@ def copyable(order: Order) -> bool:
     return order.privacy_status == PrivacyStatus.ACTIVE and order.state not in _NOT_COPYABLE
 
 
+def _account_closing(customer_id: int | None) -> bool:
+    """The account was erased, has an erasure pending (CMP.4) or is inactive: no draft is made
+    or sent for it. The erasure request is reached through the user, without importing it."""
+    if customer_id is None:
+        return False
+    return (
+        User.objects.filter(pk=customer_id)
+        .filter(models.Q(is_active=False) | models.Q(erasure_request__isnull=False))
+        .exists()
+    )
+
+
+def _refuse_closing_account(customer_id: int | None) -> None:
+    if _account_closing(customer_id):
+        raise DraftRefused(
+            gettext(
+                "The customer's account is closed or its erasure is in progress: no cart may "
+                "be prepared or sent for it."
+            )
+        )
+
+
 def open_draft_of(order: Order) -> StaffDraft | None:
     return StaffDraft.objects.filter(source_order=order, state=StaffDraftState.OPEN).first()
 
@@ -217,6 +239,7 @@ def draft_from_order(
     note = _note(note)
     if not copyable(order):
         raise DraftRefused(gettext("This order cannot be copied into a cart."))
+    _refuse_closing_account(order.customer_id)
     with transaction.atomic():
         Order.objects.select_for_update().filter(pk=order.pk).first()
         existing = open_draft_of(order)
@@ -376,6 +399,7 @@ def send_link(
         order = locked.source_order
         if order.privacy_status != PrivacyStatus.ACTIVE:
             raise DraftRefused(gettext("This order's customer data is no longer kept."))
+        _refuse_closing_account(locked.customer_id)
         lines = draft_lines(locked)
         if not lines:
             raise DraftRefused(gettext("The cart is empty: there is nothing to send."))
@@ -433,6 +457,31 @@ def send_link(
         audit_changes(changeset, ctx=ctx, action=ACTION_SENT)
     draft.refresh_from_db()
     return SendResult(changeset, left - 1, expires_at)
+
+
+def expire_links_of_customer(
+    user: User, *, now: dt.datetime | None = None, dry_run: bool = False
+) -> ChangeSet:
+    """Account erasure (CMP.4, #757): every link still open of the drafts made for `user` now
+    answers as an expired link, so a one-time link sent before the erasure no longer opens. The
+    draft stays open and keeps its digest. The caller (the erasure) owns the transaction and the
+    audit; the snapshots hold no email, name or token."""
+    stamp = now or timezone.now()
+    changeset = ChangeSet()
+    rows = (
+        StaffDraft.objects.select_related("source_order")
+        .select_for_update(of=("self",))
+        .filter(customer=user, state=StaffDraftState.OPEN, link_expires_at__gt=stamp)
+        .exclude(link_digest="")
+        .order_by("id")
+    )
+    for draft in rows:
+        before = _snapshot(draft, now=stamp)
+        draft.link_expires_at = stamp
+        changeset.update(DRAFT_MODEL, str(draft.public_id), before, _snapshot(draft, now=stamp))
+        if not dry_run:
+            draft.save(update_fields=["link_expires_at", "updated_at"])
+    return changeset
 
 
 def _email_context(

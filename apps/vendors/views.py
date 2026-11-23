@@ -28,6 +28,7 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 from django.utils.cache import add_never_cache_headers
 from django.utils.translation import get_language
+from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_http_methods
 
 from apps.accounts import engine as accounts_engine
@@ -53,10 +54,10 @@ from .models import Vendor
 
 CLAIM_SESSION_KEY = "vendors.claim"
 SIGN_IN_BACKEND = "django.contrib.auth.backends.ModelBackend"
-TOO_MANY_ATTEMPTS = "Too many attempts. Please try again later."
-NO_MATCH = "This does not match the VAT number or TIN we hold for this vendor."
-INVALID_CODE = "Invalid code. Check the time on your device and try again."
-SIGN_IN_FAILED = "The password or the authentication code is not correct."
+TOO_MANY_ATTEMPTS = _("Too many attempts. Please try again later.")
+NO_MATCH = _("This does not match the VAT number or TIN we hold for this vendor.")
+INVALID_CODE = _("Invalid code. Check the time on your device and try again.")
+SIGN_IN_FAILED = _("The password or the authentication code is not correct.")
 
 
 def _private(response: HttpResponse) -> HttpResponse:
@@ -132,9 +133,9 @@ def _submit(request: HttpRequest, vendor: Vendor, link: ActionLinkCheck) -> Http
     full_name = request.POST.get("full_name", "").strip()
     errors = []
     if not full_name:
-        errors.append("Enter your full name.")
+        errors.append(str(_("Enter your full name.")))
     if password != request.POST.get("password2", ""):
-        errors.append("The two passwords do not match.")
+        errors.append(str(_("The two passwords do not match.")))
     if errors:
         return _account_page(request, vendor, link, errors)
     try:
@@ -150,7 +151,7 @@ def _submit(request: HttpRequest, vendor: Vendor, link: ActionLinkCheck) -> Http
     except ValidationError as exc:
         return _account_page(request, vendor, link, list(exc.messages))
     except services.ClaimCodeInvalid:
-        return _account_page(request, vendor, link, [INVALID_CODE])
+        return _account_page(request, vendor, link, [str(INVALID_CODE)])
     except services.ClaimAccountExists:
         return _sign_in_page(request, vendor)
     except engine.ClaimError:
@@ -169,11 +170,11 @@ def _sign_in(request: HttpRequest, vendor: Vendor, link: ActionLinkCheck) -> Htt
         return _account_page(request, vendor, link)
     user = authenticate(request, username=account.email, password=request.POST.get("password", ""))
     if not isinstance(user, User) or user.pk != account.pk:
-        return _sign_in_page(request, vendor, SIGN_IN_FAILED)
+        return _sign_in_page(request, vendor, str(SIGN_IN_FAILED))
     device = verify_totp(user, request.POST.get("code", "").strip())
     if device is None:
         record_mfa_failure(user, TOTP, ctx=audit_context(request))
-        return _sign_in_page(request, vendor, SIGN_IN_FAILED)
+        return _sign_in_page(request, vendor, str(SIGN_IN_FAILED))
     try:
         services.submit_claim_as_account(link, user, ctx=audit_context(request))
     except engine.ClaimError:
@@ -205,7 +206,9 @@ def claim(request: HttpRequest, vendor_key: str) -> HttpResponse:
         wait = services.claim_retry_after(client_ip(request))
         if wait:
             retry = str(max(1, math.ceil(wait.total_seconds())))
-            response = HttpResponse(TOO_MANY_ATTEMPTS, status=429, headers={"Retry-After": retry})
+            response = HttpResponse(
+                str(TOO_MANY_ATTEMPTS), status=429, headers={"Retry-After": retry}
+            )
             return _private(response)
     vendor = Vendor.objects.get(public_id=vendor_key)  # the valid link names an open claim
     step = request.POST.get("step", "") if request.method == "POST" else ""
@@ -220,7 +223,7 @@ def claim(request: HttpRequest, vendor_key: str) -> HttpResponse:
         if not matched:
             if services.claim_link(request.session, vendor_key).refusal is not None:
                 return _refused(request)  # that answer locked the claim
-            return _page(request, "identity", {"vendor": vendor, "error": NO_MATCH})
+            return _page(request, "identity", {"vendor": vendor, "error": str(NO_MATCH)})
         return _account_page(request, vendor, link)
 
     if not services.identity_confirmed(link):

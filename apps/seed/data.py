@@ -89,6 +89,9 @@ ATTRIBUTES: Final[dict[str, tuple[Texts, list[tuple[str, Texts]]]]] = {
     ),
 }
 
+# The language every seed text exists in: the fallback when a language has no text (I18N.15).
+TEXT_FALLBACK: Final = "en"
+
 
 @dataclass(frozen=True)
 class Node:
@@ -625,12 +628,14 @@ class SalesTermsSeed:
     return_cost_bearer: str = ""
     return_cost_info: str = ""
 
-    def values(self, language: str = "en") -> dict[str, Any]:
+    def values(self, language: str = TEXT_FALLBACK) -> dict[str, Any]:
+        """The terms form values; clause titles in `language`, else English."""
         body = "\n\n".join(self.body[code] for code in ("it", "en"))
         return {
             "body": body,
             "clauses": [
-                {"article": article, "title": titles[language]} for article, titles in self.clauses
+                {"article": article, "title": titles.get(language) or titles[TEXT_FALLBACK]}
+                for article, titles in self.clauses
             ],
             "governing_law": self.governing_law,
             "b2b_court": self.b2b_court,
@@ -1319,6 +1324,61 @@ HOME_HERO_ALT: Final[Texts] = {
     "en": "Abstract placeholder shapes in warm colours",
     "it": "Forme astratte segnaposto in colori caldi",
 }
+
+# The vendor-recruitment home (CMS.19, owner decision 2026-11-21): English only. Every other
+# language gets an alias of the source home, which shows this text until someone translates it.
+LANDING_HERO: Final = (
+    "Open your shop on our marketplace",
+    "Reach new customers without building a website of your own. You list your products; the "
+    "marketplace brings the visitors, the checkout and the payments.",
+)
+APPLY_LABEL: Final = "Apply now"
+SHOP_LABEL: Final = "Visit the shop"
+LANDING_BENEFITS: Final = (
+    "<h2>Why sell here</h2><ul>"
+    "<li><b>Your own storefront.</b> A page with your name, your story and your products.</li>"
+    "<li><b>Checkout and payments included.</b> Customers pay the marketplace; you receive "
+    "your share.</li>"
+    "<li><b>You stay in charge.</b> You set your prices and ship from your own workshop.</li>"
+    "<li><b>Help when you need it.</b> A guide for every step and a team that answers.</li></ul>"
+)
+LANDING_STEPS: Final = (
+    "<h2>How it works</h2><ol>"
+    "<li><b>Apply.</b> Tell us about your shop and what you sell.</li>"
+    "<li><b>Set up.</b> Once approved, add your products and your shipping rates.</li>"
+    "<li><b>Sell.</b> Customers find you, order and pay; you pack and ship.</li></ol>"
+)
+# No fee is invented: the operator's configuration has no published fee terms, so the section
+# says so and points to the plans and the contract.
+LANDING_FEES: Final = (
+    "<h2>Fees</h2><p><b>Example fee, set by the operator.</b> The operator of this marketplace "
+    "sets the commission on each sale and any plan fee. The figures that apply to you are in "
+    "the contract you accept before you start selling.</p>"
+)
+LANDING_QUOTES_HEADING: Final = "What our sellers say"
+LANDING_QUOTES: Final = (
+    # (quote, author, role): invented sellers named by the demo vendors' pseudonyms
+    ("I listed my first products in an afternoon.", "Vendor A", "Example ceramics workshop"),
+    ("Orders come in, I pack them, the payments follow.", "Vendor B", "Example knitwear studio"),
+    ("New readers found my books here.", "Vendor C", "Example small press"),
+)
+LANDING_FAQ_HEADING: Final = "Questions from shopkeepers"
+LANDING_FAQ: Final = (
+    ("Who can apply?", "<p>Any business that makes or sells its own products.</p>"),
+    ("How long does approval take?", "<p>We review every application and answer by email.</p>"),
+    ("Can I leave?", "<p>Yes: you can close your shop under the terms of your contract.</p>"),
+)
+LANDING_CTA: Final = (
+    "Ready to open your shop?",
+    "The application takes a few minutes, and we read every one.",
+)
+LANDING_SHOP_CTA: Final = ("See the shop first", "Browse the products our demo sellers offer.")
+# The product content of the former demo home (ARC.10), now a page of its own.
+SHOP: Final = PageSeed(
+    slug={"en": "demo-shop", "it": "demo-negozio"},
+    title={"en": "Shop (demo)", "it": "Negozio (demo)"},
+    body={"en": "", "it": ""},
+)
 
 HOW_IT_WORKS: Final = PageSeed(
     slug={"en": "demo-how-it-works", "it": "demo-come-funziona"},

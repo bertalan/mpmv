@@ -12,8 +12,10 @@ import time
 from typing import Any
 
 import pytest
+from django.http import HttpResponse
 from django.test import Client
 from django.urls import reverse
+from django.utils.html import escape
 from django_otp.oath import TOTP
 from django_otp.plugins.otp_totp.models import TOTPDevice
 from pytest_django.fixtures import Settings as SettingsWrapper
@@ -29,6 +31,14 @@ from apps.vendors import engine, services, views
 from apps.vendors import urls as claim_urls
 from apps.vendors.models import Vendor, VendorClaim, VendorMember
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
+from tests.i18n import translated
+
+
+def _says(msgid: str, page: HttpResponse | str) -> bool:
+    """Whether the page shows `msgid` in the primary language (the claim pages are translated)."""
+    body = page if isinstance(page, str) else page.content.decode()
+    return escape(translated(msgid)) in body
+
 
 pytestmark = pytest.mark.django_db
 
@@ -248,7 +258,7 @@ def test_a_wrong_vat_number_is_refused_and_audited(client: Client) -> None:
     response = confirm_identity(client, vendor, wrong)
     assert response.status_code == 200
     assert 'name="password1"' not in response.content.decode()
-    assert "does not match" in response.content.decode()
+    assert _says("This does not match the VAT number or TIN we hold for this vendor.", response)
     claim = VendorClaim.objects.get(vendor=vendor)
     assert claim.failed_attempts == 1
     assert claim.confirmed_link == ""
@@ -305,7 +315,7 @@ def test_the_claim_is_submitted_with_a_password_and_an_authenticator(client: Cli
     response = full_claim(client, vendor)
     assert response.status_code == 200
     body = response.content.decode()
-    assert "waiting for approval" in body
+    assert _says("Claim submitted", body)
     user = User.objects.get(email=vendor.contact_email)
     assert user.has_usable_password()
     assert TOTPDevice.objects.filter(user=user, confirmed=True).exists()
@@ -327,7 +337,7 @@ def test_a_wrong_authenticator_code_creates_nothing(client: Client) -> None:
     good = pending_totp_code(client, vendor)
     response = create_account(client, vendor, code=str((int(good) + 1) % 1_000_000).zfill(6))
     assert response.status_code == 200
-    assert "Invalid code" in response.content.decode()
+    assert _says("Invalid code. Check the time on your device and try again.", response)
     assert not User.objects.filter(email=vendor.contact_email).exists()
     assert VendorClaim.objects.get(vendor=vendor).status == VendorClaim.Status.OPEN
 
@@ -358,7 +368,7 @@ def test_an_existing_account_with_the_legal_email_is_not_taken_over(client: Clie
     response = create_account(client, vendor, code="123456")  # a forged account step
     assert response.status_code == 200
     body = response.content.decode()
-    assert "already uses" in body
+    assert 'value="sign_in"' in body
     assert 'name="step" value="sign_in"' in body
     existing.refresh_from_db()
     assert not TOTPDevice.objects.filter(user=existing).exists()
@@ -396,7 +406,7 @@ def test_an_existing_account_signs_in_with_its_own_factors_and_submits(client: C
     confirm_identity(client, vendor, vendor.vat_number)
     response = sign_in_and_submit(client, vendor, password, totp_token(device))
     assert response.status_code == 200
-    assert "waiting for approval" in response.content.decode()
+    assert _says("Claim submitted", response)
     claim = VendorClaim.objects.get(vendor=vendor)
     assert claim.status == VendorClaim.Status.SUBMITTED
     assert claim.claimant == user
@@ -423,7 +433,7 @@ def test_an_existing_account_with_a_wrong_factor_submits_nothing(
         str((int(good) + 1) % 1_000_000).zfill(6) if wrong == "code" else good,
     )
     assert response.status_code == 200
-    assert "not correct" in response.content.decode()
+    assert _says("The password or the authentication code is not correct.", response)
     assert VendorClaim.objects.get(vendor=vendor).status == VendorClaim.Status.OPEN
     assert not ActionLinkUse.objects.exists()
     assert "_auth_user_id" not in client.session
@@ -451,7 +461,7 @@ def test_a_rejected_claimant_claims_again_with_a_new_link(client: Client) -> Non
     open_link(again, path)
     confirm_identity(again, vendor, vendor.vat_number)
     response = sign_in_and_submit(again, vendor, password, totp_token(device))
-    assert "waiting for approval" in response.content.decode()
+    assert _says("Claim submitted", response)
     claim = VendorClaim.objects.get(vendor=vendor)
     assert claim.status == VendorClaim.Status.SUBMITTED
     assert claim.claimant == claimant
@@ -707,7 +717,7 @@ def test_a_claim_through_the_pec_creates_the_account_on_the_pec(client: Client) 
     open_link(client, send_link(vendor, ctx=STAFF, channel=engine.CLAIM_CHANNEL_PEC))
     confirm_identity(client, vendor, vendor.vat_number)
     response = create_account(client, vendor)
-    assert "waiting for approval" in response.content.decode()
+    assert _says("Claim submitted", response)
     claim = VendorClaim.objects.get(vendor=vendor)
     assert claim.claimant is not None
     assert claim.claimant.email == vendor.pec

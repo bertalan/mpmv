@@ -1,10 +1,12 @@
 """CORE.4: recovery codes are stored hashed, single use, audited when used, regenerable."""
 
 import re
+from datetime import timedelta
 
 import pytest
 from django.test import Client, override_settings
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.html import escape
 from pytest_django.fixtures import Settings as SettingsWrapper
 
@@ -123,6 +125,40 @@ def test_failed_attempts_are_throttled(client: Client) -> None:
     assert _use(client, engine.generate_recovery_codes(1)[0]) == 200
     assert _use(client, code) == 200  # right code, but too soon after a failure
     assert RecoveryCode.objects.get().used_at is None
+
+
+@override_settings(MFA_RECOVERY_THROTTLE_FACTOR=60)
+def test_the_throttle_recovers_once_the_back_off_has_passed(
+    client: Client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The clock is django.utils.timezone.now (django-otp's ThrottlingMixin reads it): no sleeps."""
+    start = timezone.now()
+    offset = {"seconds": 0.0}
+    monkeypatch.setattr(
+        "django.utils.timezone.now", lambda: start + timedelta(seconds=offset["seconds"])
+    )
+    user = UserFactory.create(staff=True)
+    TOTPDeviceFactory.create(user=user)
+    code = engine.generate_recovery_codes(1)[0]
+    device = RecoveryCodeDeviceFactory.create(user=user)
+    RecoveryCodeFactory.create(device=device, code=code)
+    password_login(client, user)
+
+    assert _use(client, engine.generate_recovery_codes(1)[0]) == 200  # a wrong code: throttled
+    device.refresh_from_db()
+    assert device.throttling_failure_count == 1
+    assert device.throttling_failure_timestamp == start
+
+    offset["seconds"] = 59  # one second short of the 60 s back-off
+    assert _use(client, code) == 200
+    assert RecoveryCode.objects.get().used_at is None
+
+    offset["seconds"] = 61  # past the back-off
+    assert _use(client, code) == 302
+    assert RecoveryCode.objects.get().used_at == start + timedelta(seconds=61)
+    device.refresh_from_db()
+    assert device.throttling_failure_count == 0
+    assert device.throttling_failure_timestamp is None
 
 
 @override_settings(TRUSTED_PROXY_HEADER="X-Real-IP", TRUSTED_PROXIES=["10.89.250.0/24"])

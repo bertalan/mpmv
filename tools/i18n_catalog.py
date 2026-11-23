@@ -78,6 +78,8 @@ SCOPES = (
     "apps/vendors/templates/documents/vendors",  # the sales terms PDF (VEN.36), same strings as the page
     "apps/vendors/templates/vendors/apply",  # the vendor application pages (VEN.22), formal
     "apps/vendors/forms.py",  # the application and confirm forms (VEN.22)
+    "apps/vendors/templates/vendors/claim",  # the vendor claim pages (I18N.10 follow-up)
+    "apps/vendors/views.py",  # the claim page refusals
     "themes/base/templates/layouts",
     "themes/ride/templates/components/header.html",  # the Bootstrap navbar and offcanvas (THM.15)
     "themes/ride/templates/components/footer.html",  # social nav label, back to top (THM.15)
@@ -175,6 +177,9 @@ FILES = (
     "apps/orders/amendments.py",
     "apps/orders/amendment_engine.py",  # the classification reasons and refusals (ORD.20)
     "apps/orders/amendment_notices.py",
+    "apps/orders/models.py",  # the state labels staff and the order pages show
+    "apps/core/models.py",  # the image licence and author labels, the seeded "Own work"
+    "apps/themes/models.py",  # the theme settings field labels
     "apps/orders/staff_drafts.py",  # the refusals staff read on a prepared cart (ORD.32)
 )
 # Apps scanned for `help_text=` strings only (ARC.31: field help is translated; the rest of these

@@ -20,6 +20,7 @@ from django.conf import settings
 from django.db import models
 from django.db.models.functions import Round
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 
 from apps.catalog.models import Product
 from apps.core.fields import CountryField, LanguageField, MoneyField
@@ -33,26 +34,26 @@ from .tz import business_tz
 
 
 class OrderState(models.TextChoices):
-    CHECKOUT = "checkout"
-    QUOTE_FLOW = "quote_flow"
-    AWAITING_PAYMENT = "awaiting_payment"
-    PAID = "paid"
-    IN_FULFILLMENT = "in_fulfillment"
-    FULFILLED = "fulfilled"
-    CLOSED = "closed"
-    CANCELLED = "cancelled"
-    PARTIALLY_REFUNDED = "partially_refunded"
-    REFUNDED = "refunded"
+    CHECKOUT = "checkout", _("Checkout")
+    QUOTE_FLOW = "quote_flow", _("Quote in progress")
+    AWAITING_PAYMENT = "awaiting_payment", _("Waiting for payment")
+    PAID = "paid", _("Paid")
+    IN_FULFILLMENT = "in_fulfillment", _("Being prepared")
+    FULFILLED = "fulfilled", _("Delivered")
+    CLOSED = "closed", _("Completed")
+    CANCELLED = "cancelled", _("Cancelled")
+    PARTIALLY_REFUNDED = "partially_refunded", _("Partly refunded")
+    REFUNDED = "refunded", _("Refunded")
 
 
 class VendorOrderState(models.TextChoices):
-    PENDING = "pending"
-    ACCEPTED = "accepted"
-    SHIPPED = "shipped"
-    DELIVERED = "delivered"
-    COMPLETED = "completed"
-    CANCELLED = "cancelled"
-    REFUNDED = "refunded"
+    PENDING = "pending", _("Pending")
+    ACCEPTED = "accepted", _("Accepted")
+    SHIPPED = "shipped", _("Shipped")
+    DELIVERED = "delivered", _("Delivered")
+    COMPLETED = "completed", _("Completed")
+    CANCELLED = "cancelled", _("Cancelled")
+    REFUNDED = "refunded", _("Refunded")
 
 
 class PrivacyStatus(models.TextChoices):
@@ -661,17 +662,17 @@ class VendorOrderVersion(BaseModel):
 
 
 class AmendmentState(models.TextChoices):
-    DRAFT = "draft"
-    AWAITING_QUOTE = "awaiting_quote"
-    PROPOSED = "proposed"
-    ACCEPTED = "accepted"
-    AWAITING_PAYMENT = "awaiting_payment"
-    APPLIED = "applied"
-    DECLINED = "declined"
-    EXPIRED = "expired"
-    WITHDRAWN = "withdrawn"
-    SUPERSEDED = "superseded"
-    DISCARDED = "discarded"
+    DRAFT = "draft", _("Draft")
+    AWAITING_QUOTE = "awaiting_quote", _("Waiting for a quote")
+    PROPOSED = "proposed", _("Proposed")
+    ACCEPTED = "accepted", _("Accepted")
+    AWAITING_PAYMENT = "awaiting_payment", _("Waiting for payment")
+    APPLIED = "applied", _("Applied")
+    DECLINED = "declined", _("Declined")
+    EXPIRED = "expired", _("Expired")
+    WITHDRAWN = "withdrawn", _("Withdrawn")
+    SUPERSEDED = "superseded", _("Superseded")
+    DISCARDED = "discarded", _("Discarded")
 
 
 OPEN_AMENDMENT_STATES: frozenset[str] = frozenset(
@@ -871,8 +872,8 @@ class OrderEvent(BaseModel):
 
 
 class StaffDraftState(models.TextChoices):
-    OPEN = "open", "Open: staff may change it and send the link"
-    OPENED = "opened", "Opened: the customer put it in their cart"
+    OPEN = "open", _("Open: staff may change it and send the link")
+    OPENED = "opened", _("Opened: the customer put it in their cart")
 
 
 class StaffDraft(BaseModel):

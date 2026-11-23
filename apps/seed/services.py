@@ -6,6 +6,11 @@ product creation, shipping import...), so the seed exercises the same code paths
 same audit entries as staff and vendors would. Where an app has no service yet (taxonomy terms,
 translations, CMS pages, event pages), the rows are written as the admin would write them.
 
+Languages (I18N.15): source rows are stored under the configured primary language, other rows only
+under configured languages the seed data has text for; English is just the fallback text. The seed
+assumes one primary language per database: re-seeding after the primary language changed is not
+migrated, and the slug lookups (made in the current primary language) would create a second set.
+
 `reset` takes the seed out again, and only the seed: rows are found by the stable keys of
 `apps.seed.data`. Rows the database keeps as legal evidence cannot be deleted (VEN.5: contract
 acceptances and an accepted contract; legal page versions; SEC.4: the audit log), so a
@@ -30,6 +35,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.core.files.images import ImageFile
 from django.db import transaction
 from django.db.models import Q
+from django.urls import reverse
 from django.utils import timezone
 from wagtail.models import Locale
 
@@ -61,7 +67,7 @@ from apps.compliance import services as compliance_services
 from apps.core import translations
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
-from apps.core.i18n import configured_languages
+from apps.core.i18n import configured_languages, primary_language
 from apps.core.models import ImageLicence, MediaImage, PlatformOperator, TranslationModel
 from apps.core.services import (
     NoPlatformOperator,
@@ -70,6 +76,7 @@ from apps.core.services import (
     save_image,
 )
 from apps.core.site_root import sync_default_site
+from apps.core.site_url import absolute_url
 from apps.core.text import slugify
 from apps.events.models import EventIndexPage, EventPage
 from apps.events.services import ensure_event_indexes
@@ -103,7 +110,10 @@ from . import data
 from .images import placeholder_webp
 
 PUBLISHED = translations.PUBLISHED
-SOURCE_LANGUAGE = "en"
+# The seed texts are written in English (some also in Italian, a few in more languages). English
+# is only the fallback text: a row is stored under a configured language, never under "en" unless
+# "en" is configured (I18N.15).
+TEXT_FALLBACK = data.TEXT_FALLBACK
 SOLE_PROPRIETOR = vendors_engine.SOLE_PROPRIETORSHIP
 # The audit context of the `demo_seed` test fixture (root conftest); the command has its own.
 TEST_CONTEXT = AuditContext(actor_label="test:demo_seed", source="system")
@@ -255,6 +265,18 @@ def _operator_session(run: _Run) -> Iterator[None]:
         User.objects.filter(pk=user.pk).update(is_active=False)
 
 
+def _source() -> str:
+    """The language the seed's source rows are stored in: the configured primary language."""
+    return primary_language()
+
+
+def _stored_languages(wanted: Iterable[str]) -> list[str]:
+    """The configured languages among `wanted`, plus the primary one, the primary first."""
+    configured = configured_languages()
+    keep = {code for code in wanted if code in configured} | {_source()}
+    return [code for code in configured if code in keep]
+
+
 def _operator(run: _Run) -> User:
     if run.operator is None:  # pragma: no cover - set by _operator_session
         raise RuntimeError("the seed operator is set for the whole run")
@@ -267,8 +289,7 @@ def _publish_texts[T: TranslationModel](
     """Create the missing published texts of an entity, the source language first."""
     existing = {row.language: row for row in rows}
     created: list[T] = []
-    ordered = sorted(set(languages), key=lambda code: (code != SOURCE_LANGUAGE, code))
-    for language in ordered:
+    for language in _stored_languages(languages):
         if language in existing:
             continue
         row = make(language)
@@ -297,8 +318,25 @@ def _publish_fields(
     return _publish_texts(rows, make, languages)
 
 
+def _pick[V](texts: dict[str, V], language: str) -> V:
+    """The value for `language`, else the source language's, else the English fallback."""
+    if language in texts:
+        return texts[language]
+    return texts[_source()] if _source() in texts else texts[TEXT_FALLBACK]
+
+
 def _text(texts: data.Texts, language: str) -> str:
-    return texts.get(language) or texts[SOURCE_LANGUAGE]
+    return _pick(texts, language) or texts[TEXT_FALLBACK]
+
+
+def _others(texts: data.Texts) -> list[str]:
+    """The configured languages other than the source one that `texts` has a text for."""
+    return [code for code in configured_languages() if code != _source() and code in texts]
+
+
+def _slug_key(node: data.Node) -> str:
+    """The slug the seed stores `node` under in the source language."""
+    return _text(node.slugs, _source())
 
 
 # --- Platform: operator, contract, VAT rates
@@ -360,7 +398,7 @@ def _sales_terms(run: _Run, vendor: Vendor, spec: data.VendorSeed) -> None:
     owner = User.objects.get(email__iexact=spec.owner_email)
     run.add(
         terms_services.publish_sales_terms(
-            vendor, data.SALES_TERMS[spec.letter].values(), actor=owner, ctx=run.ctx
+            vendor, data.SALES_TERMS[spec.letter].values(_source()), actor=owner, ctx=run.ctx
         )
     )
 
@@ -377,7 +415,7 @@ def _contract(run: _Run) -> VendorContract:
     if contract.note == data.CONTRACT_NOTE and not contract.is_accepted:
 
         def text(language: str) -> VendorContractTranslation:
-            title, body = data.CONTRACT_TEXTS[language]
+            title, body = data.CONTRACT_TEXTS.get(language) or data.CONTRACT_TEXTS[TEXT_FALLBACK]
             return VendorContractTranslation(
                 contract=contract, language=language, title=title, body=body
             )
@@ -425,7 +463,7 @@ def _catalog_structure(run: _Run) -> _Catalog:
             AttributeTranslation,
             {"attribute": attribute},
             {"name": names},
-            [lang for lang in languages if lang in names or lang == SOURCE_LANGUAGE],
+            names,
         )
         for position, (value_code, labels) in enumerate(values):
             value, made = AttributeValue.objects.get_or_create(
@@ -438,7 +476,7 @@ def _catalog_structure(run: _Run) -> _Catalog:
                 AttributeValueTranslation,
                 {"value": value},
                 {"label": labels},
-                [lang for lang in languages if lang in labels or lang == SOURCE_LANGUAGE],
+                labels,
             )
 
     categories: dict[str, Category] = {}
@@ -481,7 +519,7 @@ def _catalog_structure(run: _Run) -> _Catalog:
             BrandTranslation,
             {"brand": brand},
             {
-                "slug": {SOURCE_LANGUAGE: slugify(name)},
+                "slug": {_source(): slugify(name)},
                 "description": {lang: f"<p>{text}</p>" for lang, text in description.items()},
             },
             description,
@@ -504,7 +542,7 @@ def _tree_node(
     if taxonomy is not None:
         siblings = siblings.filter(taxonomy=taxonomy)
     found = siblings.filter(
-        translations__language=SOURCE_LANGUAGE, translations__slug=node.key
+        translations__language=_source(), translations__slug=_slug_key(node)
     ).first()
     if found is None:
         fields = {"taxonomy": taxonomy} if taxonomy is not None else {}
@@ -525,19 +563,21 @@ def _seed_categories() -> list[Category]:
     categories, and the subcategories with a seed key under them (never a real category)."""
     found: list[Category] = []
     for node in data.CATEGORIES:
-        root = _child_with_key(Category.get_root_nodes(), node.key)
+        root = _child_with_key(Category.get_root_nodes(), node)
         if root is None:
             continue
         for child in node.children:
-            sub = _child_with_key(root.get_children(), child.key)
+            sub = _child_with_key(root.get_children(), child)
             if sub is not None:
                 found.append(sub)
         found.append(root)
     return found
 
 
-def _child_with_key(nodes: Any, key: str) -> Any:
-    return nodes.filter(translations__language=SOURCE_LANGUAGE, translations__slug=key).first()
+def _child_with_key(nodes: Any, node: data.Node) -> Any:
+    return nodes.filter(
+        translations__language=_source(), translations__slug=_slug_key(node)
+    ).first()
 
 
 def _reset_catalog_structure(run: _Run) -> None:
@@ -691,7 +731,7 @@ def _vendor(run: _Run, index: int, spec: data.VendorSeed, contract: VendorContra
             vendor=vendor, contract=contract, onboarding_round=vendor.onboarding_round
         ).exists()
         if not accepted:
-            offer = vendors_services.contract_offer(SOURCE_LANGUAGE)
+            offer = vendors_services.contract_offer(_source())
             run.add(
                 vendors_services.accept_contract(
                     vendor,
@@ -703,9 +743,7 @@ def _vendor(run: _Run, index: int, spec: data.VendorSeed, contract: VendorContra
                 )
             )
         run.add(
-            vendors_services.certify_platform_duties(
-                vendor, owner, language=SOURCE_LANGUAGE, ctx=run.ctx
-            )
+            vendors_services.certify_platform_duties(vendor, owner, language=_source(), ctx=run.ctx)
         )
         run.add(vendors_services.change_status(vendor, vendors_engine.ACTIVE, ctx=run.ctx))
     if not tax_services.has_tax_profile(vendor):
@@ -799,11 +837,11 @@ def _products(run: _Run, vendor: Vendor, spec: data.VendorSeed, catalog: _Catalo
         texts = tuple(
             catalog_engine.TranslationIn(
                 language=language,
-                title=item.title[language],
-                short_description=short[language],
-                description=long[language],
+                title=_text(item.title, language),
+                short_description=_text(short, language),
+                description=_text(long, language),
             )
-            for language in ("en", "it")
+            for language in _stored_languages(item.title)
         )
         attributes: tuple[catalog_engine.AttributeIn, ...] = ()
         variants: tuple[catalog_engine.VariantIn, ...] = ()
@@ -1058,10 +1096,11 @@ def _set_body(page: Any, body: list[Any]) -> bool:
     return bool(_stripped(page.body.get_prep_value()) != before)
 
 
-def _home_body(
+def _shop_body(
     language: str, images: dict[str, MediaImage], how: Any, vendors: list[Vendor], terms: list[Term]
 ) -> list[Any]:
-    heading, text, label = data.HOME_HERO.get(language) or data.HOME_HERO[SOURCE_LANGUAGE]
+    """The demo shop page: the product content the home showed before CMS.19."""
+    heading, text, label = _pick(data.HOME_HERO, language)
     return [
         (
             "hero",
@@ -1093,14 +1132,70 @@ def _home_body(
     ]
 
 
-def _is_seed_home(page: HomePage, language: str) -> bool:
-    """Whether the home still has the CMS.1 sample text or the seed's own body."""
+def _landing_body(images: dict[str, MediaImage], shop: StandardPage) -> list[Any]:
+    """The vendor-recruitment home (CMS.19): English example copy, existing blocks only."""
+    apply_url = absolute_url(None, reverse("vendors:apply"))  # a full URL, as the link block asks
+
+    def cta(heading: str, text: str, link: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+        return ("cta", {"heading": heading, "text": text, "link": link})
+
+    apply = {"page": None, "url": apply_url, "label": data.APPLY_LABEL}
+    to_shop = {"page": shop, "url": "", "label": data.SHOP_LABEL}
+    heading, text = data.LANDING_HERO
+    return [
+        (
+            "hero",
+            {
+                "heading": heading,
+                "text": text,
+                "image": images["home-hero"],
+                "alt_text": _text(data.HOME_HERO_ALT, _source()),
+                "links": [apply, to_shop],
+            },
+        ),
+        ("paragraph", _text(data.DEMO_NOTICE, _source())),
+        ("paragraph", data.LANDING_BENEFITS),
+        ("paragraph", data.LANDING_STEPS),
+        ("paragraph", data.LANDING_FEES),
+        (
+            "strip",
+            {
+                "heading": data.LANDING_QUOTES_HEADING,
+                "cards": [
+                    ("testimonial", {"quote": quote, "author": author, "role": role})
+                    for quote, author, role in data.LANDING_QUOTES
+                ],
+                "per_view": "2",
+            },
+        ),
+        (
+            "faq",
+            {
+                "heading": data.LANDING_FAQ_HEADING,
+                "items": [{"question": q, "answer": a} for q, a in data.LANDING_FAQ],
+            },
+        ),
+        cta(*data.LANDING_CTA, apply),
+        cta(*data.LANDING_SHOP_CTA, to_shop),
+    ]
+
+
+def _is_seed_home(page: HomePage, written: list[Any]) -> bool:
+    """Whether the whole body of the home is still what the seed wrote: the CMS.1 sample text, an
+    empty body, or one of the `written` bodies (the landing, the shop content before CMS.19).
+    A hero with the seed's picture is not enough: an editor's translation keeps it."""
     raw = _stripped(page.body.get_prep_value())
-    sample = seed_text(language).home.body
-    if raw == [{"type": "paragraph", "value": sample}] or raw == []:
-        return True
-    heading = (data.HOME_HERO.get(language) or data.HOME_HERO[SOURCE_LANGUAGE])[0]
-    return bool(raw) and raw[0].get("type") == "hero" and raw[0]["value"].get("heading") == heading
+    sample = seed_text(page.locale.language_code).home.body
+    return raw == [] or raw == [{"type": "paragraph", "value": sample}] or raw in written
+
+
+def _written_bodies(page: HomePage, shop: StandardPage, landing: list[Any]) -> list[Any]:
+    """The bodies the seed itself wrote on the home of `page`'s language."""
+    own_shop = shop.get_translation_or_none(page.locale) or shop
+    return [
+        _stripped(HomePage(body=landing).body.get_prep_value()),
+        _stripped(own_shop.body.get_prep_value()),
+    ]
 
 
 def _translation(source: Any, locale: Locale) -> Any:
@@ -1139,19 +1234,42 @@ def _cms(run: _Run, images: dict[str, MediaImage], vendors: list[Vendor]) -> Non
     terms = [
         Term.objects.get(
             taxonomy__code=data.TAXONOMY_CODE,
-            translations__language=SOURCE_LANGUAGE,
-            translations__slug=node.key,
+            translations__language=_source(),
+            translations__slug=_slug_key(node),
         )
         for node in data.TERMS
     ]
-    for page in HomePage.objects.filter(depth=2).select_related("locale"):
-        language = page.locale.language_code
-        if not _is_seed_home(page, language):
+
+    def shop_body(language: str) -> list[Any]:
+        local_how = how.get_translation_or_none(locales[language]) or how
+        return _shop_body(language, images, local_how, vendors, terms)
+
+    shop = _standard_page(run, home, locales, images["home-hero"], data.SHOP, shop_body)
+    _recruitment_home(run, home, images, shop)
+
+
+def _recruitment_home(
+    run: _Run, home: HomePage, images: dict[str, MediaImage], shop: StandardPage
+) -> None:
+    """The source home gets the landing (CMS.19); every other seed home becomes its alias, an
+    untranslated copy that shows the English text and is in no `hreflang` (spec 09 fallback)."""
+    landing = _landing_body(images, shop)
+    changed = _is_seed_home(home, _written_bodies(home, shop, landing)) and _set_body(home, landing)
+    if changed:
+        _publish(home)  # Wagtail updates the aliases with it
+        run.changes.update("cms.homepage", home.locale.language_code, {}, {"body": "landing"})
+    aliased = False
+    for page in HomePage.objects.filter(depth=2).exclude(pk=home.pk).select_related("locale"):
+        if page.alias_of_id == home.pk or not _is_seed_home(
+            page, _written_bodies(page, shop, landing)
+        ):
             continue
-        local_how = how.get_translation_or_none(page.locale) or how
-        if _set_body(page, _home_body(language, images, local_how, vendors, terms)):
-            _publish(page)
-            run.changes.update("cms.homepage", language, {}, {"body": "demo"})
+        page.alias_of = home
+        page.save(update_fields=["alias_of"])
+        aliased = True
+        run.changes.update("cms.homepage", page.locale.language_code, {}, {"alias_of": "source"})
+    if aliased:
+        home.update_aliases()  # Wagtail's own sync, as when an editor publishes the source
 
 
 def _standard_page(
@@ -1162,12 +1280,13 @@ def _standard_page(
     spec: data.PageSeed = data.HOW_IT_WORKS,
     body: Callable[[str], list[Any]] | None = None,
 ) -> StandardPage:
-    page = StandardPage.objects.child_of(home).filter(slug=spec.slug["en"]).first()
+    source = _source()
+    page = StandardPage.objects.child_of(home).filter(slug=_text(spec.slug, source)).first()
 
     def default_body(language: str) -> list[Any]:
-        faq = data.HOW_IT_WORKS_FAQ.get(language) or data.HOW_IT_WORKS_FAQ["en"]
+        faq = _pick(data.HOW_IT_WORKS_FAQ, language)
         return [
-            ("paragraph", spec.body[language] + _text(data.DEMO_NOTICE, language)),
+            ("paragraph", _text(spec.body, language) + _text(data.DEMO_NOTICE, language)),
             ("faq", {"heading": "", "items": [{"question": q, "answer": a} for q, a in faq]}),
         ]
 
@@ -1175,23 +1294,23 @@ def _standard_page(
     if page is None:
         page = StandardPage(
             locale=home.locale,
-            title=spec.title["en"],
-            slug=spec.slug["en"],
+            title=_text(spec.title, source),
+            slug=_text(spec.slug, source),
             image=image,
-            image_alt_text=_text(data.HOME_HERO_ALT, "en"),
+            image_alt_text=_text(data.HOME_HERO_ALT, source),
             noindex=spec.noindex,
-            body=make_body("en"),
+            body=make_body(source),
         )
         home.add_child(instance=page)
         page = _publish(page)
         run.created("cms.standardpage", page.url_path)
-    for language in ("it",):
+    for language in _others(spec.title):
         locale = locales.get(language)
         if locale is None or page.get_translation_or_none(locale) is not None:
             continue
         copy = page.copy_for_translation(locale).specific
         copy.title = copy.draft_title = spec.title[language]
-        copy.slug = spec.slug[language]
+        copy.slug = _text(spec.slug, language)
         copy.image_alt_text = _text(data.HOME_HERO_ALT, language)
         copy.noindex = spec.noindex
         copy.body = make_body(language)
@@ -1277,27 +1396,28 @@ def _showcase_body(language: str, images: dict[str, MediaImage]) -> list[Any]:
 def _legal_page(
     run: _Run, home: HomePage, locales: dict[str, Locale], kind: str, spec: data.PageSeed
 ) -> None:
-    page = LegalPage.objects.child_of(home).filter(slug=spec.slug["en"]).first()
+    source = _source()
+    page = LegalPage.objects.child_of(home).filter(slug=_text(spec.slug, source)).first()
     if page is None:
         page = LegalPage(
             locale=home.locale,
-            title=spec.title["en"],
-            slug=spec.slug["en"],
+            title=_text(spec.title, source),
+            slug=_text(spec.slug, source),
             kind=kind,
             effective_date=data.LEGAL_EFFECTIVE,
-            body=[("paragraph", spec.body["en"])],
+            body=[("paragraph", _text(spec.body, source))],
         )
-        _set_clauses(page, kind, "en")
+        _set_clauses(page, kind, source)
         home.add_child(instance=page)
         page = _publish(page)
         run.created("cms.legalpage", page.url_path)
-    elif _set_clauses(page, kind, "en") or not page.live:
+    elif _set_clauses(page, kind, source) or not page.live:
         was_live = page.live
         _publish(page)
         run.changes.update(
             "cms.legalpage", page.url_path, {"live": was_live}, {"live": True, "version": "new"}
         )
-    for language in ("it",):
+    for language in _others(spec.title):
         locale = locales.get(language)
         if locale is None:
             continue
@@ -1317,8 +1437,8 @@ def _legal_page(
             continue
         copy = page.copy_for_translation(locale).specific
         copy.title = copy.draft_title = spec.title[language]
-        copy.slug = spec.slug[language]
-        copy.body = [("paragraph", spec.body[language])]
+        copy.slug = _text(spec.slug, language)
+        copy.body = [("paragraph", _text(spec.body, language))]
         _set_clauses(copy, kind, language)
         copy = _publish(copy)
         run.created("cms.legalpage", copy.url_path)
@@ -1332,13 +1452,15 @@ def _set_clauses(page: LegalPage, kind: str, language: str) -> bool:
     """
     if kind != "terms":
         return False
-    # A translation starts as a copy of the source page, so it holds the English list.
-    untouched = [[], data.PLATFORM_TERMS_CLAUSES["en"]] if language != "en" else [[]]
+    clauses = _pick(data.PLATFORM_TERMS_CLAUSES, language)
+    # A translation starts as a copy of the source page, so it holds the source language's list.
+    source_clauses = _pick(data.PLATFORM_TERMS_CLAUSES, _source())
+    untouched = [[], source_clauses] if language != _source() else [[]]
     if (page.onerous_clauses or []) not in untouched:
         return False
-    if page.onerous_clauses == data.PLATFORM_TERMS_CLAUSES[language]:
+    if page.onerous_clauses == clauses:
         return False
-    page.onerous_clauses = list(data.PLATFORM_TERMS_CLAUSES[language])
+    page.onerous_clauses = list(clauses)
     return True
 
 
@@ -1350,19 +1472,30 @@ def _seed_pages(model: Any, slugs: Iterable[str]) -> list[Any]:
 
 
 def _reset_cms(run: _Run) -> None:
-    for page in _seed_pages(StandardPage, [data.HOW_IT_WORKS.slug["en"], data.SHOWCASE.slug["en"]]):
+    for page in _seed_pages(
+        StandardPage,
+        [_text(s.slug, _source()) for s in (data.HOW_IT_WORKS, data.SHOWCASE, data.SHOP)],
+    ):
         run.changes.delete("cms.standardpage", page.url_path, {})
         page.delete()
-    for page in _seed_pages(LegalPage, [spec.slug["en"] for spec in data.LEGAL_PAGES.values()]):
+    for page in _seed_pages(
+        LegalPage, [_text(spec.slug, _source()) for spec in data.LEGAL_PAGES.values()]
+    ):
         # Every publish recorded an append-only LegalPageVersion: the page is unpublished.
         if page.live:
             page.unpublish()
             run.changes.update("cms.legalpage", page.url_path, {"live": True}, {"live": False})
+    hero_title = data.IMAGES["home-hero"][0]
+    heroes = set(MediaImage.objects.filter(title=hero_title).values_list("pk", flat=True))
     for page in HomePage.objects.filter(depth=2).select_related("locale"):
         language = page.locale.language_code
         raw = _stripped(page.body.get_prep_value())
-        heading = (data.HOME_HERO.get(language) or data.HOME_HERO[SOURCE_LANGUAGE])[0]
-        if raw and raw[0].get("type") == "hero" and raw[0]["value"].get("heading") == heading:
+        seeded = (
+            bool(raw) and raw[0].get("type") == "hero" and raw[0]["value"].get("image") in heroes
+        )
+        if page.alias_of_id is not None or seeded:  # back to the CMS.1 sample text
+            page.alias_of = None
+            page.title = page.draft_title = seed_text(language).home.title
             page.body = [("paragraph", seed_text(language).home.body)]
             _publish(page)
             run.changes.update("cms.homepage", language, {"body": "demo"}, {"body": "sample"})
@@ -1375,39 +1508,41 @@ def _reset_cms(run: _Run) -> None:
 def _events(run: _Run, images: dict[str, MediaImage], vendors: list[Vendor]) -> None:
     run.add(ensure_event_indexes())
     locales = _locales()
+    source = _source()
     index = EventIndexPage.objects.filter(locale=Locale.get_default()).first()
     if index is None:  # pragma: no cover - the home's index comes with seed_site
         return
     by_letter = {spec.letter: vendor for spec, vendor in zip(data.VENDORS, vendors, strict=True)}
     image_keys = ("event-fair", "event-sale", "event-workshop")
     for spec, image_key in zip(data.EVENTS, image_keys, strict=True):
-        page = EventPage.objects.child_of(index).filter(slug=spec.slug["en"]).first()
+        page = EventPage.objects.child_of(index).filter(slug=_text(spec.slug, source)).first()
         if page is None:
             page = EventPage(
                 locale=index.locale,
                 original_locale=index.locale,
-                title=spec.title["en"],
-                slug=spec.slug["en"],
-                summary=spec.summary["en"],
+                title=_text(spec.title, source),
+                slug=_text(spec.slug, source),
+                summary=_text(spec.summary, source),
                 vendor=by_letter.get(spec.vendor) if spec.vendor else None,
                 event_type=spec.event_type,
                 listing_image=images[image_key],
-                body=[("paragraph", f"<p>{spec.summary['en']}</p>")],
+                body=[("paragraph", f"<p>{_text(spec.summary, source)}</p>")],
                 **_event_when_where(spec),
             )
             index.add_child(instance=page)
             page = _publish(page)
             run.created("events.eventpage", page.url_path)
-        locale = locales.get("it")
-        if locale is None or page.get_translation_or_none(locale) is not None:
-            continue
-        copy = page.copy_for_translation(locale).specific
-        copy.title = copy.draft_title = spec.title["it"]
-        copy.slug = spec.slug["it"]
-        copy.summary = spec.summary["it"]
-        copy.body = [("paragraph", f"<p>{spec.summary['it']}</p>")]
-        copy = _publish(copy)
-        run.created("events.eventpage", copy.url_path)
+        for language in _others(spec.title):
+            locale = locales.get(language)
+            if locale is None or page.get_translation_or_none(locale) is not None:
+                continue
+            copy = page.copy_for_translation(locale).specific
+            copy.title = copy.draft_title = spec.title[language]
+            copy.slug = _text(spec.slug, language)
+            copy.summary = _text(spec.summary, language)
+            copy.body = [("paragraph", f"<p>{copy.summary}</p>")]
+            copy = _publish(copy)
+            run.created("events.eventpage", copy.url_path)
 
 
 def _event_when_where(spec: data.EventSeed) -> dict[str, Any]:
@@ -1426,7 +1561,7 @@ def _event_when_where(spec: data.EventSeed) -> dict[str, Any]:
 
 
 def _reset_events(run: _Run, vendors: list[Vendor]) -> None:
-    slugs = [spec.slug["en"] for spec in data.EVENTS]
+    slugs = [_text(spec.slug, _source()) for spec in data.EVENTS]
     for page in _seed_pages(EventPage, slugs):
         run.changes.delete("events.eventpage", page.url_path, {})
         page.delete()

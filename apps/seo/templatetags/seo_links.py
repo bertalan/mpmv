@@ -35,7 +35,9 @@ def _page_links(context: Context) -> tuple[str, Iterable[tuple[str, str]]]:
     def absolute(url: str) -> str:
         return url if "://" in url else site.root_url + url
 
-    own = page.get_url(request)
+    # A fallback copy (an alias) is canonical to its source page (spec 09).
+    source = page.alias_of if page.alias_of_id is not None else None
+    own = (source or page).get_url(request)
     found = {
         code: absolute(url) for code, url in services.page_language_urls(page, request).items()
     }

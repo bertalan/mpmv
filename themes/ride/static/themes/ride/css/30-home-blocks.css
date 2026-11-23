@@ -110,11 +110,13 @@
     background: var(--color-on-accent);
   }
 
-  /* --- Featured tiles (terms, vendors, pages): one link per card. */
+  /* --- Featured tiles (terms, vendors, pages): one link per card.
+     The tile grids only: a listing builds `.product-grid` on Bootstrap's `row row-cols-*`
+     (45-catalog.css), and these rules must never reach it (THM.19). */
 
   .block-featured .cards,
   .card-grid,
-  .product-grid {
+  .product-grid:not(.row) {
     display: grid;
     gap: var(--space-l);
     margin: 0;
@@ -125,7 +127,7 @@
 
   .block-featured .cards > li,
   .card-grid > li,
-  .product-grid > li {
+  .product-grid:not(.row) > li {
     container-type: inline-size;
     display: grid;
   }

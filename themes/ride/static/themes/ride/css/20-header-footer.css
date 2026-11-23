@@ -61,12 +61,40 @@
   }
 
   .site-header__tools {
+    display: flex;
+    align-items: center;
     gap: var(--space-xs) var(--space-s);
+  }
+
+  /* --- Overlay (THM.21): a bar over the home hero (the page's first block, not a slider) is
+     translucent, with a gradient of the hero's scrim colour (85% to 70%, never lighter) behind the links so
+     they stay readable even on a white image (tests/e2e/test_ride_menu_contrast.py measures the 70% end over white). It turns
+     solid once the page is scrolled (`is-away`, ride.js); without JavaScript it stays solid. The
+     bar keeps its place in the flow and its negative end margin pulls the hero under it. */
+  .site-header:has(~ .site-main > .block-hero:not(.block-hero--slider):first-child):not(:has(~ :is(.site-messages, .garage-merge-notice))) {
+    margin-block-end: calc(-1 * var(--header-offset, var(--header-height)));
+  }
+
+  html:not(.no-js):not(.is-away)
+    .site-header:has(~ .site-main > .block-hero:not(.block-hero--slider):first-child):not(:has(~ :is(.site-messages, .garage-merge-notice))) {
+    background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--color-overlay) 85%, transparent),
+      color-mix(in srgb, var(--color-overlay) 70%, transparent)
+    );
+  }
+
+  .site-header:has(~ .site-main > .block-hero:not(.block-hero--slider):first-child):not(:has(~ :is(.site-messages, .garage-merge-notice)))
+    ~ .site-main > .block-hero:first-child .hero {
+    padding-block-start: calc(var(--space-section) + var(--header-offset, var(--header-height)));
   }
 
   /* --- Dropdown sub-menus (Bootstrap dropdown): a button next to the link. */
 
-  .site-header {
+  /* On `.dropdown-menu` itself: Bootstrap declares these variables there, so a value set on
+     `.site-header` would never reach the sub-menu (white links on the white default). White on
+     the dark surface and on the hover/focus shade both pass AA 4.5:1. */
+  .site-header .dropdown-menu {
     --bs-dropdown-bg: var(--color-surface-inverse);
     --bs-dropdown-color: var(--color-text-inverse);
     --bs-dropdown-link-color: var(--color-text-inverse);
@@ -112,6 +140,13 @@
     flex-basis: 100%;
     flex-direction: column;
     padding-block: var(--space-xs);
+  }
+
+  .site-header .dropdown-item:hover,
+  .site-header .dropdown-item:focus-visible {
+    background: var(--color-heading);
+    color: var(--color-text-inverse);
+    text-decoration: underline;
   }
 
   .subnav__list .dropdown-item {
@@ -160,22 +195,72 @@
     }
 
     .site-header {
+      --header-height: 4rem;
+
       position: static;
     }
 
-    .site-nav {
-      order: 1;
+    /* One row of at most 64 px (THM.21): logo, search, cart, menu button. The secondary tools
+       are in the drawer. */
+    .site-header__inner {
+      flex-wrap: nowrap;
+      gap: var(--space-s);
+    }
+
+    .site-name {
+      flex: 1 1 auto;
+      min-inline-size: 0;
+      font-size: var(--step-1);
+      line-height: 1.1;
+    }
+
+    /* Not sticky here, but positioned, so it paints above the hero it overlays. */
+    .site-header:has(~ .site-main > .block-hero:not(.block-hero--slider):first-child):not(:has(~ :is(.site-messages, .garage-merge-notice))) {
+      position: relative;
+    }
+
+    /* DOM order is the visual order (WCAG 2.4.3): logo, search and cart, then the menu button,
+       which sits after the tools in the markup. */
+    .site-header__tools,
+    .nav-toggle {
       flex: 0 0 auto;
-      margin-inline-start: auto;
     }
 
     .site-header__tools {
-      order: 2;
-      flex-basis: 100%;
+      flex-wrap: nowrap;
+    }
+
+    .site-nav {
+      flex: 0 0 auto;
+    }
+
+    .site-header__more {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-s);
+      margin-block-start: var(--space-l);
+      padding-block-start: var(--space-m);
+      border-block-start: 1px solid currentcolor;
+    }
+
+    .site-header__more :is(.user-menu__list, .garage-menu__list) {
+      position: static;
+      margin-block-start: var(--space-xs);
+      box-shadow: none;
     }
 
     .site-nav ul {
       flex-direction: column;
+    }
+
+    /* Without JavaScript the whole menu is in the flow: it wraps to its own full-width row. */
+    html.no-js .site-header__inner {
+      flex-wrap: wrap;
+    }
+
+    html.no-js .site-nav {
+      flex-basis: 100%;
     }
 
     html.no-js .nav-toggle,
@@ -225,8 +310,18 @@
     .site-header .offcanvas-body {
       display: flex;
       flex-grow: 0;
+      align-items: center;
       padding: 0;
       overflow: visible;
+    }
+
+    /* The secondary tools end the inline navigation (THM.21). */
+    .site-header__more {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--space-xs) var(--space-s);
+      margin-inline-start: auto;
     }
 
     .site-nav .navbar-nav {
@@ -271,6 +366,31 @@
     --bs-modal-color: var(--color-text-inverse);
     --bs-modal-border-width: 0;
     --bs-modal-header-border-width: 0;
+  }
+
+  /* Close buttons of the panels and the search overlay: the X is the sprite icon in currentColor
+     (the CSP blocks Bootstrap's data: URI); base's blue button paint and Bootstrap's dark-theme
+     filter are reset. */
+  .btn-close--sprite {
+    --bs-btn-close-bg: none;
+    --bs-btn-close-opacity: 1;
+    --bs-btn-close-hover-opacity: 1;
+
+    padding: 0;
+    background: transparent;
+    color: inherit;
+    font-size: var(--step-2);
+    border: 1px solid transparent;
+    border-radius: var(--radius-round);
+    filter: none;
+  }
+
+  /* Hover: a light disc with the dark X. The panels are dark (`--color-surface-inverse`), and the
+     heading colour is nearly the same shade, so it showed no hover. The light surface is over 3:1
+     against the panel (WCAG 1.4.11) and the heading-coloured X on it is over 4.5:1. */
+  .btn-close--sprite:hover {
+    background: var(--color-surface-sunken);
+    color: var(--color-heading);
   }
 
   #search-modal .modal-title,
