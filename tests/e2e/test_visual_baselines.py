@@ -103,6 +103,7 @@ def paths(settings: SettingsWrapper, live_server: LiveServer, site_allows_indexi
         ).path,
         "blog": urlsplit(BlogPostPageFactory.create(title="Choosing a vase").url).path,
         "legal": urlsplit(legal.url).path,
+        "shop": f"/shop/{seller.slug}/",
     }
 
 
@@ -137,6 +138,33 @@ def test_key_page_matches_its_visual_baseline(
     page.wait_for_function("() => [...document.images].every((img) => img.complete)", timeout=5000)
     for width in WIDTHS:
         assert_matches_baseline(page, theme=theme, name=name, width=width)
+
+
+STOREFRONT_WIDTHS = (375, 1280)
+
+
+def test_ride_storefront_matches_its_visual_baseline(
+    page: Page,
+    live_server: LiveServer,
+    settings: SettingsWrapper,
+    paths: dict,  # type: ignore[type-arg]
+) -> None:
+    """THM.25: the `ride` vendor storefront (filter card, product cards), 375 and 1280 px,
+    baselines `ride/storefront-<width>.png`."""
+    require_visual_mode()
+    settings.MPMV_THEME_DEFAULT = "ride"
+    page.emulate_media(reduced_motion="reduce")
+    page.clock.set_fixed_time(utc(2026, 11, 18, 10))
+    page.set_viewport_size({"width": 1280, "height": 900})
+    response = page.goto(f"{live_server.url}{paths['shop']}")
+    assert response is not None
+    assert response.status == 200
+    page.wait_for_load_state("load")
+    expect(page.locator("html")).to_have_attribute("data-theme", "ride")
+    page.evaluate("() => [...document.images].forEach((img) => { img.loading = 'eager'; })")
+    page.wait_for_function("() => [...document.images].every((img) => img.complete)", timeout=5000)
+    for width in STOREFRONT_WIDTHS:
+        assert_matches_baseline(page, theme="ride", name="storefront", width=width)
 
 
 PALETTE_PAGES = ("home", "product")
