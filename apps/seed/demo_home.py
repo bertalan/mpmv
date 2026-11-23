@@ -116,7 +116,7 @@ HERO: Final[dict[str, Texts]] = {
     "slide_two": {
         "en": "Meet the makers",
         "it": "Conosci gli artigiani",
-        "de": "Die Macher kennenlernen",
+        "de": "Die Hersteller kennenlernen",
     },
     "slide_three": {
         "en": "Fairs and workshops",
@@ -140,7 +140,7 @@ HERO: Final[dict[str, Texts]] = {
         "de": "Der Blog zeigt, wie die Stücke entstehen und gepflegt werden.",
     },
     "blog": {"en": "From the blog", "it": "Dal blog", "de": "Aus dem Blog"},
-    "vendors": {"en": "Our makers", "it": "I nostri artigiani", "de": "Unsere Macher"},
+    "vendors": {"en": "Our makers", "it": "I nostri artigiani", "de": "Unsere Hersteller"},
 }
 QUOTES: Final = (
     (

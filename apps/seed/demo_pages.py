@@ -67,7 +67,7 @@ ABOUT_EXTRA: Final[dict[str, Texts]] = {
     "makers": {
         "en": "Makers on the marketplace",
         "it": "Artigiani sul marketplace",
-        "de": "Macher",
+        "de": "Hersteller auf dem Marktplatz",
     },
     "products": {
         "en": "Pieces in the catalogue",

@@ -10,7 +10,7 @@ from django.urls import reverse
 from wagtail.models import Locale
 
 from apps.catalog.models import Product
-from apps.cms.models import HomePage, NavigationMenu, StandardPage
+from apps.cms.models import BlogIndexPage, HomePage, NavigationMenu, StandardPage
 from apps.cms.seed import seed_text
 from apps.core.changeset import ChangeSet
 from apps.core.i18n import primary_language
@@ -39,53 +39,38 @@ def contact() -> StandardPage:
     return page
 
 
-def test_the_about_page_is_reachable_and_rich(demo_seed: ChangeSet, client: Client) -> None:
+def test_the_seeded_pages_menu_and_images(demo_seed: ChangeSet, client: Client) -> None:
+    """One seed, several read-only checks (a seed takes a while)."""
     page = about()
-    response = client.get(page.url)
-    assert response.status_code == 200
-    kinds = [block.block_type for block in page.body]
-    assert {"figure", "counter", "video_modal"} <= set(kinds)
+    assert client.get(page.url).status_code == 200
+    assert {"figure", "counter", "video_modal"} <= {block.block_type for block in page.body}
     assert page.body[0].value.source == seed_text(primary_language()).about.body
 
-
-def test_the_contact_page_is_reachable_with_its_points(
-    demo_seed: ChangeSet, client: Client
-) -> None:
-    page = contact()
-    response = client.get(page.url)
+    contact_page = contact()
+    response = client.get(contact_page.url)
     assert response.status_code == 200
     assert demo_pages.SUPPORT_EMAIL in response.content.decode()
     assert client.get(reverse("dsa_contact_points")).status_code == 200
 
-
-def test_the_header_menu_has_the_four_entries_and_each_is_reachable(
-    demo_seed: ChangeSet, client: Client
-) -> None:
     menu = NavigationMenu.objects.get(locale=Locale.get_default(), location="header")
     pages = [link.value["page"].specific for link in menu.links]
-    assert [type(page) for page in pages] == [
-        StandardPage,
-        type(pages[1]),
-        StandardPage,
-        StandardPage,
-    ]
     assert len(pages) == 4
-    assert pages[2].pk == about().pk
-    assert pages[3].pk == contact().pk
-    for page in pages:
-        assert client.get(page.url).status_code == 200
+    assert isinstance(pages[0], StandardPage)
+    assert isinstance(pages[1], BlogIndexPage)
+    assert pages[2].pk == page.pk
+    assert pages[3].pk == contact_page.pk
+    for target in pages:
+        assert client.get(target.url).status_code == 200
 
-
-def test_every_seeded_product_has_an_image_and_a_cover(demo_seed: ChangeSet) -> None:
-    products = Product.objects.all()
-    assert products.count() >= 1
-    for product in products:
-        assert product.images.exists(), product.sku
+    assert Product.objects.exists()
+    for product in Product.objects.all():
         assert product.images.filter(is_cover=True).count() == 1, product.sku
 
-
-def test_a_second_run_changes_nothing(demo_seed: ChangeSet) -> None:
-    assert seed(ctx=TEST_CONTEXT).is_empty
+    gallery = {p.pk: list(p.images.values_list("pk", flat=True)) for p in Product.objects.all()}
+    assert seed(ctx=TEST_CONTEXT).is_empty  # a second run changes nothing
+    assert gallery == {
+        p.pk: list(p.images.values_list("pk", flat=True)) for p in Product.objects.all()
+    }
 
 
 def test_an_edited_about_page_is_left_alone(demo_seed: ChangeSet) -> None:
@@ -96,12 +81,12 @@ def test_an_edited_about_page_is_left_alone(demo_seed: ChangeSet) -> None:
     assert [block.block_type for block in about().body] == ["paragraph"]
 
 
-def test_a_product_with_an_image_keeps_its_gallery(demo_seed: ChangeSet) -> None:
-    product = Product.objects.first()
-    assert product is not None
-    before = list(product.images.values_list("pk", flat=True))
+def test_an_about_body_that_differs_by_one_character_is_left_alone(demo_seed: ChangeSet) -> None:
+    page = about()
+    page.body = [("paragraph", seed_text(primary_language()).about.body + " ")]
+    page.save_revision().publish()
     seed(ctx=TEST_CONTEXT)
-    assert list(product.images.values_list("pk", flat=True)) == before
+    assert [block.block_type for block in about().body] == ["paragraph"]
 
 
 def test_reset_removes_the_generated_product_images(demo_seed: ChangeSet) -> None:

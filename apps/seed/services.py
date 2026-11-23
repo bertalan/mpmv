@@ -918,7 +918,7 @@ def _product_images(run: _Run, vendor: Vendor, spec: data.VendorSeed) -> None:
         product = Product.objects.filter(vendor=vendor, sku=sku).first()
         if product is None or product.images.exists():
             continue
-        content = placeholder_webp(sku, data.product_image_colour(sku))
+        content = placeholder_webp(sku, data.product_image_colour(sku), scale=0.5)
         run.add(
             media.upload_image(
                 product,
