@@ -2335,6 +2335,10 @@ msgstr ""
 "ihn verwendet, den neuen Text. Solange der Baustein nicht veröffentlicht ist, wird nichts "
 "angezeigt."
 
+#: apps/themes/admin_views.py
+msgid "Choose a site to switch it to this palette when you save."
+msgstr "Wählen Sie eine Website, die beim Speichern auf diese Palette umgestellt wird."
+
 #: apps/manager/event_forms.py
 msgid "Choose a time zone such as Europe/Rome."
 msgstr "Wählen Sie eine Zeitzone, zum Beispiel Europe/Rome."
