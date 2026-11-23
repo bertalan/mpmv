@@ -100,3 +100,18 @@ def test_a_seeded_profile_without_its_legal_note_gets_it_back(demo_seed: ChangeS
     assert not again.is_empty
     assert notes.exists()
     assert seed(ctx=TEST_CONTEXT).is_empty
+
+
+def test_a_profile_whose_exemption_country_changed_gets_no_seeded_note(
+    demo_seed: ChangeSet,
+) -> None:
+    """The art. 293 B CGI wording belongs to a French exemption only: once staff move the
+    exemption to another country, the seed leaves the missing note to them."""
+    notes = VendorTaxProfileTranslation.objects.filter(profile__vendor__in=seed_vendors())
+    profiles = {note.profile for note in notes.select_related("profile")}
+    assert profiles
+    notes.delete()
+    for profile in profiles:
+        type(profile).objects.filter(pk=profile.pk).update(exempt_country="BE")
+    seed(ctx=TEST_CONTEXT)
+    assert not notes.exists()

@@ -462,7 +462,8 @@ def _tax_legal_notes(run: _Run, vendor: Vendor, spec: data.VendorSeed) -> None:
         profile = tax_services.current_tax_profile(vendor)
     except NoValidRow:
         return
-    if (profile.regime, profile.exempt_reason) != (spec.vat_regime, spec.exempt_reason):
+    seeded = (spec.vat_regime, spec.exempt_reason, spec.exempt_country)
+    if (profile.regime, profile.exempt_reason, profile.exempt_country) != seeded:
         return
     present = set(profile.translations.values_list("language", flat=True))
     for language in _stored_languages(spec.legal_note):

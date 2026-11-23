@@ -587,11 +587,17 @@ VENDORS: Final = (
         exempt_reason="other",
         exempt_country="FR",  # French franchise en base, the VAT number's country
         legal_note={
-            "en": "VAT not applicable, article 293 B of the French General Tax Code.",
+            "en": "VAT not applicable, article 293 B of the French General Tax Code (CGI).",
             "fr": "TVA non applicable, article 293 B du CGI.",
-            "it": "IVA non applicabile, articolo 293 B del codice generale delle imposte francese.",
-            "de": "Keine Umsatzsteuer gemäß Artikel 293 B des französischen Steuergesetzbuchs.",
-            "es": "IVA no aplicable, artículo 293 B del Código General de Impuestos francés.",
+            "it": (
+                "IVA non applicabile, articolo 293 B del Codice generale delle imposte "
+                "francese (CGI)."
+            ),
+            "de": (
+                "Umsatzsteuer nicht anwendbar, Artikel 293 B des französischen "
+                "Allgemeinen Steuergesetzbuchs (CGI)."
+            ),
+            "es": "IVA no aplicable, artículo 293 B del Código General de Impuestos francés (CGI).",
         },
         identity={
             "registered_street": "Rue Exemple",
