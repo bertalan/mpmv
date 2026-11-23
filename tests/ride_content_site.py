@@ -34,7 +34,8 @@ def _publish(page: Page) -> Page:
 
 def build_content_site(*, posts: int = 3, images: bool = False) -> dict[str, str]:
     """Paths by page type: standard, blog, post, author, legal, legal_version, vendor,
-    recruitment, contact. With `images`, the first post has a main image and the author a photo."""
+    recruitment, contact. With `images`, the oldest and the newest (featured) posts have a main
+    image and the author a photo."""
     seed_site()
     PlatformOperatorFactory.create(
         open_ended=True,
@@ -68,6 +69,11 @@ def build_content_site(*, posts: int = 3, images: bool = False) -> dict[str, str
                     "image_alt_text": "A workshop bench",
                 }
                 if images and number == 0
+                else {
+                    "image": MediaImageFactory.create(file__width=1600, file__height=900),
+                    "image_alt_text": f"Bench {number}",
+                }
+                if images and number == posts - 1
                 else {}
             ),
         )

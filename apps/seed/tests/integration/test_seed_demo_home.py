@@ -124,3 +124,42 @@ def test_the_footer_has_a_column_and_a_social_profile(demo_seed: ChangeSet) -> N
 
 def test_a_second_run_changes_nothing(demo_seed: ChangeSet) -> None:
     assert seed(ctx=TEST_CONTEXT).is_empty
+
+
+def test_the_blog_and_its_posts_exist_and_are_reachable_in_every_language(
+    demo_seed: ChangeSet, client: Client
+) -> None:
+    source = BlogIndexPage.objects.get(locale=Locale.get_default())
+    for locale in Locale.objects.all():
+        index = source.get_translation(locale).specific
+        assert index.live
+        assert client.get(index.url).status_code == 200
+        posts = BlogPostPage.objects.child_of(index).live()
+        assert posts.count() == BlogPostPage.objects.child_of(source).live().count()
+        assert client.get(posts.first().url).status_code == 200
+
+
+def test_the_header_menu_of_every_language_points_to_pages_of_that_language(
+    demo_seed: ChangeSet,
+) -> None:
+    for menu in NavigationMenu.objects.filter(location="header"):
+        assert len(menu.links) >= 3
+        for link in menu.links:
+            assert link.value["page"].locale_id == menu.locale_id
+
+
+def test_an_editors_post_title_and_footer_column_survive_a_second_run(demo_seed: ChangeSet) -> None:
+    post = BlogPostPage.objects.filter(locale=Locale.get_default()).first()
+    assert post is not None
+    post.title = "Edited by an editor"
+    post.save_revision().publish()
+    footer = FooterSettings.for_site(Site.objects.get(is_default_site=True))
+    column = footer.columns.first()
+    assert column is not None
+    column.title = "Editor column"
+    column.save()
+    seed(ctx=TEST_CONTEXT)
+    post.refresh_from_db()
+    column.refresh_from_db()
+    assert post.title == "Edited by an editor"
+    assert column.title == "Editor column"

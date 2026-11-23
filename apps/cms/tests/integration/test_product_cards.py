@@ -25,7 +25,13 @@ from apps.catalog.tests.factories import ProductFactory, ProductTranslationFacto
 from apps.cms.blocks import PRODUCT_CARDS_LAYOUTS, ProductCardsBlock, page_graph_nodes
 from apps.cms.models import BlogPostPage, HomePage, StandardPage, TermLandingPage, VendorLandingPage
 from apps.cms.services import SeedReport
-from apps.cms.tests.integration.test_product_grid import _grid, _home, _publish, listed
+from apps.cms.tests.integration.test_product_grid import (
+    _grid,
+    _home,
+    _publish,
+    amount,
+    listed,
+)
 from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
@@ -123,7 +129,7 @@ def test_an_on_request_product_shows_no_price(seeded: SeedReport) -> None:
     html = _publish(_home(), [_cards(for_sale, on_request, catalog_only)])
     tiles = _section(html).find_all("li")
     assert len(tiles) == 3
-    assert "12.20" in tiles[0].get_text()  # 10.00 + 22 % (TAX.12)
+    assert amount("12.20") in tiles[0].get_text()  # 10.00 + 22 % (TAX.12)
     assert "EUR" not in tiles[1].get_text()
     assert "EUR" not in tiles[2].get_text()
 

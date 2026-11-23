@@ -90,3 +90,11 @@ def test_help_has_no_exceptions_left() -> None:
 
 def test_help_en_prose_is_british() -> None:
     assert british.help_violations() == []
+
+
+def test_help_markdown_line_numbers_survive_a_fenced_block(tmp_path: Path) -> None:
+    """#1010 nit: a fence is blanked line for line, so a later US word keeps its line."""
+    (tmp_path / "a.md").write_text(
+        "Intro.\n\n```\none\ntwo\nthree\n```\n\nThe catalog price.\n", encoding="utf-8"
+    )
+    assert british.help_violations(tmp_path) == ["a.md:9: ['catalog']"]
