@@ -15,7 +15,7 @@ from apps.cms.models import BlogPostPage, HomePage, StandardPage, body_field
 from apps.cms.tests.factories import StandardPageFactory
 from tests import hostile_input as hi
 
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("english_interface")]
+pytestmark = pytest.mark.django_db
 
 
 def value(open_first: bool = False, **extra: Any) -> Any:

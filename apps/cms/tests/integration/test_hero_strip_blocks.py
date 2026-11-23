@@ -22,7 +22,7 @@ from apps.cms.services import seed_site
 from apps.core.i18n import primary_language
 from apps.core.tests.factories import MediaImageFactory
 
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("english_interface")]
+pytestmark = pytest.mark.django_db
 
 SLIDES = [
     {

@@ -29,7 +29,8 @@ banner (the only h1, the breadcrumb).
         {# A preview before the first publish: no version recorded yet. #}
         <p class="legal-meta">{% translate "Effective from" %} <time datetime="{{ page.effective_date|date:'Y-m-d' }}">{{ page.effective_date|date:"DATE_FORMAT" }}</time></p>
       {% endif %}
-      {% for block in page.body %}{% include_block block %}{% endfor %}
+      {% legal_anchors page.body as anchors %}
+      {% for block in page.body %}{% include_block block with anchor=anchors|anchor_of:block.id %}{% endfor %}
       {% if archive %}
         <section class="legal-archive mt-4" aria-labelledby="legal-archive-heading">
           <h2 id="legal-archive-heading" class="h4">{% translate "Previous versions" %}</h2>
