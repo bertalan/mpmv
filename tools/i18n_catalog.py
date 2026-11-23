@@ -164,6 +164,9 @@ SCOPES = (
     "apps/cms/templates/cms/term_landing_page.html",
     "apps/cms/templates/cms/vendor_landing_page.html",
     "apps/cms/templates/cms/vendor_recruitment_page.html",
+    # The ride 404 and 500 pages (THM.30): the same msgids as base's.
+    "themes/ride/templates/404.html",
+    "themes/ride/templates/500.html",
 )
 # Single storefront modules whose strings the Manager texts quote (shop policy headings).
 EXTRA_FILES = (
