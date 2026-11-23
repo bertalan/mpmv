@@ -6,11 +6,12 @@ reached through a test URLconf whose view raises; the project's own `handler500`
 
 import pytest
 from django.http import HttpRequest, HttpResponse
-from django.urls import include, path
+from django.urls import path
 from playwright.sync_api import Page, expect
 from pytest_django.fixtures import Settings as SettingsWrapper
 from pytest_django.live_server_helper import LiveServer
 
+from mpmv.urls import urlpatterns as project_urlpatterns
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.visual import assert_matches_baseline, require_visual_mode
 
@@ -24,7 +25,7 @@ def boom(request: HttpRequest) -> HttpResponse:
     raise RuntimeError("THM.30 test error")
 
 
-urlpatterns = [path("boom/", boom), path("", include("mpmv.urls"))]
+urlpatterns = [path("boom/", boom), *project_urlpatterns]
 handler500 = "apps.themes.views.server_error"
 handler400 = "apps.themes.views.bad_request"
 
