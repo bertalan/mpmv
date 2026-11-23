@@ -387,6 +387,9 @@ class VendorSeed:
     # A ready test payout account (`acct_demo_<n>`, owner decision 2026-11-13), so the demo cart
     # can buy its products. False keeps the vendor on request (D-19): STAGE shows both cases.
     payout_account: bool = True
+    # TAX.13: the legal note an `other` exemption prints on order documents. The tax engine
+    # decides no consumer price for such a profile without one (TAX.12, THM.23 3/3).
+    legal_note: Texts = field(default_factory=dict)
 
     @property
     def slug(self) -> str:
@@ -583,6 +586,19 @@ VENDORS: Final = (
         vat_regime="exempt",
         exempt_reason="other",
         exempt_country="FR",  # French franchise en base, the VAT number's country
+        legal_note={
+            "en": "VAT not applicable, article 293 B of the French General Tax Code (CGI).",
+            "fr": "TVA non applicable, article 293 B du CGI.",
+            "it": (
+                "IVA non applicabile, articolo 293 B del Codice generale delle imposte "
+                "francese (CGI)."
+            ),
+            "de": (
+                "Umsatzsteuer nicht anwendbar, Artikel 293 B des französischen "
+                "Allgemeinen Steuergesetzbuchs (CGI)."
+            ),
+            "es": "IVA no aplicable, artículo 293 B del Código General de Impuestos francés (CGI).",
+        },
         identity={
             "registered_street": "Rue Exemple",
             "registered_street_number": "5",
