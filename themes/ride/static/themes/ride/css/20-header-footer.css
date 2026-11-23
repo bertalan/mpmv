@@ -85,7 +85,7 @@
   }
 
   .site-header:has(~ .site-main > .block-hero:not(.block-hero--slider):first-child):not(:has(~ :is(.site-messages, .garage-merge-notice)))
-    ~ .site-main > .block-hero .hero {
+    ~ .site-main > .block-hero:first-child .hero {
     padding-block-start: calc(var(--space-section) + var(--header-offset, var(--header-height)));
   }
 
@@ -219,14 +219,18 @@
       position: relative;
     }
 
-    .site-header__tools {
-      order: 1;
+    /* DOM order is the visual order (WCAG 2.4.3): logo, search and cart, then the menu button,
+       which sits after the tools in the markup. */
+    .site-header__tools,
+    .nav-toggle {
       flex: 0 0 auto;
+    }
+
+    .site-header__tools {
       flex-wrap: nowrap;
     }
 
     .site-nav {
-      order: 2;
       flex: 0 0 auto;
     }
 
@@ -248,6 +252,15 @@
 
     .site-nav ul {
       flex-direction: column;
+    }
+
+    /* Without JavaScript the whole menu is in the flow: it wraps to its own full-width row. */
+    html.no-js .site-header__inner {
+      flex-wrap: wrap;
+    }
+
+    html.no-js .site-nav {
+      flex-basis: 100%;
     }
 
     html.no-js .nav-toggle,

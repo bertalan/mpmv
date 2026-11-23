@@ -7,6 +7,8 @@ is solid once the page is scrolled. A focused element is never hidden by the hea
 Other pages keep the solid bar.
 """
 
+from typing import Any
+
 import pytest
 from playwright.sync_api import Page, expect
 from pytest_django.live_server_helper import LiveServer
@@ -27,11 +29,11 @@ BACKGROUND = "() => getComputedStyle(document.querySelector('.site-header'))"
 def test_the_phone_header_is_one_row_of_at_most_64px(page: Page, live_server: LiveServer) -> None:
     open_page(page, live_server, "/", 375)
     assert page.evaluate("() => document.querySelector('.site-header').offsetHeight") <= 64
-    rows = {
-        round(page.evaluate(BOX, selector)[0] / 4)
+    centres = [
+        sum(page.evaluate(BOX, selector)) / 2
         for selector in (".site-name", ".tool--cart", ".nav-toggle", ".site-header__tools a")
-    }
-    assert len(rows) <= 2, "logo, search, cart and menu sit on one row"
+    ]
+    assert max(centres) - min(centres) <= 4, "logo, search, cart and menu sit on one row"
     for selector in (".site-name", ".nav-toggle", ".site-header__tools a", ".tool--cart"):
         top, bottom = page.evaluate(BOX, selector)
         assert 0 <= top <= bottom <= 64
@@ -97,3 +99,57 @@ def test_a_focused_link_is_not_hidden_under_the_overlay_header(
         )
         if not in_header:
             assert top >= header_bottom - 1, page.evaluate("document.activeElement.outerHTML")
+
+
+def test_the_phone_tab_order_is_the_visual_order(page: Page, live_server: LiveServer) -> None:
+    """WCAG 2.4.3: logo, search, cart, menu button, left to right and in the Tab order."""
+    open_page(page, live_server, "/", 375)
+    visual = page.evaluate(
+        """() => [
+                '.site-name', '.site-header__tools a:nth-of-type(1)', '.tool--cart', '.nav-toggle',
+            ]
+            .map((sel) => document.querySelector(sel))
+            .sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left)
+            .map((el) => el.className)"""
+    )
+    assert visual[0] == "site-name"
+    page.locator(".site-name").focus()
+    tabbed = ["site-name"]
+    for _ in range(3):
+        page.keyboard.press("Tab")
+        tabbed.append(page.evaluate("() => document.activeElement.className"))
+    assert tabbed == visual, (tabbed, visual)
+    assert "nav-toggle" in tabbed[-1]
+
+
+def test_without_javascript_the_phone_header_wraps_the_menu_below_the_bar(
+    browser: Any, live_server: LiveServer
+) -> None:
+    for width in (360, 375):
+        context = browser.new_context(
+            java_script_enabled=False, viewport={"width": width, "height": 800}
+        )
+        try:
+            page = context.new_page()
+            assert page.goto(f"{live_server.url}/") is not None
+            assert page.evaluate("() => document.documentElement.scrollWidth <= innerWidth")
+            logo_bottom = page.evaluate(BOX, ".site-name")[1]
+            nav_top = page.evaluate(BOX, ".site-nav")[0]
+            assert nav_top >= logo_bottom - 1, (width, nav_top, logo_bottom)
+        finally:
+            context.close()
+
+
+def test_without_javascript_the_overlay_page_keeps_a_solid_header(
+    browser: Any, live_server: LiveServer
+) -> None:
+    context = browser.new_context(
+        java_script_enabled=False, viewport={"width": 1280, "height": 900}
+    )
+    try:
+        page = context.new_page()
+        assert page.goto(f"{live_server.url}/") is not None
+        assert page.locator(".block-hero").count() == 1
+        assert page.evaluate(f"({BACKGROUND})().backgroundImage") == "none"
+    finally:
+        context.close()

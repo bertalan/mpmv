@@ -35,6 +35,7 @@ from apps.tax import engine as tax
 from apps.tax.tests.factories import TaxRateFactory
 from apps.vendors.tests.factories import CommissionRuleFactory
 from tests.e2e.palette import PALETTE_LINK, PALETTES, assert_palette_applied, choose_palette
+from tests.e2e.test_ride_home import seed_ride_home
 from tests.e2e.visual import WIDTHS, assert_matches_baseline, require_visual_mode
 from tests.i18n import translated
 from tests.ride_content_site import build_content_site
@@ -243,6 +244,8 @@ def test_ride_header_top_matches_its_visual_baseline(
     baselines `ride/header-<name>-<width>.png`."""
     require_visual_mode()
     settings.MPMV_THEME_DEFAULT = "ride"
+    if name == "home":
+        seed_ride_home(settings)  # a hero image as the first block, so the overlay shows
     page.emulate_media(reduced_motion="reduce")
     page.clock.set_fixed_time(utc(2026, 11, 18, 10))
     page.set_viewport_size({"width": 1280, "height": 900})

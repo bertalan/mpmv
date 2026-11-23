@@ -55,7 +55,8 @@ def navigation_links(context: dict[str, Any], location: str) -> list[MenuLink]:
     """
     links = _menu_links(context.get("request"), _menu(location))
     user = getattr(context.get("request"), "user", None)
-    if location == NavigationMenu.Location.HEADER and getattr(user, "is_staff", False):
+    staff = getattr(user, "is_active", False) and getattr(user, "is_staff", False)
+    if location == NavigationMenu.Location.HEADER and staff:
         links.extend(_site_links_item())
     return links
 
