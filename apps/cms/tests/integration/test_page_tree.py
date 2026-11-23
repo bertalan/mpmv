@@ -13,6 +13,7 @@ from django.test import override_settings
 from wagtail.models import Locale, Page, Site
 
 from apps.cms.models import HomePage, NavigationMenu, StandardPage
+from apps.cms.seed import seed_text
 from apps.cms.services import SeedReport, seed_site, sync_locales
 from apps.cms.tests.factories import HomePageFactory, StandardPageFactory
 from apps.core.i18n import primary_language
@@ -72,11 +73,9 @@ def test_seed_creates_a_home_and_a_static_page_per_language(seeded: SeedReport) 
     assert len({page.translation_key for page in abouts.values()}) == 1
     for code, about in abouts.items():
         assert about.get_parent().specific == homes[code]
-    assert (abouts[primary_language()].slug, abouts[other_language()].slug, abouts["de"].slug) == (
-        "about",
-        "chi-siamo",
-        "ueber-uns",
-    )
+    assert {code: about.slug for code, about in abouts.items()} == {
+        code: seed_text(code).about.slug for code in _codes()
+    }
 
 
 def test_seed_creates_a_header_and_a_footer_menu_per_language(seeded: SeedReport) -> None:

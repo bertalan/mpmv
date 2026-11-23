@@ -7,12 +7,14 @@ primary language's menu, with its page links shown in the visitor's language whe
 import pytest
 from django.db import IntegrityError
 from django.test import Client
+from django.utils.html import escape
 from wagtail.models import Locale, Site
 
 from apps.cms.models import NavigationMenu, StandardPage
+from apps.cms.seed import seed_text
 from apps.cms.services import SeedReport
 from apps.cms.tests.factories import NavigationMenuFactory, StandardPageFactory
-from apps.core.i18n import primary_language
+from apps.core.i18n import configured_languages, primary_language
 from tests.i18n import language_prefix, other_language, third_language
 
 pytestmark = pytest.mark.django_db
@@ -27,13 +29,18 @@ def _footer(html: str) -> str:
 
 
 def test_each_language_shows_its_own_header_and_footer(client: Client, seeded: SeedReport) -> None:
-    en = client.get("/").content.decode()
-    it = client.get(f"{language_prefix(other_language())}/").content.decode()
-    assert '<a href="/about/">About us</a>' in _header(en)
-    assert f'<a href="{language_prefix(other_language())}/chi-siamo/">Chi siamo</a>' in _header(it)
-    assert f'<a href="{language_prefix(other_language())}/">Home</a>' in _footer(it)
-    assert f'<a href="{language_prefix(other_language())}/chi-siamo/">Chi siamo</a>' in _footer(it)
-    assert "/about/" not in _header(it)
+    for code in configured_languages():
+        prefix = language_prefix(code)
+        texts = seed_text(code)
+        html = client.get(f"{prefix}/").content.decode()
+        about = f'<a href="{prefix}/{texts.about.slug}/">{escape(texts.about.title)}</a>'
+        assert about in _header(html), code
+        assert about in _footer(html), code
+        assert f'<a href="{prefix}/">{escape(texts.home.title)}</a>' in _footer(html), code
+        for other in configured_languages():
+            if other != code:
+                foreign = f"{language_prefix(other)}/{seed_text(other).about.slug}/"
+                assert f'href="{foreign}"' not in _header(html), (code, other)
 
 
 def test_a_language_without_its_menu_uses_the_primary_one_in_its_own_language(
@@ -63,10 +70,12 @@ def test_menus_show_custom_labels_and_external_links_in_order(client: Client) ->
 def test_menus_hide_links_to_unpublished_or_deleted_pages(
     client: Client, seeded: SeedReport
 ) -> None:
+    title = seed_text(primary_language()).about.title
+    assert title in _header(client.get("/").content.decode())
     StandardPage.objects.filter(locale__language_code=primary_language()).update(live=False)
-    assert "About us" not in _header(client.get("/").content.decode())
+    assert title not in _header(client.get("/").content.decode())
     StandardPage.objects.filter(locale__language_code=primary_language()).delete()
-    assert "About us" not in _header(client.get("/").content.decode())
+    assert title not in _header(client.get("/").content.decode())
 
 
 def test_a_language_has_one_menu_per_location() -> None:
