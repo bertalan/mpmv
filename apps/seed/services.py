@@ -79,6 +79,7 @@ from apps.core.services import (
 from apps.core.site_root import sync_default_site
 from apps.core.site_url import absolute_url
 from apps.core.text import slugify
+from apps.core.validity import NoValidRow
 from apps.events.models import EventIndexPage, EventPage
 from apps.events.services import ensure_event_indexes
 from apps.payments import connect as payments_connect
@@ -93,7 +94,7 @@ from apps.shipping.models import (
 )
 from apps.shipping.services import delete_config, save_config
 from apps.tax import services as tax_services
-from apps.tax.models import TaxRate, VendorTaxProfile
+from apps.tax.models import TaxRate, VendorTaxProfile, VendorTaxProfileTranslation
 from apps.vendors import engine as vendors_engine
 from apps.vendors import services as vendors_services
 from apps.vendors import terms_services
@@ -448,6 +449,34 @@ def _tax_rates(run: _Run) -> None:
             run.add(tax_services.configure_tax_rate(new, ctx=run.ctx))
 
 
+def _tax_legal_notes(run: _Run, vendor: Vendor, spec: data.VendorSeed) -> None:
+    """The legal note of the vendor's current tax profile, in each language that misses one.
+
+    An `other` exemption without a note decides no VAT (TAX.13), so the shop would show its
+    products without a consumer price (TAX.12, ORD.19). Only the seed's own regime gets a note,
+    and an existing note is never changed: staff may have reworded it.
+    """
+    if not spec.legal_note:
+        return
+    try:
+        profile = tax_services.current_tax_profile(vendor)
+    except NoValidRow:
+        return
+    if (profile.regime, profile.exempt_reason) != (spec.vat_regime, spec.exempt_reason):
+        return
+    present = set(profile.translations.values_list("language", flat=True))
+    for language in _stored_languages(spec.legal_note):
+        if language in present:
+            continue
+        note = VendorTaxProfileTranslation(
+            profile=profile,
+            language=language,
+            status=PUBLISHED,
+            legal_note=_text(spec.legal_note, language),
+        )
+        run.add(tax_services.save_legal_note(note, ctx=run.ctx))
+
+
 # --- Catalog structure: attributes, categories, a landing taxonomy, brands
 
 
@@ -766,6 +795,7 @@ def _vendor(run: _Run, index: int, spec: data.VendorSeed, contract: VendorContra
         run.add(
             tax_services.configure_vendor_tax_profile(profile, approver=_operator(run), ctx=run.ctx)
         )
+    _tax_legal_notes(run, vendor, spec)
 
     if spec.payout_account:
         run.add(payments_connect.record_demo_account(vendor, number=index + 1, ctx=run.ctx))
