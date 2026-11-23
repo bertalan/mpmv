@@ -63,7 +63,10 @@ def test_the_home_shows_every_section_and_links_to_apply_and_the_shop(
     for text in SECTIONS:
         assert text in html, text
     assert f'{reverse("vendors:apply")}"' in html
-    shop = StandardPage.objects.get(locale=Locale.get_default(), slug=data.SHOP.slug["en"])
+    shop = StandardPage.objects.get(
+        locale=Locale.get_default(),
+        slug=data.SHOP.slug.get(primary_language()) or data.SHOP.slug["en"],
+    )
     assert f'href="{shop.url}"' in html
     assert client.get(shop.url).status_code == 200
 
