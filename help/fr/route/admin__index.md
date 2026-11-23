@@ -11,7 +11,7 @@ Voici l'écran d'administration technique réservé à l'équipe de la plateform
 Utilisez **Approuver les politiques de retour en attente sélectionnées** ou **Refuser les politiques de retour en attente sélectionnées** dans la liste des versions des politiques de retour pour statuer sur la politique de retour d'un vendeur. Seuls Catalogue et modération et le propriétaire de la plateforme peuvent le faire. L'étape est sensible : elle demande une passkey, soit confirmée à l'instant, soit via une fenêtre passkey ouverte. Sans elle, la demande de passkey s'affiche et rien ne change. Chaque décision est inscrite dans le journal d'audit.
 
 ## Couleurs du site
-Dans le tableau des thèmes de site, vous pouvez choisir, en plus du thème, une palette de couleurs pour tout le site. Red, Blue et Petrol sont prêtes à l'emploi. Laissez le champ vide pour garder les couleurs propres du thème.
+Dans le formulaire du thème du site, vous pouvez choisir, en plus du thème, une palette de couleurs pour tout le site. Red, Blue et Petrol sont prêtes à l'emploi. Laissez le champ vide pour garder les couleurs propres du thème.
 Chaque palette a passé un contrôle du contraste, afin que le texte reste lisible sur son fond. Une palette qui échoue au contrôle est refusée, et le site garde ses couleurs actuelles. Une palette utilisée par un site ne peut pas être supprimée. La création de palettes personnalisées viendra plus tard.
 
 ## Bon à savoir

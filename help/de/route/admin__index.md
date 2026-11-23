@@ -11,7 +11,7 @@ Dies ist die technische Verwaltungsseite für das Plattform-Team. Sie listet die
 Verwenden Sie **Ausgewählte ausstehende Rückgaberichtlinien genehmigen** oder **Ausgewählte ausstehende Rückgaberichtlinien ablehnen** in der Liste der Versionen der Rückgaberichtlinien, um über die Rückgaberichtlinie eines Verkäufers zu entscheiden. Das können nur Katalog und Moderation sowie der Plattformeigentümer. Der Schritt ist sensibel: Er verlangt einen Passkey, entweder gerade bestätigt oder über ein offenes Passkey-Fenster. Ohne ihn erscheint die Passkey-Abfrage und nichts ändert sich. Jede Entscheidung wird im Audit-Protokoll festgehalten.
 
 ## Farben der Website
-In der Tabelle der Website-Themen können Sie neben dem Theme eine Farbpalette für die ganze Website wählen. Red, Blue und Petrol sind sofort einsatzbereit. Lassen Sie das Feld leer, um die eigenen Farben des Themes zu behalten.
+Im Formular des Website-Themes können Sie neben dem Theme eine Farbpalette für die ganze Website wählen. Red, Blue und Petrol sind sofort einsatzbereit. Lassen Sie das Feld leer, um die eigenen Farben des Themes zu behalten.
 Jede Palette hat eine Kontrollprüfung bestanden, damit Text auf seinem Hintergrund lesbar bleibt. Eine Palette, die die Prüfung nicht besteht, wird abgelehnt, und die Website behält ihre aktuellen Farben. Eine Palette, die eine Website verwendet, kann nicht entfernt werden. Eigene Paletten zu erstellen, folgt später.
 
 ## Gut zu wissen
