@@ -12,9 +12,11 @@ from apps.cms.models import (
     BlogIndexPage,
     BlogPostPage,
     FooterSettings,
+    HomePage,
     NavigationMenu,
     StandardPage,
 )
+from apps.cms.seed import seed_text
 from apps.core.changeset import ChangeSet
 from apps.core.i18n import primary_language
 from apps.seed import data
@@ -63,6 +65,55 @@ def test_the_header_menu_links_shop_blog_and_about(demo_seed: ChangeSet) -> None
     pages = [link.value["page"].specific for link in menu.links]
     assert [type(page) for page in pages][:3] == [StandardPage, BlogIndexPage, StandardPage]
     assert pages[0].slug == shop_slug()
+
+
+def _header() -> NavigationMenu:
+    locale = Locale.get_default()
+    return NavigationMenu.objects.get(locale=locale, location="header")
+
+
+def _default_menu(about: StandardPage) -> list[tuple[str, dict[str, object]]]:
+    return [("page", {"page": about, "label": ""})]
+
+
+def _reset_to(links: list[tuple[str, dict[str, object]]]) -> NavigationMenu:
+    menu = _header()
+    menu.links = links
+    menu.save()
+    return menu
+
+
+def _about() -> StandardPage:
+    locale = Locale.get_default()
+    home = HomePage.objects.get(locale=locale, depth=2)
+    page: StandardPage = StandardPage.objects.child_of(home).get(
+        slug=seed_text(locale.language_code).about.slug
+    )
+    return page
+
+
+def test_the_untouched_cms1_menu_is_rewritten(demo_seed: ChangeSet) -> None:
+    _reset_to(_default_menu(_about()))
+    seed(ctx=TEST_CONTEXT)
+    assert len(_header().links) >= 3
+
+
+@pytest.mark.parametrize("edit", ["other page", "label", "no page"])
+def test_an_edited_single_link_menu_is_left_alone(demo_seed: ChangeSet, edit: str) -> None:
+    other = shop()
+    links: list[tuple[str, dict[str, object]]]
+    if edit == "other page":
+        links = _default_menu(other)
+    elif edit == "label":
+        links = [("page", {"page": _about(), "label": "Who we are"})]
+    else:
+        links = [("page", {"page": None, "label": ""})]
+    before = _reset_to(links).links.get_prep_value()
+    seed(ctx=TEST_CONTEXT)
+    after = _header().links.get_prep_value()
+    assert [{k: v for k, v in b.items() if k != "id"} for b in after] == [
+        {k: v for k, v in b.items() if k != "id"} for b in before
+    ]
 
 
 def test_the_footer_has_a_column_and_a_social_profile(demo_seed: ChangeSet) -> None:

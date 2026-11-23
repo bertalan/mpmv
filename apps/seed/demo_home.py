@@ -22,6 +22,7 @@ from apps.cms.models import (
     SocialProfile,
     StandardPage,
 )
+from apps.cms.seed import seed_text
 from apps.core.i18n import primary_language
 
 Texts = dict[str, str]
@@ -33,7 +34,7 @@ def pick(texts: Texts, language: str) -> str:
 
 
 BLOG_TITLE: Final[Texts] = {"en": "Blog", "it": "Blog", "de": "Blog"}
-BLOG_SLUG: Final[Texts] = {"en": "blog", "it": "blog", "de": "blog"}
+BLOG_SLUG: Final = "blog"  # the same in every language
 BLOG_INTRO: Final[Texts] = {
     "en": "<p>News from the workshops, with notes on materials and care.</p>",
     "it": "<p>Notizie dai laboratori, con appunti su materiali e cura.</p>",
@@ -96,7 +97,7 @@ MENU_LABELS: Final[dict[str, Texts]] = {
 }
 FOOTER_TITLE: Final[Texts] = {"en": "Explore", "it": "Esplora", "de": "Entdecken"}
 SOCIAL: Final = (
-    ("instagram", "https://www.instagram.com/mpmv.demo"),
+    ("instagram", "https://www.instagram.com/example-workshop-demo"),
     ("mastodon", "https://social.example/@mpmv_demo"),
 )
 
@@ -187,7 +188,7 @@ def seed_blog(
     index = BlogIndexPage.objects.child_of(home).first()
     if index is None:
         index = BlogIndexPage(
-            title=pick(BLOG_TITLE, source), slug=BLOG_SLUG["en"], intro=pick(BLOG_INTRO, source)
+            title=pick(BLOG_TITLE, source), slug=BLOG_SLUG, intro=pick(BLOG_INTRO, source)
         )
         home.add_child(instance=index)
         index = _publish(index)
@@ -222,7 +223,7 @@ def seed_blog(
     for language, other in locales.items():
         if other.pk == locale.pk:
             continue
-        translated = _translate(index, other, fill_index, language)
+        _translate(index, other, fill_index, language)
         for post, spec in zip(posts, POSTS, strict=True):
 
             def fill_post(copy: Any, lang: str, spec: dict[str, Any] = spec) -> None:
@@ -232,13 +233,32 @@ def seed_blog(
                 copy.body = [("paragraph", pick(spec["text"], lang))]
 
             _translate(post, other, fill_post, language)
-        _ = translated
     return index, posts
 
 
 def _local(page: Any, locale: Locale) -> Any:
     found = page.get_translation_or_none(locale)
     return found.specific if found is not None else page
+
+
+def _seeded_about(locale: Locale, language: str) -> StandardPage | None:
+    """The About page the CMS.1 seed made in `locale`, or None."""
+    home = HomePage.objects.filter(locale=locale, depth=2).first()
+    if home is None:
+        return None
+    slug = seed_text(language).about.slug
+    page: StandardPage | None = StandardPage.objects.child_of(home).filter(slug=slug).first()
+    return page
+
+
+def _is_default_menu(menu: NavigationMenu, about: StandardPage) -> bool:
+    """Whether `menu` is exactly what CMS.1 made: one link, no label, to the seeded About page
+    (a menu an editor changed in any way is left alone)."""
+    if len(menu.links) != 1:
+        return False
+    link = menu.links[0].value
+    page = link["page"]
+    return page is not None and not link["label"] and page.pk == about.pk
 
 
 def seed_navigation(
@@ -249,9 +269,9 @@ def seed_navigation(
     """The header menu of every language (`pages` is (label key, source page)) and the footer."""
     for language, locale in locales.items():
         menu = NavigationMenu.objects.filter(locale=locale, location="header").first()
-        if menu is None or len(menu.links) != 1 or menu.links[0].value["label"]:
+        about = _seeded_about(locale, language)
+        if menu is None or about is None or not _is_default_menu(menu, about):
             continue  # an editor's menu stays as it is
-        about = menu.links[0].value["page"]  # the CMS.1 About page
         entries = [*pages, ("about", about)]
         menu.links = [
             ("page", {"page": _local(page, locale), "label": pick(MENU_LABELS[key], language)})
