@@ -2,9 +2,8 @@
 
 import pytest
 
-from apps.themes.engine import contrast_ratio
+from apps.themes.engine import DARK_SURFACE, contrast_ratio
 from apps.themes.palettes import (
-    DARK_SURFACE,
     DEFAULT_PALETTE,
     PRESETS,
     ROLE_TOKENS,

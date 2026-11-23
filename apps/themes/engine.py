@@ -14,6 +14,7 @@ token contract (`contract.py`) with `contrast_ratio`, and `render_tokens_css` /
 """
 
 import hashlib
+import math
 import posixpath
 import re
 from collections.abc import Container, Mapping, Sequence
@@ -668,3 +669,209 @@ def heading_level(value: object, default: int = 3) -> int:
     else:
         return default
     return min(max(level, low), high)
+
+
+# --- Palette derivation (THM.33, spec 14 §14.12)
+#
+# Pure colour maths for the palette builder. Contrast is always measured on the rounded
+# `#RRGGBB` that would be stored, with `contrast_ratio` above (WCAG 2.2 relative luminance).
+
+LIGHT_SURFACE = "#FFFFFF"
+DARK_SURFACE = "#121417"  # the dark token set of spec 14 §14.4
+TEXT_CONTRAST = 4.5  # WCAG 2.2 SC 1.4.3
+UI_CONTRAST = 3.0  # WCAG 2.2 SC 1.4.11
+FOREGROUNDS = ("#FFFFFF", "#1A1A1A")
+LIGHTNESS_STEP = 0.001
+HOVER_STEP = 0.07  # OKLCH lightness removed from a background for its hover state
+TINT_LIGHTNESS = (0.96, 0.975, 0.99, 1.0)
+TINT_CHROMA = 0.03
+DEFAULT_FOCUS = "#2F80ED"
+DEFAULT_CONTROL_BORDER = "#8A8A8A"
+
+_OKLAB_EPSILON = 1e-6
+
+
+def _to_linear(channel: int) -> float:
+    c = channel / 255
+    return c / 12.92 if c <= 0.04045 else float(((c + 0.055) / 1.055) ** 2.4)
+
+
+def _from_linear(value: float) -> float:
+    value = min(1.0, max(0.0, value))
+    return 12.92 * value if value <= 0.0031308 else float(1.055 * value ** (1 / 2.4) - 0.055)
+
+
+def _hex(colour: str) -> str:
+    """`#RRGGBB`, upper case, from `#rgb` or `#rrggbb` (ThemeError for anything else)."""
+    red, green, blue = _channels(colour)
+    return f"#{red:02X}{green:02X}{blue:02X}"
+
+
+def _to_oklch(colour: str) -> tuple[float, float, float]:
+    """(L, C, hue in radians) of an sRGB colour (Ottosson's OKLab)."""
+    r, g, b = (_to_linear(c) for c in _channels(colour))
+    long = (0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b) ** (1 / 3)
+    medium = (0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b) ** (1 / 3)
+    short = (0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b) ** (1 / 3)
+    lightness = 0.2104542553 * long + 0.7936177850 * medium - 0.0040720468 * short
+    a = 1.9779984951 * long - 2.4285922050 * medium + 0.4505937099 * short
+    b2 = 0.0259040371 * long + 0.7827717662 * medium - 0.8086757660 * short
+    return lightness, math.hypot(a, b2), math.atan2(b2, a)
+
+
+def _oklch_linear(lightness: float, chroma: float, hue: float) -> tuple[float, float, float]:
+    a, b = chroma * math.cos(hue), chroma * math.sin(hue)
+    long = (lightness + 0.3963377774 * a + 0.2158037573 * b) ** 3
+    medium = (lightness - 0.1055613458 * a - 0.0638541728 * b) ** 3
+    short = (lightness - 0.0894841775 * a - 1.2914855480 * b) ** 3
+    return (
+        4.0767416621 * long - 3.3077115913 * medium + 0.2309699292 * short,
+        -1.2684380046 * long + 2.6097574011 * medium - 0.3413193965 * short,
+        -0.0041960863 * long - 0.7034186147 * medium + 1.7076147010 * short,
+    )
+
+
+def _in_gamut(rgb: tuple[float, float, float]) -> bool:
+    return all(-_OKLAB_EPSILON <= v <= 1 + _OKLAB_EPSILON for v in rgb)
+
+
+def _from_oklch(lightness: float, chroma: float, hue: float) -> str:
+    """`#RRGGBB` for an OKLCH colour; chroma is reduced only as far as needed to fit sRGB."""
+    lightness = min(1.0, max(0.0, lightness))
+    if not _in_gamut(_oklch_linear(lightness, chroma, hue)):
+        low, high = 0.0, chroma
+        for _ in range(24):
+            middle = (low + high) / 2
+            if _in_gamut(_oklch_linear(lightness, middle, hue)):
+                low = middle
+            else:
+                high = middle
+        chroma = low
+    rgb = _oklch_linear(lightness, chroma, hue)
+    red, green, blue = (round(_from_linear(v) * 255) for v in rgb)
+    return f"#{red:02X}{green:02X}{blue:02X}"
+
+
+def _lightness_scan(colour: str, against: str, min_ratio: float, *, darker: bool) -> str | None:
+    lightness, chroma, hue = _to_oklch(colour)
+    steps = round((lightness if darker else 1 - lightness) / LIGHTNESS_STEP)
+    for step in range(1, steps + 1):
+        shift = step * LIGHTNESS_STEP
+        candidate = _from_oklch(lightness - shift if darker else lightness + shift, chroma, hue)
+        if contrast_ratio(candidate, against) >= min_ratio:
+            return candidate
+    return None
+
+
+def nearest_compliant(colour: str, against: str, min_ratio: float) -> str | None:
+    """The closest colour to `colour` that reaches `min_ratio` against `against`.
+
+    Keeps the OKLCH hue and chroma and moves only the lightness, in the direction that raises
+    the contrast (darker when `against` is lighter than `colour`, lighter otherwise), by the
+    smallest step (0.001 L) that passes; chroma shrinks only to stay inside sRGB. Returns
+    `colour` itself when it already passes, and None when no lightness in that direction does.
+    The search is one-directional (towards more contrast against `against`), so None means "not
+    found in that direction", not "impossible": for a foreground role the fallback is
+    `suggest_foreground` on the locked background.
+
+    Contrast is WCAG 2.2 `(L1 + 0.05) / (L2 + 0.05)` with the relative luminance of
+    https://www.w3.org/TR/WCAG22/#dfn-relative-luminance, see `contrast_ratio`.
+    """
+    if contrast_ratio(colour, against) >= min_ratio:
+        return colour
+    darker = relative_luminance(against) > relative_luminance(colour)
+    return _lightness_scan(colour, against, min_ratio, darker=darker)
+
+
+def suggest_foreground(background: str, min_ratio: float) -> str | None:
+    """`#FFFFFF` or `#1A1A1A` for text on `background`, whichever has the higher contrast;
+    None when neither reaches `min_ratio`."""
+    best = max(FOREGROUNDS, key=lambda fg: contrast_ratio(fg, background))
+    return best if contrast_ratio(best, background) >= min_ratio else None
+
+
+def _all_compliant(colour: str, requirements: Sequence[tuple[str, float]]) -> str:
+    """`colour` moved until it meets every (against, minimum), or unchanged when that is
+    impossible (the palette check then reports the pair)."""
+    current = colour
+    for _ in range(4):
+        failing = [(a, m) for a, m in requirements if contrast_ratio(current, a) < m]
+        if not failing:
+            return current
+        moved = nearest_compliant(current, *failing[0])
+        if moved is None:
+            return colour
+        current = moved
+    return colour if any(contrast_ratio(current, a) < m for a, m in requirements) else current
+
+
+def _hover(background: str, foreground: str) -> str:
+    """A fixed OKLCH lightness step darker, kept at 4.5:1 with its foreground when it can."""
+    lightness, chroma, hue = _to_oklch(background)
+    hover = _from_oklch(lightness - HOVER_STEP, chroma, hue)
+    if contrast_ratio(foreground, hover) >= TEXT_CONTRAST:
+        return hover
+    return nearest_compliant(hover, foreground, TEXT_CONTRAST) or background
+
+
+def _tint(primary: str) -> str:
+    """The lightest-needed tinted background on which the primary is still 4.5:1 text."""
+    _, chroma, hue = _to_oklch(primary)
+    tint = LIGHT_SURFACE
+    for lightness in TINT_LIGHTNESS:
+        tint = _from_oklch(lightness, min(chroma, TINT_CHROMA), hue)
+        if contrast_ratio(primary, tint) >= TEXT_CONTRAST:
+            break
+    return tint
+
+
+def derive_palette(
+    base: Mapping[str, str],
+    *,
+    start: Mapping[str, str] | None = None,
+    surfaces: Sequence[str] = (),
+) -> dict[str, str]:
+    """Every role of a palette from its base colours (spec 14 §14.12).
+
+    `base` holds `primary` and, optionally, `secondary` (the accent) and `band`; an empty
+    optional colour takes the value of `start`, a starting palette (ThemeError when there is
+    none). The base colours are never changed, so a failing base shows up as a failing pair in
+    `check_brand_palette`. `surfaces` are the extra surfaces of the registered themes (`#FFFFFF`
+    is always included). Pure and deterministic.
+
+    - `on_*` roles: `suggest_foreground` at 4.5:1 (white when neither candidate passes).
+    - hover: a fixed OKLCH lightness step darker; tint: a light tint of the primary's hue.
+    - `primary_dark`: `nearest_compliant` against `#121417` at 4.5:1.
+    - `secondary_text`: `nearest_compliant` against every surface at 4.5:1.
+    - `focus`, `control_border`: `nearest_compliant` at 3:1 against the surfaces (and the band
+      for the focus ring).
+    """
+    chosen: dict[str, str] = {}
+    for role in ("primary", "secondary", "band"):
+        value = base.get(role) or (start or {}).get(role)
+        if not value:
+            raise ThemeError(f"no {role} colour and no starting palette")
+        chosen[role] = _hex(value)
+    primary, secondary, band = chosen["primary"], chosen["secondary"], chosen["band"]
+    light = list(dict.fromkeys([LIGHT_SURFACE, *(_hex(s) for s in surfaces)]))
+
+    on_primary = suggest_foreground(primary, TEXT_CONTRAST) or FOREGROUNDS[0]
+    on_secondary = suggest_foreground(secondary, TEXT_CONTRAST) or FOREGROUNDS[0]
+    text_on_band = suggest_foreground(band, TEXT_CONTRAST) or FOREGROUNDS[0]
+    focus_start = _hex((start or {}).get("focus") or DEFAULT_FOCUS)
+    border_start = _hex((start or {}).get("control_border") or DEFAULT_CONTROL_BORDER)
+    return {
+        "primary": primary,
+        "primary_hover": _hover(primary, on_primary),
+        "primary_tint": _tint(primary),
+        "on_primary": on_primary,
+        "primary_dark": nearest_compliant(primary, DARK_SURFACE, TEXT_CONTRAST) or primary,
+        "secondary": secondary,
+        "secondary_hover": _hover(secondary, on_secondary),
+        "secondary_text": _all_compliant(secondary, [(s, TEXT_CONTRAST) for s in light]),
+        "on_secondary": on_secondary,
+        "band": band,
+        "text_on_band": text_on_band,
+        "focus": _all_compliant(focus_start, [(s, UI_CONTRAST) for s in [*light, band]]),
+        "control_border": _all_compliant(border_start, [(s, UI_CONTRAST) for s in light]),
+    }
