@@ -78,11 +78,11 @@ def test_each_legal_section_keeps_an_anchor_and_its_data_hook(
     doc = soup(client, page.url, settings)
     sections = doc.select("section.block-legal-section[data-section]")
     assert [s["id"] for s in sections] == [
-        "section-restrictions-1",
-        "section-termination-2",
+        "section-restrictions",
+        "section-termination",
     ]
     for section in sections:
-        assert section["id"].startswith(f"section-{section['data-section']}-")
+        assert section["id"] == f"section-{section['data-section']}"
         assert section.select_one("h2") is not None
 
 
@@ -99,6 +99,8 @@ def test_two_legal_sections_with_one_tag_get_distinct_ids(
     ids = [s["id"] for s in soup(client, page.url, settings).select("section[data-section]")]
     assert len(ids) == 2
     assert len(set(ids)) == 2
+    assert ids[0] == "section-redress"
+    assert ids[1].startswith("section-redress-")
 
 
 def test_the_ride_bundle_prints_a_legal_page_without_the_chrome() -> None:

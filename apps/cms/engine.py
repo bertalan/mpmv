@@ -948,3 +948,21 @@ def file_type_label(name: str) -> str:
     """The file type shown to visitors: the upper-case extension ("PDF"), "" when there is none."""
     stem, dot, extension = name.rpartition(".")
     return extension.upper() if dot and stem else ""
+
+
+def legal_section_anchors(sections: list[tuple[str, str]]) -> list[str]:
+    """Anchor ids for the legal sections of a page, given (tag, block id) in body order (THM.29).
+
+    The first section of a tag is `section-<tag>`; a repeat is `section-<tag>-<first 8 characters
+    of its block id>`. Block ids never change when an editor reorders sections, and the first
+    occurrence keeps the plain anchor unless it is moved below a duplicate of its tag.
+    """
+    seen: set[str] = set()
+    anchors: list[str] = []
+    for tag, block_id in sections:
+        if tag in seen:
+            anchors.append(f"section-{tag}-{block_id[:8]}")
+        else:
+            seen.add(tag)
+            anchors.append(f"section-{tag}")
+    return anchors
