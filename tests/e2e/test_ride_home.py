@@ -25,8 +25,8 @@ pytestmark = pytest.mark.django_db(transaction=True)
 NO_SIDEWAYS_SCROLL = "() => document.documentElement.scrollWidth <= window.innerWidth"
 
 
-@pytest.fixture(autouse=True)
-def _ride_home(settings: SettingsWrapper, live_server: LiveServer, _cms_site: None) -> None:
+def seed_ride_home(settings: SettingsWrapper) -> None:
+    """The home page with a hero (image, heading, two links) as its first block."""
     settings.MPMV_THEME_DEFAULT = "ride"
     settings.MPMV_HELP_URL = "/about/#help"
     home = HomePage.objects.get(locale__language_code=primary_language())
@@ -56,6 +56,11 @@ def _ride_home(settings: SettingsWrapper, live_server: LiveServer, _cms_site: No
         ),
     ]
     home.save_revision().publish()
+
+
+@pytest.fixture(autouse=True)
+def _ride_home(settings: SettingsWrapper, live_server: LiveServer, _cms_site: None) -> None:
+    seed_ride_home(settings)
 
 
 def open_home(page: Page, live_server: LiveServer, width: int, height: int) -> list[str]:

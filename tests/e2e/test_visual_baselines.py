@@ -35,6 +35,7 @@ from apps.tax import engine as tax
 from apps.tax.tests.factories import TaxRateFactory
 from apps.vendors.tests.factories import CommissionRuleFactory
 from tests.e2e.palette import PALETTE_LINK, PALETTES, assert_palette_applied, choose_palette
+from tests.e2e.test_ride_home import seed_ride_home
 from tests.e2e.visual import WIDTHS, assert_matches_baseline, require_visual_mode
 from tests.i18n import translated
 from tests.ride_content_site import build_content_site
@@ -226,3 +227,34 @@ def test_ride_standard_page_matches_its_visual_baseline(
     expect(page.locator("html")).to_have_attribute("data-theme", "ride")
     for width in BLOG_WIDTHS:
         assert_matches_baseline(page, theme="ride", name=f"page-{name}", width=width)
+
+
+HEADER_WIDTHS = (375, 1280)
+
+
+@pytest.mark.parametrize("name", ["home", "listing"])
+def test_ride_header_top_matches_its_visual_baseline(
+    name: str,
+    page: Page,
+    live_server: LiveServer,
+    settings: SettingsWrapper,
+    paths: dict,  # type: ignore[type-arg]
+) -> None:
+    """THM.21: the tops of the home (header over the hero) and a listing, `ride`, 375 and 1280 px,
+    baselines `ride/header-<name>-<width>.png`."""
+    require_visual_mode()
+    settings.MPMV_THEME_DEFAULT = "ride"
+    if name == "home":
+        seed_ride_home(settings)  # a hero image as the first block, so the overlay shows
+    page.emulate_media(reduced_motion="reduce")
+    page.clock.set_fixed_time(utc(2026, 11, 18, 10))
+    page.set_viewport_size({"width": 1280, "height": 900})
+    response = page.goto(f"{live_server.url}{PAGES[name].format(**paths)}")
+    assert response is not None
+    assert response.status == 200
+    page.wait_for_load_state("load")
+    expect(page.locator("html")).to_have_attribute("data-theme", "ride")
+    page.evaluate("() => [...document.images].forEach((img) => { img.loading = 'eager'; })")
+    page.wait_for_function("() => [...document.images].every((img) => img.complete)", timeout=5000)
+    for width in HEADER_WIDTHS:
+        assert_matches_baseline(page, theme="ride", name=f"header-{name}", width=width)
