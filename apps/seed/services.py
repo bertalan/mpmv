@@ -1514,6 +1514,7 @@ def _reset_cms(run: _Run) -> None:
     # happens to use the slug stays.
     for page in _seed_pages(StandardPage, [_text(demo_pages.CONTACT.slug, _source())]):
         if demo_pages.is_seed_contact(page):
+            demo_home.remove_contact_entries({page.pk})
             run.changes.delete("cms.standardpage", page.url_path, {})
             page.delete()
     for page in _seed_pages(

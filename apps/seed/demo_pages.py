@@ -13,7 +13,7 @@ from apps.cms.models import StandardPage
 from apps.cms.seed import seed_text
 from apps.core.i18n import configured_languages, primary_language
 from apps.seed import data
-from apps.seed.demo_home import Texts, _publish, _seeded_about, pick
+from apps.seed.demo_home import Texts, pick, publish, seeded_about
 
 CONTACT: Final = data.PageSeed(
     slug={"en": "contact", "it": "contatti", "de": "kontakt"},
@@ -88,6 +88,7 @@ ABOUT_EXTRA: Final[dict[str, Texts]] = {
     },
 }
 # An open-licence film on a video provider the video block accepts; it loads only after consent.
+# Demo content only: "Big Buck Bunny", an open film by the Blender Foundation (CC BY 3.0).
 VIDEO_URL: Final = "https://www.youtube.com/watch?v=aqz-KE-bpKQ"
 
 
@@ -143,14 +144,14 @@ def contact_body(language: str) -> list[Any]:
 def seed_about(run: Any, locales: dict[str, Locale], images: dict[str, Any]) -> None:
     """Enrich the About page of every language, unless an editor already changed its body."""
     for language, locale in locales.items():
-        page = _seeded_about(locale, language)
+        page = seeded_about(locale, language)
         if page is None:
             continue
         plain = [("paragraph", seed_text(language).about.body)]
         if _flat(page) != _flat_value(plain):
             continue  # not what CMS.1 made: an editor's page stays as it is
         page.body = about_body(language, images)
-        _publish(page)
+        publish(page)
         run.changes.update("cms.standardpage", page.url_path, {"body": "plain"}, {"body": "rich"})
 
 

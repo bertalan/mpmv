@@ -18,6 +18,7 @@ from apps.core.changeset import ChangeSet
 from apps.core.i18n import configured_languages, primary_language
 from apps.core.models import MediaImage, PlatformOperator
 from apps.seed import data, demo_pages
+from apps.seed.demo_home import MENU_LABELS, pick
 from apps.seed.services import TEST_CONTEXT, reset, seed
 
 pytestmark = pytest.mark.django_db
@@ -128,3 +129,39 @@ def test_reset_keeps_a_contact_page_an_editor_wrote(demo_seed: ChangeSet) -> Non
     page.save_revision().publish()
     reset(ctx=TEST_CONTEXT)
     assert StandardPage.objects.filter(pk=page.pk).exists()
+
+
+def _header_links() -> list[tuple[Any, Any]]:
+    return [
+        (menu, link.value)
+        for menu in NavigationMenu.objects.filter(location="header")
+        for link in menu.links
+    ]
+
+
+def test_reset_removes_the_seeded_contact_menu_entry_and_the_menu_still_renders(
+    demo_seed: ChangeSet, client: Client
+) -> None:
+    contact_pks = {link["page"].pk for _menu, link in _header_links() if link["page"]} & set(
+        StandardPage.objects.filter(slug__in=list(demo_pages.CONTACT.slug.values())).values_list(
+            "pk", flat=True
+        )
+    )
+    assert contact_pks
+    reset(ctx=TEST_CONTEXT)
+    assert not StandardPage.objects.filter(pk__in=contact_pks).exists()
+    label = pick(MENU_LABELS["contact"], primary_language())
+    assert label not in [link["label"] for _menu, link in _header_links()]
+    assert client.get("/").status_code == 200
+
+
+def test_reset_keeps_a_contact_menu_entry_an_editor_relabelled(demo_seed: ChangeSet) -> None:
+    menu = NavigationMenu.objects.get(locale=Locale.get_default(), location="header")
+    menu.links = [
+        (child.block_type, {**child.value, "label": "Talk to us"} if index == 3 else child.value)
+        for index, child in enumerate(menu.links)
+    ]
+    menu.save()
+    reset(ctx=TEST_CONTEXT)
+    menu.refresh_from_db()
+    assert "Talk to us" in [link.value["label"] for link in menu.links]
