@@ -22,7 +22,7 @@ from apps.cms import roles
 from apps.cms.models import HomePage, NavigationMenu
 from apps.cms.services import SeedReport, can_access_cms_admin
 from apps.core.i18n import primary_language
-from tests.i18n import other_language
+from tests.i18n import other_language, translated
 
 pytestmark = pytest.mark.django_db
 
@@ -57,10 +57,11 @@ def test_the_admin_refuses_a_second_home_page_in_a_language(client: Client) -> N
     root = Page.get_first_root_node()
     url = reverse("wagtailadmin_pages:add", args=("cms", "homepage", root.pk))
     response = client.post(
-        f"{url}?locale=en", {"title": "Second home", "slug": "second-home", "body-count": "0"}
+        f"{url}?locale={primary_language()}",
+        {"title": "Second home", "slug": "second-home", "body-count": "0"},
     )
     assert response.status_code == 200  # the form again, with the error
-    assert "This language already has a home page." in response.content.decode()
+    assert translated("This language already has a home page.") in response.content.decode()
     assert HomePage.objects.filter(locale__language_code=primary_language()).count() == 1
 
 

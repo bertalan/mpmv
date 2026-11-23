@@ -16,9 +16,12 @@ drafts until counsel has checked them.
 
 import datetime as dt
 import io
+import re
 import secrets
+from typing import Any
 
 import pytest
+from bs4 import BeautifulSoup
 from django.core.exceptions import ValidationError
 from django.core.management import CommandError, call_command
 from django.db import DatabaseError, transaction
@@ -31,6 +34,7 @@ from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
 from apps.cms.engine import GO_LIVE_LEGAL_KINDS, VersionStamp, version_in_force
 from apps.cms.models import LegalPage, LegalPageReview
+from apps.cms.seed import legal_placeholder
 from apps.cms.services import (
     SeedReport,
     legal_readiness,
@@ -44,7 +48,7 @@ from apps.cms.tests.factories import LegalPageFactory, LegalPageReviewFactory
 from apps.core.audit import AuditContext
 from apps.core.i18n import configured_languages, primary_language
 from apps.core.models import AuditLog
-from tests.i18n import language_prefix, other_language, third_language
+from tests.i18n import language_prefix, other_language, third_language, translated
 
 pytestmark = pytest.mark.django_db
 
@@ -111,6 +115,13 @@ def _only_the_cms_checks(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("apps.cms.engine.DSA_LEGAL_KINDS", ())
 
 
+def _placeholder_word(code: str) -> str:
+    """The bold first word of the placeholder sentence in `code` (Placeholder, Platzhalter...)."""
+    match = re.search(r"<b>(.*?)</b>", legal_placeholder(code, "terms").body)
+    assert match is not None
+    return match.group(1).rstrip(".")
+
+
 def _readiness() -> str:
     out = io.StringIO()
     call_command("golive_readiness", stdout=out)
@@ -146,26 +157,26 @@ def test_the_readiness_check_fails_when_a_page_lacks_a_published_translation(
 
 def test_a_draft_translation_does_not_count_as_published(seeded: SeedReport) -> None:
     pages = _every_page_in_every_language()
-    shipping_es = pages["shipping", "es"]
-    shipping_es.unpublish()
-    shipping_es.title = "Envíos (borrador)"
-    shipping_es.save_revision()
+    shipping_other = pages["shipping", other_language()]
+    shipping_other.unpublish()
+    shipping_other.title = "Draft title"
+    shipping_other.save_revision()
 
-    assert [(p.kind, p.language) for p in legal_readiness()] == [("shipping", "es")]
+    assert [(p.kind, p.language) for p in legal_readiness()] == [("shipping", other_language())]
 
 
 def test_the_readiness_check_fails_without_the_counsel_check_of_a_language(
     seeded: SeedReport,
 ) -> None:
     pages = _every_page_in_every_language()
-    terms_fr = pages["terms", "fr"]
-    terms_fr.body = [("paragraph", "<p>Nouvelles conditions.</p>")]
-    terms_fr.effective_date = dt.date(2027, 6, 1)
-    _publish(terms_fr)  # a new version: the checks of version 1 do not cover it
-    _review(terms_fr, "native_review")
+    terms_other = pages["terms", other_language()]
+    terms_other.body = [("paragraph", "<p>New terms.</p>")]
+    terms_other.effective_date = dt.date(2027, 6, 1)
+    _publish(terms_other)  # a new version: the checks of version 1 do not cover it
+    _review(terms_other, "native_review")
 
     assert [(p.kind, p.language, p.missing) for p in legal_readiness()] == [
-        ("terms", "fr", "counsel_check")
+        ("terms", other_language(), "counsel_check")
     ]
     with pytest.raises(CommandError):
         _readiness()
@@ -186,10 +197,10 @@ def test_the_seed_publishes_placeholders_of_the_five_pages_in_every_language(
     }
     assert len(report.created) == len(GO_LIVE_LEGAL_KINDS) * len(configured_languages())
     italian_terms = live.get(kind="terms", locale__language_code=other_language())
-    assert italian_terms.title == "Condizioni di vendita"
+    assert italian_terms.title == legal_placeholder(other_language(), "terms").title
     english_terms = live.get(kind="terms", locale__language_code=primary_language())
     assert italian_terms.translation_key == english_terms.translation_key
-    assert "Placeholder" in str(english_terms.body)
+    assert _placeholder_word(primary_language()) in str(english_terms.body)
     assert all(page.versions.exists() for page in live)
 
     # Placeholders are drafts, not legal texts: the go-live check still fails on them.
@@ -201,11 +212,11 @@ def test_the_seed_publishes_placeholders_of_the_five_pages_in_every_language(
 
 def test_a_placeholder_says_it_is_not_a_legal_text(client: Client, seeded: SeedReport) -> None:
     seed_site(legal_placeholders=True)
-    page = LegalPage.objects.live().get(kind="withdrawal", locale__language_code=third_language())
+    page = LegalPage.objects.live().get(kind="withdrawal", locale__language_code=other_language())
 
     html = client.get(page.url).content.decode()
 
-    assert "Platzhalter" in html
+    assert _placeholder_word(other_language()) in html
 
 
 # --- Per-language reviews
@@ -293,14 +304,22 @@ def test_the_page_is_marked_as_a_draft_until_counsel_has_checked_it(
     client: Client, seeded: SeedReport
 ) -> None:
     page = _publish(LegalPageFactory.create(title="Terms of sale", live=False))
-    notice = "not been checked by legal counsel"
-    assert notice in client.get("/terms-of-sale/").content.decode()
+
+    def draft_notices() -> list[Any]:
+        html = client.get("/terms-of-sale/").content.decode()
+        return BeautifulSoup(html, "html.parser").select(".legal-draft")
+
+    notices = draft_notices()
+    assert len(notices) == 1
+    assert notices[0].get_text(strip=True) == translated(
+        "Draft: this text has not been checked by legal counsel yet and is not final."
+    )
 
     _review(page, "native_review")
-    assert notice in client.get("/terms-of-sale/").content.decode()
+    assert len(draft_notices()) == 1
 
     _review(page, "counsel_check")
-    assert notice not in client.get("/terms-of-sale/").content.decode()
+    assert draft_notices() == []
 
 
 # --- Own effective date per language, through wagtail-localize

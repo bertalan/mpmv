@@ -72,7 +72,10 @@ def test_ride_tokens_meet_the_token_contract(tokens: dict[str, str]) -> None:
 
 
 def test_the_compressed_css_is_within_the_budget(theme_css: str) -> None:
-    assert compressed_size(theme_css.encode()) < CSS_BUDGET
+    # ride's own budget is in its manifest (§14.7: 48 KB); `base` keeps the 45 KB default.
+    budget_kb = tomllib.loads((RIDE / "theme.toml").read_text())["css_budget_kb"]
+    assert budget_kb * 1024 > CSS_BUDGET
+    assert compressed_size(theme_css.encode()) < budget_kb * 1024
 
 
 # --- Colours (brief): values and every text pair
@@ -267,7 +270,8 @@ def _media_blocks(css: str) -> Iterator[tuple[str, str]]:
 
 def test_breakpoints_are_40_64_and_80rem(sources: str) -> None:
     for prelude, _ in _media_blocks(sources):
-        if "@media" in prelude and "prefers-" not in prelude:
+        # `print` is a media type, not a breakpoint (THM.29 legal pages).
+        if "@media" in prelude and "prefers-" not in prelude and "print" not in prelude:
             assert re.search(r"\b(?:40|64|80)rem\b", prelude), prelude
 
 

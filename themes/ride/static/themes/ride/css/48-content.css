@@ -12,13 +12,204 @@
     block-size: auto;
   }
 
+  /* THM.28: blog cards. The card paints its own surface (.surface-light or, featured,
+     .surface-band), so text, heading and link colours come from the surface variables. */
+  /* 30-home-blocks.css gives every .post-summary a raised background and padding of its own (the
+     home teaser): the blog card is a Bootstrap card with its own surface, so reset both. */
+  .post-summary.card {
+    padding: 0;
+    background: var(--s-bg);
+    color: var(--s-text);
+    --bs-card-bg: var(--s-bg);
+    --bs-card-color: var(--s-text);
+    --bs-card-border-color: var(--color-border);
+    overflow: hidden;
+  }
+
+  /* The card names its own link and focus colours (also set by the generic surface rules,
+     38-surfaces.css: `a:not(.button)` and `:focus-visible`), so it stays right if those change. */
+  .post-summary a:not(.button) {
+    color: var(--s-link);
+  }
+
+  .post-summary :focus-visible {
+    outline-color: var(--s-focus);
+  }
+
   .post-summary .card-title a {
-    color: inherit;
+    color: var(--s-link);
+    text-decoration: none;
   }
 
   .post-summary .card-title a:hover,
   .post-summary .card-title a:focus-visible {
-    color: var(--color-accent);
+    text-decoration: underline;
+  }
+
+  /* The title link covers the card; the author link sits above that cover so it stays usable. */
+  .post-summary .article-author a {
+    position: relative;
+    z-index: 2;
+  }
+
+  .post-summary .article-meta {
+    font-size: 0.875rem;
+  }
+
+  .post-summary__row {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .post-summary__media img {
+    display: block;
+    inline-size: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+  }
+
+  @media (min-width: 40rem) {
+    .post-summary__row {
+      flex-direction: row;
+      align-items: stretch;
+    }
+
+    .post-summary__media {
+      flex: 0 0 15rem;
+    }
+
+    .post-summary--featured .post-summary__media {
+      flex-basis: 50%;
+    }
+
+    .post-summary__media img {
+      block-size: 100%;
+      aspect-ratio: auto;
+    }
+
+    .post-summary__row > .card-body {
+      flex: 1 1 0;
+      padding: var(--space-m);
+    }
+  }
+
+  .post-summary--featured .card-body {
+    padding: var(--space-m);
+  }
+
+  /* Post page: a reading column of about 70 characters, figures wider than it are not needed. */
+  .reading-column {
+    max-inline-size: 44rem;
+    margin-inline: auto;
+    font-size: 1.125rem;
+    line-height: 1.7;
+  }
+
+  .reading-column .article-meta {
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+    letter-spacing: 0.02em;
+  }
+
+  .post-figure {
+    margin-block: var(--space-m);
+  }
+
+  .post-figure img {
+    border-radius: var(--radius-card);
+  }
+
+  .post-figure .figure-caption {
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+  }
+
+  /* THM.29: split block, feature row, contact layout. */
+  .split {
+    display: grid;
+    gap: var(--space-m);
+  }
+
+  .split__media figure {
+    margin: 0;
+  }
+
+  .split__media img {
+    border-radius: var(--radius-card);
+  }
+
+  .feature-row__item {
+    padding-block-start: var(--space-s);
+    border-block-start: 2px solid var(--color-accent);
+  }
+
+  .feature-row__item .icon {
+    display: block;
+    margin-block-end: var(--space-xs);
+    color: var(--color-heading);
+  }
+
+  .contact-layout {
+    display: grid;
+    gap: var(--space-m);
+    align-items: start;
+  }
+
+  .contact-address address {
+    font-style: normal;
+  }
+
+  .contact-form-card {
+    --bs-card-border-color: var(--color-border);
+    box-shadow: none;
+  }
+
+  @media (min-width: 40rem) {
+    .split {
+      grid-template-columns: 5fr 7fr;
+      align-items: start;
+    }
+
+    .contact-layout {
+      grid-template-columns: 5fr 7fr;
+    }
+  }
+
+  /* THM.29: a legal page prints as plain text: no header, footer, consent card, banner image or
+     breadcrumb; the banner keeps the title and the lead line (the operator on contact), as plain
+     text; section anchors stay as ids. */
+  @media print {
+    .page-banner__image,
+    .page-banner__scrim,
+    .page-banner .breadcrumb,
+    .site-header,
+    .site-footer,
+    .consent-banner,
+    .back-to-top {
+      display: none;
+    }
+
+    .page-banner {
+      background: none;
+      color: CanvasText;
+    }
+
+    .page-banner__title,
+    .page-banner__text {
+      color: CanvasText;
+    }
+
+    .legal-page .page-content {
+      padding: 0;
+    }
+
+    .legal-page .block-legal-section h2 {
+      break-after: avoid;
+    }
+
+    .legal-page a[href^="http"]::after {
+      content: " (" attr(href) ")";
+    }
   }
 
   /* The plan is a Bootstrap card: its padding and border come from the card. */

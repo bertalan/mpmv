@@ -20,7 +20,8 @@ from django.test import Client
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import translation
-from django.utils.translation import gettext
+from django.utils.formats import number_format
+from django.utils.html import escape
 from wagtail_localize.models import StringSegment, TranslationSource
 
 from apps.accounts.models import User
@@ -48,7 +49,7 @@ from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
-from tests.i18n import language_prefix, localized, other_language
+from tests.i18n import language_prefix, localized, other_language, translated
 
 pytestmark = pytest.mark.django_db
 
@@ -73,6 +74,20 @@ def _about(code: str = primary_language()) -> StandardPage:
         locale__language_code=code, depth=_home(code).depth + 1
     )
     return about
+
+
+def amount(value: str) -> str:
+    """A price figure as the page language writes it (12.20 or 12,20)."""
+    with translation.override(primary_language()):
+        return number_format(Decimal(value), decimal_pos=2)
+
+
+def see_all_text(language: str, name: str) -> BeautifulSoup:
+    """The "See all" link text of a product grid in `language`, as markup."""
+    template = translated(
+        'See all<span class="visually-hidden"> products: %(name)s</span>', language
+    )
+    return BeautifulSoup(template % {"name": name}, "html.parser")
 
 
 def _grid(
@@ -173,8 +188,8 @@ def test_a_term_grid_renders_the_cat8_results(seeded: SeedReport, maker: Term) -
     section = _grid_section(html)
     assert section.find("h2").get_text(strip=True) == "Our picks"
     prices = [p.get_text(" ", strip=True) for p in section.find_all(class_="product-tile__price")]
-    note = "Indicative price. Final amount at checkout."  # TAX.12: with VAT, IT 22 %
-    assert prices == [f"EUR 12.20 {note}", f"EUR 15.25 {note}"]
+    note = translated("Indicative price. Final amount at checkout.")  # TAX.12: with VAT, IT 22 %
+    assert prices == [f"EUR {amount('12.20')} {note}", f"EUR {amount('15.25')} {note}"]
     links = [a["href"] for a in section.find_all("a")]
     assert any(href.endswith("-en/") and localized("/product/") in href for href in links)
 
@@ -220,8 +235,13 @@ def test_see_all_links_to_the_canonical_listing(seeded: SeedReport, maker: Term)
     html = _publish(_home(), [_grid("term", maker)])
     see_all = _grid_section(html).find("a", class_="product-grid-all")
     assert see_all["href"] == "/compatibility/maker/"
-    assert " ".join(see_all.get_text().split()) == "See all products: Maker"
-    assert see_all.find(class_="visually-hidden").get_text(strip=True) == "products: Maker"
+    expected = see_all_text(primary_language(), "Maker")
+    assert " ".join(see_all.get_text().split()) == " ".join(expected.get_text().split())
+    hidden = expected.find(class_="visually-hidden")
+    assert hidden is not None
+    assert see_all.find(class_="visually-hidden").get_text(strip=True) == hidden.get_text(
+        strip=True
+    )
     assert Client().get(see_all["href"]).status_code == 200
 
 
@@ -229,9 +249,7 @@ def test_see_all_names_its_listing_in_the_page_language(seeded: SeedReport, make
     listed("Steel bag").terms.add(maker)
     html = _publish(_home(other_language()), [_grid("term", maker, heading="Scelti per te")])
     see_all = _grid_section(html).find("a", class_="product-grid-all")
-    with translation.override(other_language()):
-        template = gettext('See all<span class="visually-hidden"> products: %(name)s</span>')
-    expected = BeautifulSoup(template % {"name": "Marca"}, "html.parser")
+    expected = see_all_text(other_language(), "Marca")
     hidden = expected.find(class_="visually-hidden")
     assert hidden is not None
     assert see_all.find(class_="visually-hidden").get_text(strip=True) == hidden.get_text(
@@ -383,7 +401,7 @@ def test_the_editor_offers_the_product_grid_block(
     assert response.status_code == 200
     html = response.content.decode()
     for label in ("Product grid", "Category", "Brand"):
-        assert label in html, label
+        assert escape(translated(label)) in html, label
 
 
 def test_the_category_and_brand_choosers_list_them(

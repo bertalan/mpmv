@@ -97,7 +97,9 @@ _IDENTIFIER = re.compile(r"\b[a-z_]+:[a-z_.]+\b")  # URL names such as catalog:b
 
 def markdown_prose(text: str) -> str:
     """The prose of a markdown page: no fenced or inline code, URLs or identifiers."""
-    for pattern in (_FENCE, _INLINE_CODE, _URL, _IDENTIFIER):
+    # A fence keeps its newlines, so the line numbers after it stay right.
+    text = _FENCE.sub(lambda m: "\n" * m.group(0).count("\n"), text)
+    for pattern in (_INLINE_CODE, _URL, _IDENTIFIER):
         text = pattern.sub(" ", text)
     return text
 
