@@ -1,0 +1,6 @@
+{% comment %}
+Required legal section on `ride` (THM.29): the app template's content plus a stable anchor from `legal_anchors` (stable: `section-<tag>`, a repeat adds its block id); `data-section` is kept.
+{% endcomment %}<section class="block block-legal-section" {% if anchor %}id="{{ anchor }}" {% endif %} data-section="{{ value.section }}">
+  <h2>{{ value.heading }}</h2>
+  <div class="legal-section-text">{{ value.text }}</div>
+</section>

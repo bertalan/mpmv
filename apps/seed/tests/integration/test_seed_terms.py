@@ -20,9 +20,21 @@ from apps.seed import data
 from apps.seed.services import TEST_CONTEXT, reset, seed, seed_vendors
 from apps.vendors.models import SalesTermsInForce, SalesTermsVersion
 from apps.vendors.terms_services import version_in_force
-from tests.i18n import other_language
+from tests.i18n import other_language, translated
 
 pytestmark = pytest.mark.django_db
+
+
+def clauses_in(language: str) -> list[dict[str, str]]:
+    return data.PLATFORM_TERMS_CLAUSES.get(language) or data.PLATFORM_TERMS_CLAUSES["en"]
+
+
+def shown(article: str, titles: dict[str, str]) -> str:
+    """A clause as the checkout lists it, in the primary language (English text as fallback)."""
+    language = primary_language()
+    title = titles.get(language) or titles["en"]
+    template = translated("Article %(article)s: %(title)s", language)
+    return template % {"article": article, "title": title}
 
 
 def test_every_demo_vendor_has_terms_in_force_with_the_expected_clauses(
@@ -33,7 +45,7 @@ def test_every_demo_vendor_has_terms_in_force_with_the_expected_clauses(
         version = version_in_force(vendor)
         assert version is not None, vendor.display_name
         assert version.number == 1
-        assert version.clauses == expected.values()["clauses"]
+        assert version.clauses == expected.values(primary_language())["clauses"]
         assert version.clauses  # a version without clauses cannot be published
         assert str(version.governing_law) == expected.governing_law
         assert version.b2b_court == expected.b2b_court
@@ -49,14 +61,20 @@ def test_every_demo_vendor_has_terms_in_force_with_the_expected_clauses(
 def test_the_customer_terms_pages_list_onerous_clauses_in_both_languages(
     demo_seed: ChangeSet,
 ) -> None:
-    for language in (primary_language(), other_language()):
+    # The seed has Italian text next to its English one: a page exists in every configured
+    # language that has its own clauses, and the primary page holds the fallback otherwise.
+    languages = [primary_language()]
+    if other_language() in data.PLATFORM_TERMS_CLAUSES:
+        languages.append(other_language())
+    for language in languages:
+        clauses = clauses_in(language)
         locale = Locale.objects.get(language_code=language)
         page = LegalPage.objects.get(kind="terms", locale=locale, slug__startswith="demo")
         assert page.live
-        assert page.onerous_clauses == data.PLATFORM_TERMS_CLAUSES[language]
+        assert page.onerous_clauses == clauses
         latest = page.versions.order_by("-number").first()
         assert latest is not None
-        assert latest.onerous_clauses == data.PLATFORM_TERMS_CLAUSES[language]
+        assert latest.onerous_clauses == clauses
 
 
 def test_a_second_seed_is_a_no_op_and_reset_keeps_the_terms(demo_seed: ChangeSet) -> None:
@@ -111,9 +129,12 @@ def test_a_business_buyer_sees_box_2_with_the_clauses_of_the_italian_parties(
     assert client.post(reverse("orders:checkout"), details).status_code == 302
     html = client.get(reverse("orders:review")).content.decode()
     assert "accept-onerous" in html
-    assert "Article 7: Limitation of liability" in html  # vendor A
-    assert "Article 12: Competent court" in html
-    assert "Article 9: Limitation of liability" in html  # the platform terms page
-    assert "Article 14: Competent court" in html
-    assert "Article 10: Arbitration clause" not in html  # vendor D is not an Italian party
+    vendor_a = dict(data.SALES_TERMS["A"].clauses)
+    arbitration = dict(data.SALES_TERMS["D"].clauses)["10"]
+    assert shown("7", vendor_a["7"]) in html  # vendor A
+    assert shown("12", vendor_a["12"]) in html
+    platform = {c["article"]: c["title"] for c in clauses_in(primary_language())}
+    assert shown("9", {primary_language(): platform["9"]}) in html  # the platform terms page
+    assert shown("14", {primary_language(): platform["14"]}) in html
+    assert shown("10", arbitration) not in html  # vendor D is not an Italian party
     assert "S.r.l.." not in html

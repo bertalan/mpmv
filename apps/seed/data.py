@@ -89,6 +89,9 @@ ATTRIBUTES: Final[dict[str, tuple[Texts, list[tuple[str, Texts]]]]] = {
     ),
 }
 
+# The language every seed text exists in: the fallback when a language has no text (I18N.15).
+TEXT_FALLBACK: Final = "en"
+
 
 @dataclass(frozen=True)
 class Node:
@@ -625,12 +628,14 @@ class SalesTermsSeed:
     return_cost_bearer: str = ""
     return_cost_info: str = ""
 
-    def values(self, language: str = "en") -> dict[str, Any]:
+    def values(self, language: str = TEXT_FALLBACK) -> dict[str, Any]:
+        """The terms form values; clause titles in `language`, else English."""
         body = "\n\n".join(self.body[code] for code in ("it", "en"))
         return {
             "body": body,
             "clauses": [
-                {"article": article, "title": titles[language]} for article, titles in self.clauses
+                {"article": article, "title": titles.get(language) or titles[TEXT_FALLBACK]}
+                for article, titles in self.clauses
             ],
             "governing_law": self.governing_law,
             "b2b_court": self.b2b_court,

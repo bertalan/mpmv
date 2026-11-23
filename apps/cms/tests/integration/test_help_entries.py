@@ -22,7 +22,7 @@ from apps.cms.models import HelpEntry
 from apps.cms.tests.factories import HelpEntryFactory
 from apps.core.i18n import primary_language
 from tests import hostile_input as hi
-from tests.i18n import other_language
+from tests.i18n import other_language, third_language
 from tests.unit.field_help_allowlist import ALLOWED_FIELD_NAMES
 
 pytestmark = pytest.mark.django_db
@@ -115,12 +115,16 @@ def test_a_screen_without_an_entry_gets_the_general_one() -> None:
 
 
 def test_the_answer_follows_the_language_and_falls_back_to_the_primary_one() -> None:
-    HelpEntryFactory.create(kind="route", key="home", title="Help")
+    HelpEntryFactory.create(kind="route", key="home", title="Primary help")
     HelpEntryFactory.create(
-        kind="route", key="home", title="Aiuto", locale=locale(other_language())
+        kind="route", key="home", title="Other help", locale=locale(other_language())
     )
-    assert help_lookup.help_for("home", "", other_language()).title == "Aiuto"  # type: ignore[union-attr]
-    assert help_lookup.help_for("home", "", "de").title == "Help"  # type: ignore[union-attr]
+    other = help_lookup.help_for("home", "", other_language())
+    assert other is not None
+    assert other.title == "Other help"
+    fallback = help_lookup.help_for("home", "", third_language())
+    assert fallback is not None
+    assert fallback.title == "Primary help"
 
 
 def test_without_any_entry_the_lookup_is_empty_not_an_error() -> None:

@@ -7,6 +7,7 @@ no review, so publishing is refused with a message and `manage.py check` fails (
 import json
 
 import pytest
+from bs4 import BeautifulSoup
 from django.test import Client
 from django.urls import reverse
 from wagtail.models import Workflow
@@ -17,6 +18,7 @@ from apps.cms.checks import check_snippet_workflow
 from apps.cms.models import ContentSnippet, content_snippet_workflow
 from apps.cms.services import SeedReport
 from apps.cms.tests.factories import ContentSnippetFactory, StandardPageFactory
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db
 
@@ -135,5 +137,5 @@ def test_deleting_a_used_snippet_warns_with_the_page_count() -> None:
 
 def test_deleting_an_unused_snippet_shows_no_warning() -> None:
     html = _delete_page(ContentSnippetFactory.create())
-    assert "still used by" not in html
-    assert "Yes, delete" in html
+    assert BeautifulSoup(html, "html.parser").select(".help-warning") == []
+    assert translated("Yes, delete") in html

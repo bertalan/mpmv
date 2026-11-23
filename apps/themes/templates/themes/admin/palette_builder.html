@@ -1,0 +1,85 @@
+{% extends "wagtailadmin/generic/base.html" %}
+{% load i18n wagtailadmin_tags %}
+{% block main_content %}
+  <p>{% blocktranslate %}Choose up to three base colours. Every other colour is derived from them, and every pair of text and background is checked against the contrast minimums of WCAG 2.2 AA. A palette that fails a pair cannot be saved.{% endblocktranslate %}</p>
+
+  <form method="get" action="{% url 'themes_admin:palette_builder' %}" class="palette-start">
+    <label for="id_start_choice">{% translate "Start from" %}</label>
+    <select id="id_start_choice" name="start">
+      {% for option in form.fields.start.queryset %}
+        <option value="{{ option.slug }}"{% if option.slug == form.start.value %} selected{% endif %}>{{ option.name }}</option>
+      {% endfor %}
+    </select>
+    <button class="button button-secondary" type="submit">{% translate "Load colours" %}</button>
+  </form>
+
+  {% if errors %}
+    <div class="messages" role="alert">
+      <ul>{% for error in errors %}<li class="error">{{ error }}</li>{% endfor %}</ul>
+    </div>
+  {% endif %}
+  {% if form.errors %}
+    <div class="messages" role="alert">
+      <ul>
+        {% for field in form %}{% for error in field.errors %}<li class="error">{{ field.label }}: {{ error }}</li>{% endfor %}{% endfor %}
+        {% for error in form.non_field_errors %}<li class="error">{{ error }}</li>{% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  <form method="post" action="{% url 'themes_admin:palette_builder' %}" id="palette-builder">
+    {% csrf_token %}
+    <input type="hidden" name="start" value="{{ form.start.value }}">
+    {% for field in form %}
+      {% if field.name != "start" %}{% formattedfield field %}{% endif %}
+    {% endfor %}
+
+    {% if report %}
+      <h2>{% translate "Contrast checks" %}</h2>
+      <p id="palette-failing" role="status" aria-live="polite">
+        {% if failing %}
+          {% blocktranslate count counter=failing %}{{ counter }} pair fails.{% plural %}{{ counter }} pairs fail.{% endblocktranslate %}
+        {% else %}
+          {% translate "Every pair passes." %}
+        {% endif %}
+      </p>
+      <table class="listing" id="palette-pairs">
+        <caption class="visuallyhidden">{% translate "Contrast of every pair of colours" %}</caption>
+        <thead>
+          <tr>
+            <th scope="col">{% translate "Pair" %}</th>
+            <th scope="col">{% translate "Ratio" %}</th>
+            <th scope="col">{% translate "Minimum" %}</th>
+            <th scope="col">{% translate "Result" %}</th>
+            <th scope="col">{% translate "Fix" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in report.rows %}
+            <tr data-pair-result="{% if row.result.passes %}pass{% else %}fail{% endif %}">
+              <th scope="row">{{ row.result.name }} ({{ row.result.foreground }} / {{ row.result.background }})</th>
+              <td>{{ row.result.ratio }}:1</td>
+              <td>{{ row.result.minimum|floatformat:"-1" }}:1</td>
+              <td>{% if row.result.passes %}{% translate "Pass" %}{% else %}{% translate "Fail" %}{% endif %}</td>
+              <td>
+                {% if row.suggestion %}
+                  <button class="button button-small button-secondary" type="submit" name="use" value="{{ row.suggestion.field }}:{{ row.suggestion.colour }}">{% blocktranslate with colour=row.suggestion.colour field=row.suggestion.field %}Use this: {{ colour }} for {{ field }}{% endblocktranslate %}</button>
+                {% elif not row.result.passes %}
+                  {% translate "No base colour to change for this pair." %}
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+
+    <div>
+      <button class="button button-secondary" type="submit" name="action" value="check">{% translate "Check contrast" %}</button>
+      <button class="button" type="submit" name="action" value="save"{% if failing %} disabled aria-describedby="palette-save-reason"{% endif %}>{% translate "Save palette" %}</button>
+      {% if failing %}
+        <p id="palette-save-reason">{% translate "Save is off while a pair fails. Use the suggested shade or pick another colour, then check again." %}</p>
+      {% endif %}
+    </div>
+  </form>
+{% endblock %}
