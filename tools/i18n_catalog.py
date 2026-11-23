@@ -164,6 +164,16 @@ SCOPES = (
     "apps/cms/templates/cms/term_landing_page.html",
     "apps/cms/templates/cms/vendor_landing_page.html",
     "apps/cms/templates/cms/vendor_recruitment_page.html",
+    # Admin, editor and Manager-login templates (I18N.20 part 3b, slice 4): what staff and vendors
+    # see in the brand merge, the image lists, the render monitor, the events moderation screens,
+    # the ride Manager login and the error page. Formal register.
+    "apps/catalog/templates/admin",
+    "apps/catalog/templates/catalog/admin",
+    "apps/cms/templates/cms/admin/image_review.html",
+    "apps/cms/templates/cms/admin/content_snippet_confirm_delete.html",
+    "apps/events/templates/events/admin",
+    "themes/ride/templates/manager",
+    "themes/ride/templates/layouts",
 )
 # Single storefront modules whose strings the Manager texts quote (shop policy headings).
 EXTRA_FILES = (

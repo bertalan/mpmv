@@ -165,7 +165,7 @@ SECTION_LABELS: Final[Mapping[str, str]] = {
     "platform.config": "Platform: configuration and tax (ARC.24)",
     "platform.owner_settings": "Platform: owner-only settings (CMP.13, CMP.11 approvals)",
     "platform.trust_rules": "Platform: trust rules, the versions of the badge thresholds (TRU.1)",
-    "platform.catalog": "Platform: catalog, categories, attributes, taxonomies, imports",
+    "platform.catalog": "Platform: catalogue, categories, attributes, taxonomies, imports",
     "platform.products": "Platform: products, bulk publish, preview, translation status (CAT.11)",
     "platform.moderation": "Platform: moderation (vendor events, storefront changes, content)",
     "platform.fitment_scheme": "Platform: fitment scheme, the levels of the garage (FIT.1)",

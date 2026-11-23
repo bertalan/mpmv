@@ -21,6 +21,7 @@ from apps.themes.gates import (
     ALLOWED_LICENCES_BY_KIND,
     CSS_BUDGET,
     JS_BUDGET,
+    LAZY_JS_BUDGET,
     LICENCES_FILE,
     MAX_FONT_FILES,
     compressed_size,
@@ -168,8 +169,38 @@ def test_a_lazy_script_is_not_counted_in_the_page_javascript(themes: Path) -> No
     theme_dir = write_theme(themes, "lazyjs")
     lazy = theme_dir / "static" / "themes" / "lazyjs" / "js" / "lazy" / "big.js"
     lazy.parent.mkdir(parents=True)
-    lazy.write_text(incompressible_css(JS_BUDGET), encoding="utf-8")
+    lazy.write_text(incompressible_css(LAZY_JS_BUDGET // 2), encoding="utf-8")
     assert [f for f in failures_of(themes, "lazyjs") if "[size]" in f] == []
+
+
+def test_a_lazy_script_over_its_own_cap_fails(themes: Path) -> None:
+    theme_dir = write_theme(themes, "lazybig")
+    lazy = theme_dir / "static" / "themes" / "lazybig" / "js" / "lazy" / "big.js"
+    lazy.parent.mkdir(parents=True)
+    lazy.write_text(incompressible_css(LAZY_JS_BUDGET + 2048), encoding="utf-8")
+    failures = [f for f in failures_of(themes, "lazybig") if "[size]" in f]
+    assert any("lazy/big.js" in f and "8.0 KB" in f for f in failures), failures
+    assert not any("JavaScript is" in f for f in failures), failures
+
+
+def test_the_manifest_sets_the_lazy_script_cap(themes: Path) -> None:
+    manifest = (
+        'slug = "lazycap"\nname = "Lazy"\nversion = "1.0.0"\ndirection = "ltr"\n'
+        'parent = "base"\nlazy_js_budget_kb = 30\n'
+    )
+    theme_dir = write_theme(themes, "lazycap", manifest=manifest)
+    lazy = theme_dir / "static" / "themes" / "lazycap" / "js" / "lazy" / "big.js"
+    lazy.parent.mkdir(parents=True)
+    lazy.write_text(incompressible_css(LAZY_JS_BUDGET + 2048), encoding="utf-8")
+    assert [f for f in failures_of(themes, "lazycap") if "[size]" in f] == []
+
+
+def test_the_shipped_lazy_scripts_are_well_under_the_cap() -> None:
+    for path in SHIPPED_THEMES.glob("*/static/themes/*/js/lazy/*.js"):
+        size = compressed_size(path.read_bytes())
+        assert size * 2 < LAZY_JS_BUDGET, (
+            f"{path.name} is {size} bytes compressed: less than 2x margin"
+        )
 
 
 def test_more_than_four_font_files_fail(themes: Path) -> None:

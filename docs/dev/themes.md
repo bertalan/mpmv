@@ -311,6 +311,8 @@ stable and that a CSS change fails it.
   Base's layout has a `foundation_scripts` block for the bundle. The build drops the
   `sourceMappingURL` comment from the built copies.
 - Per-theme budgets: `css_budget_kb` and `js_budget_kb` in `theme.toml` (ride: 48 and 70).
+  `lazy_js_budget_kb` caps each script under `js/lazy/` (default 8 KB compressed; they are outside
+  the page JS budget).
 - A ride override must start from the current base template and get a render test under ride.
 
 ## The `ride` theme (THM.6)
