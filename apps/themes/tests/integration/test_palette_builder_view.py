@@ -167,3 +167,46 @@ def test_the_builder_is_in_the_settings_menu_only_for_those_who_may_use_it(
     other = Client()
     verified_login(other, user_with("access_admin"))
     assert reverse(URL) not in other.get(reverse("wagtailadmin_home")).content.decode()
+
+
+ACTIONS: list[dict[str, str]] = [
+    {"action": "save", "primary": "#0B5C7A"},
+    {"action": "save", "primary": "#0B5C7A", "site": "1"},  # the site-palette part of a save
+    {"action": "check", "primary": "#FFE600"},
+    {"use": "primary:#8A6D00"},
+]
+
+
+@pytest.mark.parametrize("fields", ACTIONS)
+def test_every_post_action_is_refused_to_an_anonymous_visitor(
+    client: Client, fields: dict[str, str]
+) -> None:
+    response = post(client, **fields)
+    assert response.status_code == 302
+    assert "login" in response["Location"]
+    assert not BrandPalette.objects.filter(slug="mine").exists()
+    assert not AuditLog.objects.filter(action=PALETTE_CONFIGURED).exists()
+
+
+@pytest.mark.parametrize("fields", ACTIONS)
+def test_every_post_action_is_refused_to_an_editor_without_the_permission(
+    client: Client, fields: dict[str, str]
+) -> None:
+    verified_login(client, user_with("access_admin"))
+    assert refused(post(client, **fields))
+    assert not BrandPalette.objects.filter(slug="mine").exists()
+    assert not AuditLog.objects.filter(action=PALETTE_CONFIGURED).exists()
+
+
+def test_start_from_is_refused_without_the_permission(client: Client) -> None:
+    assert client.get(reverse(URL), {"start": "blue"}).status_code == 302
+    verified_login(client, user_with("access_admin"))
+    assert refused(client.get(reverse(URL), {"start": "blue"}))
+
+
+def test_a_post_without_a_csrf_token_is_refused() -> None:
+    strict = Client(enforce_csrf_checks=True)
+    verified_login(strict, builder_user())
+    response = post(strict, action="save", primary="#0B5C7A")
+    assert response.status_code == 403
+    assert not BrandPalette.objects.filter(slug="mine").exists()
