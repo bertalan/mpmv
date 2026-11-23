@@ -483,6 +483,7 @@ EXCLUDED = {
     "apps/cms/templates/wagtail_localize/": "wagtail-localize overrides, its own catalog",
     "apps/core/templates/admin/": "Django admin filter widget, Django translates it",
     "apps/vendors/templates/admin/": "Django delete confirmation copy, Django translates it",
+    "apps/themes/templates/themes/admin/": "editor-only palette builder, I18N.20 part 3b",
     "themes/base/templates/styleguide.html": "developer style guide, not shown to customers",
     "themes/ride/templates/styleguide": "developer style guide, not shown to customers",
 }

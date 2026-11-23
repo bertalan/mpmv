@@ -22,6 +22,7 @@ from apps.cms.services import SeedReport, disclosure_images_in_stream, page_imag
 from apps.cms.tests.factories import StandardPageFactory
 from apps.core.models import ImageLicence, MediaImage
 from apps.core.tests.factories import MediaImageFactory
+from tests.i18n import translated
 
 pytestmark = pytest.mark.django_db
 
@@ -93,7 +94,7 @@ def test_a_cc_by_hero_is_credited_in_the_page_credits_disclosure(
 
     assert [credit.text for credit in credits] == ["Ada Lovelace"]
     assert '<details class="image-credits">' in html
-    assert "Image credits" in html
+    assert translated("Image credits") in html
 
 
 def test_a_cc0_hero_adds_nothing_to_the_disclosure(

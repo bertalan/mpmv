@@ -2387,6 +2387,10 @@ msgstr ""
 "Choisissez un texte réutilisable. Lorsqu’il est modifié et approuvé, chaque page qui l’utilise "
 "affiche le nouveau texte. Rien n’est affiché tant que l’extrait n’est pas publié."
 
+#: apps/themes/admin_views.py
+msgid "Choose a site to switch it to this palette when you save."
+msgstr "Choisissez un site à passer sur cette palette à l'enregistrement."
+
 #: apps/manager/event_forms.py
 msgid "Choose a time zone such as Europe/Rome."
 msgstr "Choisissez un fuseau horaire, par exemple Europe/Rome."
@@ -8635,7 +8639,7 @@ msgstr "Coordonnées du vendeur"
 msgid "Selling mode"
 msgstr "Mode de vente"
 
-#: apps/cms/templates/cms/form_page.html
+#: apps/cms/templates/cms/form_page.html themes/ride/templates/cms/form_page.html
 msgid "Send"
 msgstr "Envoyer"
 
@@ -11983,7 +11987,7 @@ msgstr ""
 "marque et une machine. Rien n'est enregistré tant que vous n'avez pas confirmé sur la page "
 "d'aperçu."
 
-#: apps/cms/templates/cms/form_page.html
+#: apps/cms/templates/cms/form_page.html themes/ride/templates/cms/form_page.html
 msgid "The security check failed. Please try again."
 msgstr "La vérification de sécurité a échoué. Réessaie."
 

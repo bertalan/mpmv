@@ -2,14 +2,21 @@
 
 import pytest
 from django.core.exceptions import ValidationError
+from django.utils import translation
 from wagtail.models import Page
 
-from apps.cms import engine
+from apps.cms import engine, slugs
 from apps.cms.checks import check_reserved_root_slugs
 from apps.cms.models import HomePage, StandardPage
 from apps.cms.tests.factories import HomePageFactory, StandardPageFactory
+from apps.core.i18n import primary_language
 
 pytestmark = pytest.mark.django_db
+
+
+def _reserved_message() -> str:
+    with translation.override(primary_language()):
+        return slugs.message("help-centre")
 
 
 def _home() -> HomePage:
@@ -34,7 +41,7 @@ def test_an_existing_page_cannot_be_renamed_to_the_reserved_slug() -> None:
     page.slug = "help-centre"
     with pytest.raises(ValidationError) as caught:
         page.clean()
-    assert "reserved" in str(caught.value)
+    assert caught.value.message_dict["slug"] == [_reserved_message()]
 
 
 def test_the_page_form_shows_the_reserved_message() -> None:
@@ -46,10 +53,11 @@ def test_the_page_form_shows_the_reserved_message() -> None:
         parent_page=home,
     )
     assert not form.is_valid()
-    assert any("reserved" in e for e in form.errors.get("slug", [])) or any(
-        "reserved" in e for e in form.non_field_errors()
+    reserved = _reserved_message()
+    # The reserved message is the only slug error: not also "already in use".
+    assert form.errors.get("slug", []) == [reserved] or (
+        reserved in form.non_field_errors() and "slug" not in form.errors
     )
-    assert not any("already in use" in e for e in form.errors.get("slug", []))
 
 
 def test_the_check_flags_a_live_page_with_the_reserved_slug() -> None:

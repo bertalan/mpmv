@@ -1,0 +1,9 @@
+{% load cms_tags %}{% comment %}
+The header's secondary tools (THM.21): the help link, the language switcher, the garage menu and the
+signed-in user's tools. `header.html` renders this once: inside the menu panel when there is a menu
+(below 64rem the panel is a drawer, so the bar keeps one row; from 64rem the panel is the inline
+navigation and these sit at its end), otherwise in the tools beside the search and cart icons.
+{% endcomment %}{% include "components/help_link.html" %}
+{% if languages %}{% include "components/language_switcher.html" %}{% endif %}
+{% include "components/garage_menu.html" %}
+{% help_context as help %}{% include "components/user_tools.html" %}

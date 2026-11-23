@@ -51,17 +51,19 @@ def navigation_links(context: dict[str, Any], location: str) -> list[MenuLink]:
     """The links of the header or footer menu; pages are shown in the active language.
 
     Links to deleted or unpublished pages are left out. The header menu ends with the
-    temporary "Site links" item (OPS.12; remove before LIVE).
+    temporary "Site links" item (OPS.12; remove before LIVE), for staff only (THM.21).
     """
     links = _menu_links(context.get("request"), _menu(location))
-    if location == NavigationMenu.Location.HEADER:
+    user = getattr(context.get("request"), "user", None)
+    staff = getattr(user, "is_active", False) and getattr(user, "is_staff", False)
+    if location == NavigationMenu.Location.HEADER and staff:
         links.extend(_site_links_item())
     return links
 
 
 def _site_links_item() -> list[MenuLink]:
-    """The temporary staff "Site links" page (OPS.12), shown to everyone so the owner can test
-    its protection on STAGE; remove before LIVE."""
+    """The temporary staff "Site links" page (OPS.12); the caller adds it for staff only, so the
+    menu of a visitor or a customer never shows a link they cannot open; remove before LIVE."""
     try:
         return [MenuLink(label=gettext("Site links"), url=reverse("site_links"))]
     except NoReverseMatch:  # a test URLconf without the route
@@ -242,3 +244,19 @@ def help_context(context: dict[str, Any]) -> dict[str, str] | None:
         "page_type": engine.help_page_type(label),
         "language": translation.get_language() or settings.LANGUAGE_CODE,
     }
+
+
+@register.simple_tag
+def legal_anchors(body: Any) -> dict[str, str]:
+    """Anchor id by block id for the legal sections of a body (THM.29)."""
+    sections = [
+        (str(c.value["section"]), str(c.id)) for c in body if c.block_type == "legal_section"
+    ]
+    anchors = engine.legal_section_anchors(sections)
+    return {block_id: anchor for (_, block_id), anchor in zip(sections, anchors, strict=True)}
+
+
+@register.filter
+def anchor_of(anchors: dict[str, str], block_id: Any) -> str:
+    """The anchor of one block ('' when it has none)."""
+    return anchors.get(str(block_id), "")
