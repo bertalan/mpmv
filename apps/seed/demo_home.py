@@ -97,6 +97,7 @@ MENU_LABELS: Final[dict[str, Texts]] = {
     "shop": {"en": "Shop", "it": "Negozio", "de": "Shop"},
     "blog": {"en": "Blog", "it": "Blog", "de": "Blog"},
     "about": {"en": "About", "it": "Chi siamo", "de": "Über uns"},
+    "contact": {"en": "Contact", "it": "Contatti", "de": "Kontakt"},
 }
 FOOTER_TITLE: Final[Texts] = {"en": "Explore", "it": "Esplora", "de": "Entdecken"}
 SOCIAL: Final = (
@@ -118,7 +119,7 @@ HERO: Final[dict[str, Texts]] = {
     "slide_two": {
         "en": "Meet the makers",
         "it": "Conosci gli artigiani",
-        "de": "Die Macher kennenlernen",
+        "de": "Die Hersteller kennenlernen",
     },
     "slide_three": {
         "en": "Fairs and workshops",
@@ -142,7 +143,7 @@ HERO: Final[dict[str, Texts]] = {
         "de": "Der Blog zeigt, wie die Stücke entstehen und gepflegt werden.",
     },
     "blog": {"en": "From the blog", "it": "Dal blog", "de": "Aus dem Blog"},
-    "vendors": {"en": "Our makers", "it": "I nostri artigiani", "de": "Unsere Macher"},
+    "vendors": {"en": "Our makers", "it": "I nostri artigiani", "de": "Unsere Hersteller"},
 }
 QUOTES: Final = (
     (
@@ -175,7 +176,7 @@ def _translate(page: Any, locale: Locale, fill: Callable[[Any, str], None], lang
     return copy
 
 
-def _publish(page: Any) -> Any:
+def publish(page: Any) -> Any:
     page.save_revision().publish()
     page.refresh_from_db()
     return page
@@ -194,7 +195,7 @@ def seed_blog(
             title=pick(BLOG_TITLE, source), slug=BLOG_SLUG, intro=pick(BLOG_INTRO, source)
         )
         home.add_child(instance=index)
-        index = _publish(index)
+        index = publish(index)
         run.created("cms.blogindexpage", index.url_path)
     author = BlogAuthor.objects.filter(slug=AUTHOR[1], locale=locale).first()
     if author is None:
@@ -215,7 +216,7 @@ def seed_blog(
                 body=[("paragraph", pick(spec["text"], source))],
             )
             index.add_child(instance=post)
-            post = _publish(post)
+            post = publish(post)
             run.created("cms.blogpostpage", post.url_path)
         posts.append(post)
 
@@ -244,7 +245,7 @@ def _local(page: Any, locale: Locale) -> Any:
     return found.specific if found is not None else page
 
 
-def _seeded_about(locale: Locale, language: str) -> StandardPage | None:
+def seeded_about(locale: Locale, language: str) -> StandardPage | None:
     """The About page the CMS.1 seed made in `locale`, or None."""
     home = HomePage.objects.filter(locale=locale, depth=2).first()
     if home is None:
@@ -268,14 +269,16 @@ def seed_navigation(
     run: Any,
     locales: dict[str, Locale],
     pages: list[tuple[str, Any]],
+    contact: Any | None = None,
 ) -> None:
-    """The header menu of every language (`pages` is (label key, source page)) and the footer."""
+    """The header menu of every language (`pages` is (label key, source page)), with About and
+    then `contact` (when given) after them, and the footer."""
     for language, locale in locales.items():
         menu = NavigationMenu.objects.filter(locale=locale, location="header").first()
-        about = _seeded_about(locale, language)
+        about = seeded_about(locale, language)
         if menu is None or about is None or not _is_default_menu(menu, about):
             continue  # an editor's menu stays as it is
-        entries = [*pages, ("about", about)]
+        entries = [*pages, ("about", about), *([("contact", contact)] if contact else [])]
         menu.links = [
             ("page", {"page": _local(page, locale), "label": pick(MENU_LABELS[key], language)})
             for key, page in entries
@@ -387,3 +390,23 @@ def shop_home_body(
             },
         ),
     ]
+
+
+def remove_contact_entries(page_pks: set[int]) -> None:
+    """Take the seeded Contact entry out of every header menu, for the Contact pages in
+    `page_pks` that the reset is about to delete. An entry an editor relabelled stays."""
+    for menu in NavigationMenu.objects.filter(location="header").select_related("locale"):
+        label = pick(MENU_LABELS["contact"], menu.locale.language_code)
+        kept = [
+            (child.block_type, child.value)
+            for child in menu.links
+            if not (
+                child.block_type == "page"
+                and child.value["page"] is not None
+                and child.value["page"].pk in page_pks
+                and child.value["label"] == label
+            )
+        ]
+        if len(kept) != len(menu.links):
+            menu.links = kept
+            menu.save()
