@@ -159,3 +159,41 @@ def test_the_buttons_and_page_links_are_at_least_44_px(
     box = button.bounding_box()
     assert box is not None
     assert min(box["width"], box["height"]) >= 44
+
+
+CARD_COLOURS = """
+(card) => {
+  const resolve = (name, prop) => {
+    const probe = document.createElement('i');
+    probe.style.setProperty(prop, `var(${name})`);
+    card.appendChild(probe);
+    const value = getComputedStyle(probe)[prop === 'color' ? 'color' : 'outlineColor'];
+    probe.remove();
+    return value;
+  };
+  const author = card.querySelector('.article-author a');
+  author.focus();
+  const style = getComputedStyle(author);
+  return {
+    link: style.color, wantLink: resolve('--s-link', 'color'),
+    ring: style.outlineColor, wantRing: resolve('--s-focus', 'outline-color'),
+    text: getComputedStyle(card.querySelector('.card-text')).color,
+    wantText: resolve('--s-text', 'color'),
+  };
+}
+"""
+
+
+@pytest.mark.parametrize(
+    "selector", [".post-summary--featured", ".post-summary:not(.post-summary--featured)"]
+)
+def test_a_blog_card_uses_the_link_focus_and_text_colours_of_its_surface(
+    selector: str, page: Page, live_server: LiveServer, site: dict[str, str]
+) -> None:
+    """THM.28: the featured band card and the light card each paint and name their own colours."""
+    page.set_viewport_size({"width": 1280, "height": 900})
+    open_page(page, live_server, site, "blog")
+    got = page.eval_on_selector(selector, CARD_COLOURS)
+    assert got["link"] == got["wantLink"]
+    assert got["ring"] == got["wantRing"]
+    assert got["text"] == got["wantText"]

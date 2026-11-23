@@ -1,0 +1,15 @@
+{% load wagtailcore_tags responsive_images %}{% comment %}
+One article card of the `ride` blog (THM.28): the image on the left (the CMS main image through the
+"card" preset, "content" for the featured one), then the title, the date and author line and the
+summary. The title link covers the whole card (`stretched-link`), so the image needs no link of
+its own. Context: `post`, `blog`, `request`, `featured`.
+{% endcomment %}<article class="post-summary card mb-3 {% if featured %}post-summary--featured surface-band{% else %}surface-light{% endif %}">
+  <div class="post-summary__row">
+    {% if post.image %}<div class="post-summary__media">{% if featured %}{% responsive_image post.image "content" alt=post.image_alt_text %}{% else %}{% responsive_image post.image "card" alt=post.image_alt_text %}{% endif %}</div>{% endif %}
+    <div class="card-body">
+      <h2 class="card-title {% if featured %}h2{% else %}h4{% endif %}"><a class="stretched-link" href="{% pageurl post %}">{{ post.title }}</a></h2>
+      {% include "cms/includes/article_meta.html" with post=post blog=blog request=request only %}
+      {% if post.summary %}<p class="card-text">{{ post.summary }}</p>{% endif %}
+    </div>
+  </div>
+</article>
