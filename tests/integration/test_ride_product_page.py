@@ -28,7 +28,7 @@ from apps.tax import engine as tax
 from apps.tax.tests.factories import TaxRateFactory, VendorTaxProfileFactory
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
-from tests.i18n import translated
+from tests.i18n import localized, translated
 
 pytestmark = pytest.mark.django_db
 
@@ -65,10 +65,8 @@ def _product(vendor: Vendor, slug: str, variants: int = 0, **fields: Any) -> str
         variant = VariantFactory.create(
             product=product, sku=f"{slug}-{n}".upper(), is_default=n == 0
         )
-        VariantTranslationFactory.create(
-            variant=variant, language="en", label=f"Size {n}", status=PUBLISHED
-        )
-    return f"/product/{slug}/"
+        VariantTranslationFactory.create(variant=variant, label=f"Size {n}", status=PUBLISHED)
+    return localized(f"/product/{slug}/")
 
 
 def _soup(client: Client, settings: SettingsWrapper, theme: str, path: str) -> Any:
