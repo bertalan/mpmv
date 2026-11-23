@@ -1144,15 +1144,22 @@ def _landing_body(images: dict[str, MediaImage], shop: StandardPage) -> list[Any
     ]
 
 
-def _is_seed_home(page: HomePage, images: dict[str, MediaImage]) -> bool:
-    """Whether the home still has the CMS.1 sample text or a body the seed wrote (a hero with the
-    seed's picture: the shop content before CMS.19, the landing after it)."""
+def _is_seed_home(page: HomePage, written: list[Any]) -> bool:
+    """Whether the whole body of the home is still what the seed wrote: the CMS.1 sample text, an
+    empty body, or one of the `written` bodies (the landing, the shop content before CMS.19).
+    A hero with the seed's picture is not enough: an editor's translation keeps it."""
     raw = _stripped(page.body.get_prep_value())
     sample = seed_text(page.locale.language_code).home.body
-    if raw == [{"type": "paragraph", "value": sample}] or raw == []:
-        return True
-    first = raw[0] if raw else {}
-    return first.get("type") == "hero" and first["value"].get("image") == images["home-hero"].pk
+    return raw == [] or raw == [{"type": "paragraph", "value": sample}] or raw in written
+
+
+def _written_bodies(page: HomePage, shop: StandardPage, landing: list[Any]) -> list[Any]:
+    """The bodies the seed itself wrote on the home of `page`'s language."""
+    own_shop = shop.get_translation_or_none(page.locale) or shop
+    return [
+        _stripped(HomePage(body=landing).body.get_prep_value()),
+        _stripped(own_shop.body.get_prep_value()),
+    ]
 
 
 def _translation(source: Any, locale: Locale) -> Any:
@@ -1210,13 +1217,16 @@ def _recruitment_home(
 ) -> None:
     """The source home gets the landing (CMS.19); every other seed home becomes its alias, an
     untranslated copy that shows the English text and is in no `hreflang` (spec 09 fallback)."""
-    changed = _is_seed_home(home, images) and _set_body(home, _landing_body(images, shop))
+    landing = _landing_body(images, shop)
+    changed = _is_seed_home(home, _written_bodies(home, shop, landing)) and _set_body(home, landing)
     if changed:
         _publish(home)  # Wagtail updates the aliases with it
         run.changes.update("cms.homepage", home.locale.language_code, {}, {"body": "landing"})
     aliased = False
     for page in HomePage.objects.filter(depth=2).exclude(pk=home.pk).select_related("locale"):
-        if page.alias_of_id == home.pk or not _is_seed_home(page, images):
+        if page.alias_of_id == home.pk or not _is_seed_home(
+            page, _written_bodies(page, shop, landing)
+        ):
             continue
         page.alias_of = home
         page.save(update_fields=["alias_of"])

@@ -1,9 +1,10 @@
-{% load i18n responsive_images %}{% comment %}
+{% load i18n static responsive_images %}{% comment %}
 Gallery of the `ride` theme (THM.14, replaces base's list): a Bootstrap carousel of the product
 images with a row of thumbnail buttons, Previous, Pause/Play and Next (spec 14 §14.3). Each image
 keeps base's "Enlarge" button and `<dialog>` zoom (opened by base.js). Nothing moves unless
 `autoplay` is set. Without JavaScript all images follow one another and the thumbnails stay
-hidden. Without images a neutral placeholder, hidden from assistive technology, keeps the layout.
+hidden. Without images the product placeholder (decorative, `alt=""`) fills the same square box as an
+image would (THM.19).
 Same context as base's components/gallery.html, plus `autoplay` and `interval`:
 
   {% include "components/gallery.html" with id="product-images" label=_("Product images") images=images only %}
@@ -28,4 +29,4 @@ Same context as base's components/gallery.html, plus `autoplay` and `interval`:
       {% for image in images %}{% blocktranslate asvar indicator_label with count=forloop.counter total=total %}Show image {{ count }} of {{ total }}{% endblocktranslate %}<button type="button" data-bs-target="#{{ id }}" data-bs-slide-to="{{ forloop.counter0 }}"{% if forloop.first %} class="active" aria-current="true"{% endif %} aria-label="{{ indicator_label }}" hidden><img src="{{ image.url }}" alt="{{ image.alt }}" width="80" height="80" loading="lazy"></button>{% endfor %}
     </div>
   </div>{% endif %}
-</section>{% endwith %}{% else %}<section class="gallery" aria-label="{{ label }}"><div class="gallery__placeholder" aria-hidden="true"></div></section>{% endif %}
+</section>{% endwith %}{% else %}<section class="gallery ride-gallery" aria-label="{{ label }}"><img class="ride-gallery__image ride-gallery__placeholder" src="{% static 'themes/ride/images/product-placeholder.svg' %}" alt="" width="800" height="800"></section>{% endif %}
