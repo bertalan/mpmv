@@ -2327,6 +2327,10 @@ msgstr ""
 "Choisissez un texte réutilisable. Lorsqu’il est modifié et approuvé, chaque page qui l’utilise "
 "affiche le nouveau texte. Rien n’est affiché tant que l’extrait n’est pas publié."
 
+#: apps/themes/admin_views.py
+msgid "Choose a site to switch it to this palette when you save."
+msgstr "Choisissez un site à passer sur cette palette à l'enregistrement."
+
 #: apps/manager/event_forms.py
 msgid "Choose a time zone such as Europe/Rome."
 msgstr "Choisissez un fuseau horaire, par exemple Europe/Rome."
