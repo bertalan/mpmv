@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 from django.http import HttpRequest
 from django.test import RequestFactory
+from django.urls import reverse
 from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.themes import views
@@ -59,7 +60,7 @@ def test_the_500_page_is_a_full_bleed_hero_with_a_display_code(request_: HttpReq
     assert re.search(r'<p class="error-hero__code" aria-hidden="true">500</p>', html)
     assert len(re.findall(r"<h1\b", html)) == 1
     assert translated("Something went wrong") in html.split("<h1", 1)[1].split("</h1>", 1)[0]
-    assert 'class="btn btn-primary" href="/"' in html
+    assert f'class="btn btn-primary" href="{reverse("home")}"' in html
     assert 'id="error-search"' not in html  # static page: the search belongs to the 404
 
 
@@ -76,7 +77,7 @@ def test_the_404_page_has_the_display_code_a_way_home_and_a_search() -> None:
     html = views._render_plain(RequestFactory().get("/nope/"), "404.html")
     assert re.search(r'<p class="error-hero__code" aria-hidden="true">404</p>', html)
     assert len(re.findall(r"<h1\b", html)) == 1
-    assert 'class="btn btn-primary" href="/"' in html
+    assert f'class="btn btn-primary" href="{reverse("home")}"' in html
     form = html.split('for="error-search"', 1)[1].split("</form>", 1)[0]
     assert 'name="s"' in form
     assert re.search(r'<form[^>]+role="search"[^>]+action="/"', html.split("error-hero", 1)[1])
