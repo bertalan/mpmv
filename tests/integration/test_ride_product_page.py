@@ -2,19 +2,28 @@
 
 Presentation only: a gallery card, a buy box (title, meta list, large price, variant pills, the
 primary button) and a related strip. The price, tax note, vendor link and compliance blocks are
-the same markup as `base` renders; the page loads in a fixed number of queries.
+the same markup as `base` renders; the page loads in a fixed number of queries, whatever the
+number of variants and images.
+
+Assumption: `.product-safety` and `.product-destination-notice` are assumed class names for the
+GPSR block and the destination notice that CMP.26 will add to the product page (no template
+renders them yet). The parity check covers them only if CMP.26 uses these names.
 """
 
+import io
 from decimal import Decimal
 from typing import Any
 
 import pytest
 from bs4 import BeautifulSoup
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
+from PIL import Image
 from pytest_django.fixtures import Settings as SettingsWrapper
 
+from apps.catalog import media
 from apps.catalog.models import Product, SalesMode
 from apps.catalog.tests.factories import (
     ProductFactory,
@@ -22,8 +31,9 @@ from apps.catalog.tests.factories import (
     VariantFactory,
     VariantTranslationFactory,
 )
+from apps.core.audit import AuditContext
 from apps.core.models import TranslationStatus
-from apps.core.tests.factories import PlatformOperatorFactory, utc
+from apps.core.tests.factories import ImageLicenceFactory, PlatformOperatorFactory, utc
 from apps.tax import engine as tax
 from apps.tax.tests.factories import TaxRateFactory, VendorTaxProfileFactory
 from apps.vendors.models import Vendor
@@ -131,7 +141,9 @@ def test_price_tax_text_vendor_and_compliance_match_base(
             "on_request": [p.get_text(strip=True) for p in soup.select(".product-on-request")],
             "gpsr": [str(s) for s in soup.select(".product-safety, .product-destination-notice")],
             "hidden": sorted(
-                i["name"] for i in soup.select("form.product-form input[type=hidden]")
+                (i["name"], i.get("value", ""))
+                for i in soup.select("form.product-form input[type=hidden]")
+                if i["name"] != "csrfmiddlewaretoken"  # a fresh token on every response
             ),
         }
 
@@ -152,17 +164,53 @@ def test_the_primary_button_and_quantity_keep_their_hooks(
     assert soup.select_one("form.product-form #product-quantity") is not None
 
 
-def test_the_page_loads_in_a_fixed_number_of_queries(
+def _images(vendor: Vendor, slug: str, count: int) -> None:
+    product = Product.objects.get(translations__slug=slug, vendor=vendor)
+    licence = ImageLicenceFactory.create(code=f"own-{slug}", name="Own", source_required=False)
+    for n in range(count):
+        buffer = io.BytesIO()
+        Image.new("RGB", (640, 480), (n * 40, 90, 30)).save(buffer, format="PNG")
+        media.upload_image(
+            product,
+            file=SimpleUploadedFile(f"{n}.png", buffer.getvalue(), content_type="image/png"),
+            title=f"image {n}",
+            licence=licence,
+            author="The vendor",
+            alt_text=f"Image {n}",
+            caption="",
+            ctx=AuditContext(actor_label="system:test", source="system"),
+        )
+
+
+def _count(client: Client, path: str) -> int:
+    with CaptureQueriesContext(connection) as queries:
+        assert client.get(path).status_code == 200
+    return len(queries)
+
+
+def test_the_page_loads_in_a_fixed_number_of_queries_for_any_variants(
     client: Client, settings: SettingsWrapper, shop: Vendor
 ) -> None:
     settings.MPMV_THEME_DEFAULT = "ride"
-
-    def count(path: str) -> int:
-        with CaptureQueriesContext(connection) as queries:
-            assert client.get(path).status_code == 200
-        return len(queries)
-
     few = _product(shop, "few", variants=2)
     many = _product(shop, "many", variants=7)
-    count(few)  # warms the operator setting cache
-    assert count(many) == count(few)
+    _count(client, few)  # warms the operator setting cache
+    assert _count(client, many) == _count(client, few)
+
+
+@pytest.mark.parametrize("theme", ["base", "ride"])
+@pytest.mark.xfail(
+    strict=True,
+    reason="lane-a: the gallery loads one core_imagelicence row per image (N+1 in the catalog "
+    "page data, in `base` too, not in a template); remove the mark when it is fixed",
+)
+def test_the_page_loads_in_a_fixed_number_of_queries_for_any_images(
+    client: Client, settings: SettingsWrapper, shop: Vendor, theme: str
+) -> None:
+    settings.MPMV_THEME_DEFAULT = theme
+    few = _product(shop, "few", variants=2)
+    many = _product(shop, "many", variants=2)
+    _images(shop, "few", 1)
+    _images(shop, "many", 5)
+    _count(client, few)
+    assert _count(client, many) == _count(client, few)
