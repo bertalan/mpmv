@@ -251,6 +251,7 @@ def test_a_translator_replaces_one_image_in_one_locale_only(
     _publish_translation(client, workshop, other_language())
 
     assert _in(workshop, other_language()).image == italian
+    assert _in(workshop, other_language()).image != workshop.image
     for code in _untouched():
         assert _in(workshop, code).image == workshop.image
     workshop.refresh_from_db()
@@ -375,6 +376,20 @@ def test_the_gallery_shows_dedicated_images_in_their_language_and_neutral_ones_e
     assert "box-dedicated" in dedicated
     assert "neutral-1" not in dedicated
     assert 'alt="Dedicated box"' in dedicated
+
+
+def test_a_third_language_shows_the_neutral_gallery_images(
+    workshop: StandardPage, editor: User, client: Client
+) -> None:
+    third = third_language()
+    translate_page(workshop, [other_language(), third], user=editor)
+
+    html = client.get(_in(workshop, third).url).content.decode()
+    start = html.index('class="gallery"')
+    gallery = html[start : html.index("</ul>", start)]
+    assert "neutral-1" in gallery
+    assert "neutral-2" in gallery
+    assert "box-dedicated" not in gallery
 
 
 # --- Page validation and rendering

@@ -48,7 +48,7 @@ from apps.cms.tests.factories import LegalPageFactory, LegalPageReviewFactory
 from apps.core.audit import AuditContext
 from apps.core.i18n import configured_languages, primary_language
 from apps.core.models import AuditLog
-from tests.i18n import language_prefix, other_language, third_language
+from tests.i18n import language_prefix, other_language, third_language, translated
 
 pytestmark = pytest.mark.django_db
 
@@ -309,7 +309,11 @@ def test_the_page_is_marked_as_a_draft_until_counsel_has_checked_it(
         html = client.get("/terms-of-sale/").content.decode()
         return BeautifulSoup(html, "html.parser").select(".legal-draft")
 
-    assert len(draft_notices()) == 1
+    notices = draft_notices()
+    assert len(notices) == 1
+    assert notices[0].get_text(strip=True) == translated(
+        "Draft: this text has not been checked by legal counsel yet and is not final."
+    )
 
     _review(page, "native_review")
     assert len(draft_notices()) == 1
