@@ -13,6 +13,7 @@ import pytest
 from django.core.exceptions import ValidationError
 from django.test import Client
 from django.urls import reverse
+from django.utils.html import escape
 from wagtail_localize.models import OverridableSegment, StringSegment, TranslationSource
 
 from apps.accounts.models import User
@@ -24,7 +25,7 @@ from apps.cms.services import SeedReport
 from apps.core.i18n import primary_language
 from apps.core.models import MediaImage
 from apps.core.tests.factories import MediaImageFactory
-from tests.i18n import other_language
+from tests.i18n import other_language, translated
 
 pytestmark = pytest.mark.django_db
 
@@ -194,4 +195,4 @@ def test_the_editor_offers_the_blocks_on_the_home_page(
     assert response.status_code == 200
     html = response.content.decode()
     for label in ("Hero", "Call to action", "FAQ", "Rich text"):
-        assert label in html, label
+        assert escape(translated(label)) in html, label

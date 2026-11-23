@@ -123,7 +123,7 @@ def test_the_dry_run_reports_the_article_and_changes_nothing(blog: BlogIndexPage
 
     article = changes.changes[-1]
     assert (article.op, article.model) == ("create", "cms.blogpostpage")
-    assert article.key == "en:a-visit-to-the-workshop"
+    assert article.key == f"{blog.locale.language_code}:a-visit-to-the-workshop"
     assert article.after is not None
     assert article.after["title"] == "A visit to the workshop"
     assert article.after["date"] == "2023-04-12"

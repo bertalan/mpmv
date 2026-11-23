@@ -486,6 +486,7 @@ EXCLUDED = {
     "apps/cms/templates/wagtail_localize/": "editor-only, I18N.20 part 3b",
     "apps/core/templates/admin/": "admin-only, I18N.20 part 3b",
     "apps/events/templates/events/admin/": "admin-only, I18N.20 part 3b",
+    "apps/themes/templates/themes/admin/": "editor-only palette builder, I18N.20 part 3b",
     "apps/vendors/templates/admin/": "admin-only, I18N.20 part 3b",
     "themes/ride/templates/manager/": "Manager override, I18N.20 part 3b",
     "themes/ride/templates/layouts/": "layout override, I18N.20 part 3b",
