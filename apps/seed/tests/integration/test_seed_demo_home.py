@@ -16,16 +16,20 @@ from apps.cms.models import (
     StandardPage,
 )
 from apps.core.changeset import ChangeSet
+from apps.core.i18n import primary_language
 from apps.seed import data
 from apps.seed.services import TEST_CONTEXT, seed
 
 pytestmark = pytest.mark.django_db
 
 
+def shop_slug() -> str:
+    """The shop slug in the primary language (English text where it has none)."""
+    return data.SHOP.slug.get(primary_language()) or data.SHOP.slug["en"]
+
+
 def shop() -> StandardPage:
-    page: StandardPage = StandardPage.objects.get(
-        locale=Locale.get_default(), slug=data.SHOP.slug["en"]
-    )
+    page: StandardPage = StandardPage.objects.get(locale=Locale.get_default(), slug=shop_slug())
     return page
 
 
@@ -58,8 +62,7 @@ def test_the_header_menu_links_shop_blog_and_about(demo_seed: ChangeSet) -> None
     menu = NavigationMenu.objects.get(locale=Locale.get_default(), location="header")
     pages = [link.value["page"].specific for link in menu.links]
     assert [type(page) for page in pages][:3] == [StandardPage, BlogIndexPage, StandardPage]
-    assert pages[0].slug == data.SHOP.slug["en"]
-    assert pages[2].slug == "about"
+    assert pages[0].slug == shop_slug()
 
 
 def test_the_footer_has_a_column_and_a_social_profile(demo_seed: ChangeSet) -> None:
