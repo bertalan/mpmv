@@ -18,12 +18,14 @@ from playwright.sync_api import Page, expect
 from pytest_django.fixtures import Settings as SettingsWrapper
 from pytest_django.live_server_helper import LiveServer
 
-from apps.catalog.models import Product
+from apps.catalog.models import Product, SalesMode
 from apps.catalog.tests.factories import (
     CategoryFactory,
     CategoryTranslationFactory,
     ProductFactory,
     ProductTranslationFactory,
+    VariantFactory,
+    VariantTranslationFactory,
 )
 from apps.cms.tests.factories import BlogPostPageFactory, LegalPageFactory
 from apps.core.models import TranslationStatus
@@ -103,6 +105,7 @@ def paths(settings: SettingsWrapper, live_server: LiveServer, site_allows_indexi
         ).path,
         "blog": urlsplit(BlogPostPageFactory.create(title="Choosing a vase").url).path,
         "legal": urlsplit(legal.url).path,
+        "shop": f"/shop/{seller.slug}/",
     }
 
 
@@ -139,6 +142,33 @@ def test_key_page_matches_its_visual_baseline(
         assert_matches_baseline(page, theme=theme, name=name, width=width)
 
 
+STOREFRONT_WIDTHS = (375, 1280)
+
+
+def test_ride_storefront_matches_its_visual_baseline(
+    page: Page,
+    live_server: LiveServer,
+    settings: SettingsWrapper,
+    paths: dict,  # type: ignore[type-arg]
+) -> None:
+    """THM.25: the `ride` vendor storefront (filter card, product cards), 375 and 1280 px,
+    baselines `ride/storefront-<width>.png`."""
+    require_visual_mode()
+    settings.MPMV_THEME_DEFAULT = "ride"
+    page.emulate_media(reduced_motion="reduce")
+    page.clock.set_fixed_time(utc(2026, 11, 18, 10))
+    page.set_viewport_size({"width": 1280, "height": 900})
+    response = page.goto(f"{live_server.url}{paths['shop']}")
+    assert response is not None
+    assert response.status == 200
+    page.wait_for_load_state("load")
+    expect(page.locator("html")).to_have_attribute("data-theme", "ride")
+    page.evaluate("() => [...document.images].forEach((img) => { img.loading = 'eager'; })")
+    page.wait_for_function("() => [...document.images].every((img) => img.complete)", timeout=5000)
+    for width in STOREFRONT_WIDTHS:
+        assert_matches_baseline(page, theme="ride", name="storefront", width=width)
+
+
 PALETTE_PAGES = ("home", "product")
 PALETTE_WIDTHS = (375, 1280)
 
@@ -170,6 +200,62 @@ def test_palette_page_matches_its_visual_baseline(
     page.wait_for_function("() => [...document.images].every((img) => img.complete)", timeout=5000)
     for width in PALETTE_WIDTHS:
         assert_matches_baseline(page, theme=f"ride-{palette}", name=name, width=width)
+
+
+PRODUCT_KINDS = ("simple", "variant", "request")
+PRODUCT_WIDTHS = (375, 1280)
+
+
+@pytest.mark.parametrize("kind", PRODUCT_KINDS)
+def test_ride_product_page_matches_its_visual_baseline(
+    kind: str,
+    page: Page,
+    live_server: LiveServer,
+    settings: SettingsWrapper,
+    paths: dict,  # type: ignore[type-arg]
+) -> None:
+    """THM.26: the `ride` product page of a simple, a variant and an on-request product."""
+    require_visual_mode()
+    settings.MPMV_THEME_DEFAULT = "ride"
+    slug = "blue-vase"
+    if kind != "simple":
+        extra = ProductFactory.create(
+            vendor=Product.objects.get(translations__slug="blue-vase").vendor,
+            status=Product.Status.PUBLISHED,
+            price_net=Decimal("40.00"),
+            **(
+                {"kind": Product.Kind.VARIABLE}
+                if kind == "variant"
+                else {"sales_mode": SalesMode.ON_REQUEST}
+            ),
+        )
+        slug = f"{kind}-vase"
+        ProductTranslationFactory.create(
+            product=extra, language="en", title=f"{kind.title()} vase", slug=slug, status=PUBLISHED
+        )
+        if kind == "variant":
+            for n, (sku, label) in enumerate((("VASE-S", "Small"), ("VASE-L", "Large"))):
+                variant = VariantFactory.create(
+                    product=extra,
+                    sku=sku,
+                    is_default=n == 0,
+                    price_net_override=Decimal(40 + 10 * n),
+                )
+                VariantTranslationFactory.create(
+                    variant=variant, language="en", label=label, status=PUBLISHED
+                )
+    page.emulate_media(reduced_motion="reduce")
+    page.clock.set_fixed_time(utc(2026, 11, 18, 10))
+    page.set_viewport_size({"width": 1280, "height": 900})
+    response = page.goto(f"{live_server.url}/product/{slug}/")
+    assert response is not None
+    assert response.status == 200
+    page.wait_for_load_state("load")
+    expect(page.locator("html")).to_have_attribute("data-theme", "ride")
+    page.evaluate("() => [...document.images].forEach((img) => { img.loading = 'eager'; })")
+    page.wait_for_function("() => [...document.images].every((img) => img.complete)", timeout=5000)
+    for width in PRODUCT_WIDTHS:
+        assert_matches_baseline(page, theme="ride", name=f"product-{kind}", width=width)
 
 
 BLOG_PAGES = ("blog-index", "blog-article")
