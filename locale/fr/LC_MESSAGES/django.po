@@ -69,6 +69,56 @@ msgid_plural "%(counter)s events are awaiting review."
 msgstr[0] "%(counter)s événement est en attente de relecture."
 msgstr[1] "%(counter)s événements sont en attente de relecture."
 
+#: apps/cms/templates/cms/admin/image_review.html
+msgid ""
+"%(counter)s image has no licence or author yet. It cannot be chosen for new content until it is "
+"classified."
+msgid_plural ""
+"%(counter)s images have no licence or author yet. They cannot be chosen for new content until they"
+" are classified."
+msgstr[0] ""
+"%(counter)s image n’a pas encore de licence ni d’auteur. Elle ne peut pas être choisie pour de "
+"nouveaux contenus tant qu’elle n’est pas classée."
+msgstr[1] ""
+"%(counter)s images n’ont pas encore de licence ni d’auteur. Elles ne peuvent pas être choisies "
+"pour de nouveaux contenus tant qu’elles ne sont pas classées."
+
+#: apps/catalog/templates/catalog/admin/orphan_images.html
+msgid ""
+"%(counter)s image is not used by any product, brand, vendor, page, event or draft, and is more "
+"than a day old."
+msgid_plural ""
+"%(counter)s images are not used by any product, brand, vendor, page, event or draft, and are more "
+"than a day old."
+msgstr[0] ""
+"%(counter)s image n’est utilisée par aucun produit, marque, vendeur, page, événement ou brouillon "
+"et date de plus d’un jour."
+msgstr[1] ""
+"%(counter)s images ne sont utilisées par aucun produit, marque, vendeur, page, événement ou "
+"brouillon et datent de plus d’un jour."
+
+#: apps/catalog/templates/catalog/admin/rendition_monitor.html
+msgid "%(counter)s image lacks renditions. Pages show its original file until they are made."
+msgid_plural ""
+"%(counter)s images lack renditions. Pages show their original files until they are made."
+msgstr[0] ""
+"%(counter)s image n’a pas toutes ses déclinaisons. Les pages affichent le fichier d’origine tant "
+"qu’elles ne sont pas créées."
+msgstr[1] ""
+"%(counter)s images n’ont pas toutes leurs déclinaisons. Les pages affichent les fichiers d’origine"
+" tant qu’elles ne sont pas créées."
+
+#: apps/catalog/templates/catalog/admin/orphan_images.html
+msgid "%(counter)s image would be kept because it is in use, too new or not yours to delete."
+msgid_plural ""
+"%(counter)s images would be kept because they are in use, too new or not yours to delete."
+msgstr[0] ""
+"%(counter)s image serait conservée parce qu’elle est utilisée, trop récente ou que vous n’avez pas"
+" le droit de la supprimer."
+msgstr[1] ""
+"%(counter)s images seraient conservées parce qu’elles sont utilisées, trop récentes ou que vous "
+"n’avez pas le droit de les supprimer."
+
 #: apps/orders/templates/orders/_cart_mini.html themes/base/templates/components/mini_cart.html
 #: themes/ride/templates/orders/_cart_body.html themes/ride/templates/orders/_cart_mini.html
 msgid "%(counter)s item"
@@ -1649,6 +1699,10 @@ msgstr "à la nouvelle adresse %(why)s"
 msgid "At the top level of the scheme."
 msgstr "Au premier niveau du schéma."
 
+#: apps/catalog/templates/catalog/admin/rendition_monitor.html
+msgid "Attempts"
+msgstr "Tentatives"
+
 #: apps/events/templates/events/event_page.html apps/manager/event_forms.py
 msgid "Attendance"
 msgstr "Participation"
@@ -1671,7 +1725,8 @@ msgstr "application d'authentification"
 msgid "Authenticator app"
 msgstr "Application d'authentification"
 
-#: apps/core/models.py apps/manager/event_image_form.py
+#: apps/cms/templates/cms/admin/image_review.html apps/core/models.py
+#: apps/manager/event_image_form.py
 msgid "Author"
 msgstr "Auteur"
 
@@ -1716,6 +1771,10 @@ msgstr "Disponible à partir du"
 msgid "Available now"
 msgstr "Disponible maintenant"
 
+#: apps/events/templates/events/admin/form.html
+msgid "Back"
+msgstr "Retour"
+
 #: apps/seo/site_links.py
 msgid "Back office"
 msgstr "Back office"
@@ -1747,6 +1806,7 @@ msgstr "Retour au panier"
 msgid "Back to the change"
 msgstr "Retour à la modification"
 
+#: apps/events/templates/events/admin/confirm.html apps/events/templates/events/admin/hide.html
 #: apps/manager/templates/manager/shop/event_block_form.html
 #: apps/manager/templates/manager/shop/event_block_types.html
 msgid "Back to the event"
@@ -2440,6 +2500,11 @@ msgid "Choose the page the card leads to. If the page is not live, the card is l
 msgstr ""
 "Choisissez la page vers laquelle mène la carte. Si la page n'est pas publiée, la carte est omise."
 
+#: apps/events/templates/events/admin/map_picker_panel.html
+msgid "Choose the place that matches the address, then adjust the point on the map if needed."
+msgstr ""
+"Choisissez le lieu qui correspond à l’adresse, puis ajustez si besoin le point sur la carte."
+
 #: apps/cms/blocks.py
 msgid "Choose the product the card leads to. A card to a product that is not on sale is left out."
 msgstr ""
@@ -2536,6 +2601,15 @@ msgstr "Effacer tous les filtres"
 msgid "Clear filters"
 msgstr "Effacer les filtres"
 
+#: apps/events/templates/events/admin/map_picker_panel.html
+msgid ""
+"Click the map to place the point and drag the marker to move it, or type the latitude and "
+"longitude below. “Find coordinates” looks up the address above."
+msgstr ""
+"Cliquez sur la carte pour placer le point et faites glisser le repère pour le déplacer, ou "
+"saisissez la latitude et la longitude ci-dessous. « Trouver les coordonnées » recherche l’adresse "
+"saisie plus haut."
+
 #: themes/base/templates/components/dialog.html themes/base/templates/components/gallery.html
 #: themes/ride/templates/components/gallery.html themes/ride/templates/components/header.html
 #: themes/ride/templates/components/video_modal.html
@@ -2557,6 +2631,10 @@ msgstr "Solde de clôture"
 #: apps/manager/fitment_forms.py apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "Code"
 msgstr "Code"
+
+#: apps/catalog/templates/catalog/admin/orphan_images.html
+msgid "Collection"
+msgstr "Collection"
 
 #: apps/catalog/product_pages.py
 msgid "Colour"
@@ -3022,6 +3100,10 @@ msgstr "Supprimer (uniquement si rien ne l'utilise et s'il n'a pas d'enfants)"
 msgid "Delete selected %(verbose_name_plural)s"
 msgstr "Supprimer les %(verbose_name_plural)s sélectionnés"
 
+#: apps/catalog/templates/catalog/admin/orphan_images.html
+msgid "Delete selected images"
+msgstr "Supprimer les images sélectionnées"
+
 #: apps/fitment/templates/fitment/garage_delete.html
 msgid "Delete this vehicle?"
 msgstr "Supprimer ce véhicule ?"
@@ -3399,7 +3481,7 @@ msgstr "Supprimez la ligne ou modifiez sa quantité, pas les deux."
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 #: themes/base/templates/components/seller_details.html
-#: themes/ride/templates/components/seller_details.html
+#: themes/ride/templates/components/seller_details.html themes/ride/templates/manager/login.html
 msgid "Email"
 msgstr "E-mail"
 
@@ -3544,13 +3626,17 @@ msgid "Erasure requests"
 msgstr "Demandes d'effacement"
 
 #: themes/base/templates/components/alert.html themes/ride/templates/components/alert.html
-#: themes/ride/templates/components/field.html
+#: themes/ride/templates/components/field.html themes/ride/templates/manager/login.html
 msgid "Error"
 msgstr "Erreur"
 
-#: apps/manager/templates/manager/shop/events.html
+#: apps/events/templates/events/admin/review.html apps/manager/templates/manager/shop/events.html
 msgid "Event"
 msgstr "Événement"
+
+#: apps/events/templates/events/admin/map_picker_panel.html
+msgid "Event point"
+msgstr "Point de l’événement"
 
 #: apps/events/templates/events/_links.html
 msgid "Event views"
@@ -3560,6 +3646,10 @@ msgstr "Affichages des événements"
 #: apps/manager/site_map.py apps/manager/templates/manager/shop/events.html
 msgid "Events"
 msgstr "Événements"
+
+#: apps/events/templates/events/admin/review.html
+msgid "Events awaiting review"
+msgstr "Événements en attente de relecture"
 
 #: apps/events/templates/events/event_calendar.html
 msgid "Events in %(month)s"
@@ -3590,6 +3680,10 @@ msgstr "Chaque modification figure sur la page de ta commande : %(order_url)s"
 msgid "Every how many"
 msgstr "Toutes les combien de fois"
 
+#: apps/catalog/templates/catalog/admin/rendition_monitor.html
+msgid "Every image has its renditions."
+msgstr "Toutes les images ont leurs déclinaisons."
+
 #: apps/manager/event_forms.py
 msgid "Every month, on one day"
 msgstr "Chaque mois, un jour donné"
@@ -3611,6 +3705,10 @@ msgstr ""
 "Tous les utilisateurs, personnel et vendeurs compris, sont déconnectés partout. Seule cette "
 "session est conservée. Les clés API et les liens envoyés par e-mail ne sont pas affectés : "
 "révoquez-les séparément."
+
+#: apps/events/templates/events/admin/policies.html
+msgid "Every vendor follows the default threshold."
+msgstr "Tous les vendeurs suivent le seuil par défaut."
 
 #: apps/manager/event_forms.py
 msgid "Every week, on these days"
@@ -3692,6 +3790,10 @@ msgstr "Faits et circonstances"
 msgid "Facts and circumstances relied on"
 msgstr "Faits et circonstances sur lesquels la décision s'appuie"
 
+#: apps/catalog/templates/catalog/admin/rendition_monitor.html
+msgid "Failed render jobs"
+msgstr "Traitements d’images en échec"
+
 #: apps/cms/templates/cms/vendor_landing_page.html
 #: themes/ride/templates/cms/vendor_landing_page.html
 msgid "Featured products"
@@ -3750,6 +3852,10 @@ msgid ""
 msgstr ""
 "Recherchez une commande par son numéro. Le colis de chaque vendeur se modifie sur sa propre page, "
 "avec une note et votre clé d’accès."
+
+#: apps/events/templates/events/admin/map_picker_panel.html
+msgid "Find coordinates"
+msgstr "Trouver les coordonnées"
 
 #: apps/orders/templates/orders/_cart_body.html themes/ride/templates/orders/_cart_body.html
 msgid "Find something you like."
@@ -4008,7 +4114,7 @@ msgstr "Indiquez l'écran ou le type de page : uniquement des lettres, des chiff
 msgid "Go to slide %(count)s of %(total)s"
 msgstr "Aller à la diapositive %(count)s sur %(total)s"
 
-#: themes/base/templates/layouts/error.html
+#: themes/base/templates/layouts/error.html themes/ride/templates/layouts/error.html
 msgid "Go to the home page"
 msgstr "Aller à la page d'accueil"
 
@@ -4059,6 +4165,10 @@ msgstr ""
 #: apps/manager/templates/manager/shop/termination.html
 msgid "Ground"
 msgstr "Fondement juridique"
+
+#: apps/catalog/templates/catalog/admin/rendition_monitor.html
+msgid "Group"
+msgstr "Groupe"
 
 #: apps/shipping/models.py
 msgid ""
@@ -4185,6 +4295,18 @@ msgstr "Masqué par la plateforme."
 #: apps/manager/event_views.py
 msgid "Hidden by the platform: %(reason)s"
 msgstr "Masqué par la plateforme : %(reason)s"
+
+#: apps/events/templates/events/admin/hide.html
+msgid "Hide event"
+msgstr "Masquer l’événement"
+
+#: apps/events/templates/events/admin/hide.html
+msgid ""
+"Hiding takes the event offline in every language. Its vendor cannot edit or resubmit it; only "
+"staff restore it."
+msgstr ""
+"Masquer l’événement le retire du site dans toutes les langues. Son vendeur ne peut ni le modifier "
+"ni le soumettre de nouveau ; seule l’équipe peut le rétablir."
 
 #: themes/ride/templates/cms/blocks/strip.html
 msgid "Highlights"
@@ -4600,7 +4722,9 @@ msgstr ""
 msgid "illegal content"
 msgstr "un contenu illicite"
 
-#: apps/manager/event_block_forms.py
+#: apps/catalog/templates/catalog/admin/orphan_images.html
+#: apps/catalog/templates/catalog/admin/rendition_monitor.html
+#: apps/cms/templates/cms/admin/image_review.html apps/manager/event_block_forms.py
 msgid "Image"
 msgstr "Image"
 
@@ -4619,6 +4743,10 @@ msgstr "Images"
 #: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
 msgid "Images of %(label)s"
 msgstr "Images de %(label)s"
+
+#: apps/catalog/templates/catalog/admin/rendition_monitor.html
+msgid "Images without all their renditions"
+msgstr "Images sans toutes leurs déclinaisons"
 
 #: apps/catalog/taxonomy.py
 msgid "import batch"
@@ -4880,8 +5008,8 @@ msgstr "Conservée avec le préavis, non affichée au vendeur. Met fin au gel de
 msgid "Label"
 msgstr "Libellé"
 
-#: apps/manager/event_forms.py apps/manager/fitment_forms.py
-#: apps/manager/templates/manager/platform/fitment_node.html
+#: apps/events/templates/events/admin/review.html apps/manager/event_forms.py
+#: apps/manager/fitment_forms.py apps/manager/templates/manager/platform/fitment_node.html
 #: apps/manager/templates/manager/platform/product.html
 #: apps/manager/templates/manager/shop/events.html
 #: themes/base/templates/components/language_switcher.html
@@ -4908,6 +5036,10 @@ msgstr "Dernier jour"
 #: apps/manager/event_forms.py
 msgid "Last day of the repetition"
 msgstr "Dernier jour de la récurrence"
+
+#: apps/catalog/templates/catalog/admin/rendition_monitor.html
+msgid "Last error"
+msgstr "Dernière erreur"
 
 #: apps/manager/templates/manager/platform/user_sessions.html
 msgid "Last used"
@@ -5064,7 +5196,8 @@ msgstr "Niveaux"
 msgid "Levels of the scheme"
 msgstr "Niveaux du schéma"
 
-#: apps/core/models.py apps/manager/event_image_form.py
+#: apps/cms/templates/cms/admin/image_review.html apps/core/models.py
+#: apps/manager/event_image_form.py
 msgid "Licence"
 msgstr "Licence"
 
@@ -5177,6 +5310,10 @@ msgstr "URL source du logo"
 msgid "Longitude"
 msgstr "Longitude"
 
+#: apps/events/templates/events/admin/map_picker_panel.html
+msgid "Looking up the address…"
+msgstr "Recherche de l’adresse…"
+
 #: apps/manager/trust_views.py
 msgid "Lost above"
 msgstr "Perdu au-dessus de"
@@ -5255,6 +5392,10 @@ msgstr "Carte des événements listés"
 msgid "Map: %(name)s"
 msgstr "Carte : %(name)s"
 
+#: apps/events/templates/events/admin/map_picker_panel.html
+msgid "Map: click to place the event’s point"
+msgstr "Carte : cliquez pour placer le point de l’événement"
+
 #: apps/manager/templates/manager/shop/order.html
 msgid "Mark as delivered"
 msgstr "Marquer comme livré"
@@ -5289,6 +5430,10 @@ msgstr "Prix maximum"
 #: themes/base/templates/components/header.html themes/ride/templates/components/header.html
 msgid "Menu"
 msgstr "Menu"
+
+#: apps/catalog/templates/admin/catalog/brand/merge.html
+msgid "Merge"
+msgstr "Fusionner"
 
 #: apps/manager/fitment_views.py
 msgid "Merge %(name)s"
@@ -5327,6 +5472,10 @@ msgstr "Modification mineure : elle s’applique immédiatement"
 msgid "missing"
 msgstr "manquante"
 
+#: apps/catalog/templates/catalog/admin/rendition_monitor.html
+msgid "Missing groups"
+msgstr "Groupes manquants"
+
 #: apps/manager/product_views.py
 msgid "Missing in %(language)s"
 msgstr "Manquant en %(language)s"
@@ -5339,7 +5488,7 @@ msgstr "Modèle ou type"
 msgid "Model withdrawal form"
 msgstr "Modèle de formulaire de rétractation"
 
-#: apps/manager/templates/manager/shop/events.html
+#: apps/events/templates/events/admin/policies.html apps/manager/templates/manager/shop/events.html
 msgid "Moderation"
 msgstr "Modération"
 
@@ -5528,6 +5677,7 @@ msgstr "Nouvelle valeur"
 msgid "New version"
 msgstr "Nouvelle version"
 
+#: apps/catalog/templates/catalog/admin/rendition_monitor.html
 #: apps/catalog/templates/catalog/listing.html apps/catalog/templates/catalog/search.html
 #: themes/base/templates/components/pagination.html themes/ride/templates/catalog/listing.html
 #: themes/ride/templates/catalog/search.html themes/ride/templates/cms/includes/post_list.html
@@ -5578,6 +5728,10 @@ msgstr "Aucune modification"
 #: apps/manager/event_block_forms.py
 msgid "No event"
 msgstr "Aucun événement"
+
+#: apps/events/templates/events/admin/review.html
+msgid "No event is awaiting review."
+msgstr "Aucun événement n’attend de relecture."
 
 #: apps/events/templates/events/event_index_page.html
 msgid "No events are planned at the moment."
@@ -5648,6 +5802,10 @@ msgstr "aucune authentification par clé d'accès en cours"
 msgid "no pending passkey registration"
 msgstr "aucun enregistrement de clé d'accès en cours"
 
+#: apps/events/templates/events/admin/map_picker_panel.html
+msgid "No place found for this address. Place the point on the map or type it."
+msgstr "Aucun lieu trouvé pour cette adresse. Placez le point sur la carte ou saisissez-le."
+
 #: apps/manager/templates/manager/platform/order_drafts.html
 msgid "No prepared cart is waiting."
 msgstr "Aucun panier préparé n’est en attente."
@@ -5673,6 +5831,10 @@ msgstr "Aucun produit ne l'utilisait."
 #: apps/orders/templates/email/orders/vendor_package_cancelled/body.txt
 msgid "No refund fee is charged to your shop."
 msgstr "Aucuns frais de remboursement ne sont facturés à votre boutique."
+
+#: apps/catalog/templates/catalog/admin/rendition_monitor.html
+msgid "No render job has failed."
+msgstr "Aucun traitement d’image n’a échoué."
 
 #: themes/base/templates/components/rating.html
 msgid "No reviews yet"
@@ -6307,6 +6469,10 @@ msgstr "Seuls le support ou le propriétaire de la plateforme peuvent préparer 
 msgid "Only the customer who placed the order may answer this offer."
 msgstr "Seul le client qui a passé la commande peut répondre à cette offre."
 
+#: apps/catalog/templates/catalog/admin/rendition_monitor.html
+msgid "Only the newest %(scanned)s images were checked."
+msgstr "Seules les %(scanned)s images les plus récentes ont été vérifiées."
+
 #: apps/orders/amendments.py
 msgid "Only the platform owner or Support may change an order from the platform side."
 msgstr ""
@@ -6784,6 +6950,10 @@ msgstr "Colis encore modifiables"
 msgid "Page %(number)s"
 msgstr "Page %(number)s"
 
+#: apps/catalog/templates/catalog/admin/rendition_monitor.html
+msgid "Page %(number)s of %(total)s"
+msgstr "Page %(number)s sur %(total)s"
+
 #: apps/catalog/templates/catalog/listing.html apps/catalog/templates/catalog/search.html
 #: themes/ride/templates/catalog/listing.html themes/ride/templates/catalog/search.html
 msgid "Page %(page)s"
@@ -6802,6 +6972,10 @@ msgstr "Page introuvable"
 #: apps/cms/models.py
 msgid "Page type"
 msgstr "Type de page"
+
+#: apps/catalog/templates/catalog/admin/rendition_monitor.html
+msgid "Pages"
+msgstr "Pages"
 
 #: apps/catalog/templates/catalog/listing.html apps/catalog/templates/catalog/search.html
 #: themes/base/templates/components/pagination.html themes/ride/templates/catalog/listing.html
@@ -6872,7 +7046,7 @@ msgstr "Les clés d'accès nécessitent JavaScript."
 #: apps/compliance/templates/compliance/privacy_account.html
 #: apps/manager/templates/manager/login.html apps/vendors/templates/vendors/claim/account.html
 #: apps/vendors/templates/vendors/claim/sign_in.html
-#: themes/ride/templates/compliance/privacy_account.html
+#: themes/ride/templates/compliance/privacy_account.html themes/ride/templates/manager/login.html
 msgid "Password"
 msgstr "Mot de passe"
 
@@ -7054,6 +7228,10 @@ msgstr "Passée le"
 #: apps/manager/templates/manager/platform/orders.html
 msgid "Placed until"
 msgstr "Passée jusqu'au"
+
+#: apps/events/templates/events/admin/map_picker_panel.html
+msgid "Places found for the address"
+msgstr "Lieux trouvés pour l’adresse"
 
 #: apps/catalog/taxonomy.py
 msgid ""
@@ -7259,6 +7437,14 @@ msgstr ""
 msgid "Point on the map"
 msgstr "Point sur la carte"
 
+#: apps/events/templates/events/admin/map_picker_panel.html
+msgid "Point placed on the map."
+msgstr "Point placé sur la carte."
+
+#: apps/events/templates/events/admin/map_picker_panel.html
+msgid "Point set from the chosen place."
+msgstr "Point défini à partir du lieu choisi."
+
 #: apps/compliance/templates/compliance/contact_points.html
 #: themes/ride/templates/compliance/contact_points.html
 msgid "Points of contact"
@@ -7317,6 +7503,10 @@ msgstr "Paniers préparés"
 msgid "Preview"
 msgstr "Aperçu"
 
+#: apps/catalog/templates/catalog/admin/orphan_images.html
+msgid "Preview delete"
+msgstr "Aperçu de la suppression"
+
 #: apps/manager/fitment_views.py
 msgid "Preview of the change"
 msgstr "Aperçu de la modification"
@@ -7361,6 +7551,13 @@ msgstr "Aperçu du brouillon enregistré"
 msgid "Preview: %(action)s"
 msgstr "Aperçu : %(action)s"
 
+#: apps/catalog/templates/catalog/admin/orphan_images.html
+msgid "Preview: %(counter)s image would be deleted. Nothing has been deleted yet."
+msgid_plural "Preview: %(counter)s images would be deleted. Nothing has been deleted yet."
+msgstr[0] "Aperçu : %(counter)s image serait supprimée. Rien n’a encore été supprimé."
+msgstr[1] "Aperçu : %(counter)s images seraient supprimées. Rien n’a encore été supprimé."
+
+#: apps/catalog/templates/catalog/admin/rendition_monitor.html
 #: apps/catalog/templates/catalog/listing.html apps/catalog/templates/catalog/search.html
 #: themes/base/templates/components/pagination.html themes/ride/templates/catalog/listing.html
 #: themes/ride/templates/catalog/search.html themes/ride/templates/cms/includes/post_list.html
@@ -7631,6 +7828,14 @@ msgstr "Question %(number)d"
 #: apps/manager/event_block_forms.py
 msgid "Questions and answers"
 msgstr "Questions et réponses"
+
+#: apps/catalog/templates/catalog/admin/rendition_monitor.html
+msgid "Queue %(group)s"
+msgstr "Mettre %(group)s en file"
+
+#: apps/catalog/templates/catalog/admin/rendition_monitor.html
+msgid "queued again"
+msgstr "remis en file"
 
 #: apps/orders/models.py
 msgid "Quote in progress"
@@ -8078,6 +8283,10 @@ msgstr "Retirer (page en ligne, non achetable)"
 msgid "Retired"
 msgstr "Retirés"
 
+#: apps/catalog/templates/catalog/admin/rendition_monitor.html
+msgid "Retry"
+msgstr "Réessayer"
+
 #: apps/manager/forms.py
 msgid "Return cost information"
 msgstr "Informations sur le coût du retour"
@@ -8401,7 +8610,7 @@ msgstr "Voir où vous êtes connecté"
 msgid "See your order page"
 msgstr "Voir la page de ta commande"
 
-#: apps/manager/templates/manager/list.html
+#: apps/catalog/templates/catalog/admin/orphan_images.html apps/manager/templates/manager/list.html
 msgid "Select"
 msgstr "Sélectionner"
 
@@ -8524,6 +8733,10 @@ msgid "Set a quantity to 0 to remove the item. A change makes a link already sen
 msgstr ""
 "Mettez une quantité à 0 pour retirer l’article. Une modification rend inutilisable un lien déjà "
 "envoyé."
+
+#: apps/events/templates/events/admin/policies.html
+msgid "Set a vendor's policy"
+msgstr "Définir la règle d’un vendeur"
 
 #: apps/accounts/templates/accounts/mfa/totp.html themes/ride/templates/accounts/mfa/totp.html
 msgid "Set up an authenticator app"
@@ -8722,7 +8935,7 @@ msgstr "Afficher uniquement les produits d'un vendeur."
 
 #: apps/accounts/forms.py apps/manager/templates/manager/login.html apps/vendors/forms.py
 #: apps/vendors/templates/vendors/claim/account.html
-#: apps/vendors/templates/vendors/claim/sign_in.html
+#: apps/vendors/templates/vendors/claim/sign_in.html themes/ride/templates/manager/login.html
 msgid "Show password"
 msgstr "Afficher le mot de passe"
 
@@ -8795,7 +9008,7 @@ msgstr ""
 
 #: apps/manager/site_map.py apps/manager/templates/manager/login.html apps/seo/site_links.py
 #: apps/vendors/templates/email/vendors/application_exists/body.html
-#: apps/vendors/templates/vendors/apply/confirmed.html
+#: apps/vendors/templates/vendors/apply/confirmed.html themes/ride/templates/manager/login.html
 msgid "Sign in"
 msgstr "Se connecter"
 
@@ -9086,7 +9299,8 @@ msgstr "Exposés des motifs"
 msgid "Statistics"
 msgstr "Statistiques"
 
-#: apps/manager/fitment_forms.py apps/manager/fitment_views.py apps/manager/product_views.py
+#: apps/catalog/templates/catalog/admin/rendition_monitor.html apps/manager/fitment_forms.py
+#: apps/manager/fitment_views.py apps/manager/product_views.py
 #: apps/manager/templates/manager/amendment.html
 #: apps/manager/templates/manager/platform/fitment_node.html
 #: apps/manager/templates/manager/platform/notice_detail.html
@@ -9191,6 +9405,14 @@ msgstr "Soumettre pour vérification"
 #: apps/vendors/templates/vendors/claim/sign_in.html
 msgid "Submit the claim"
 msgstr "Envoyer la demande"
+
+#: apps/events/templates/events/admin/review.html
+msgid "Submitted"
+msgstr "Soumis"
+
+#: apps/events/templates/events/admin/review.html
+msgid "Submitted by"
+msgstr "Soumis par"
 
 #: apps/events/templates/events/_subscribe.html
 msgid "Subscribe"
@@ -10106,7 +10328,7 @@ msgstr ""
 msgid "The email of an existing account. Capitals do not matter."
 msgstr "L'e-mail d'un compte existant. Les majuscules n'ont pas d'importance."
 
-#: apps/manager/templates/manager/login.html
+#: apps/manager/templates/manager/login.html themes/ride/templates/manager/login.html
 msgid ""
 "The email or the password is not correct, or the account is locked for a while. Please try again."
 msgstr ""
@@ -10736,6 +10958,10 @@ msgstr ""
 "Le côté le plus long du produit en millimètres, par exemple 300. Facultatif : laissez vide si vous"
 " ne le connaissez pas."
 
+#: apps/events/templates/events/admin/map_picker_panel.html
+msgid "The lookup did not work. Place the point on the map or type it."
+msgstr "La recherche n’a pas fonctionné. Placez le point sur la carte ou saisissez-le."
+
 #: apps/catalog/models.py
 msgid ""
 "The main category of the product. It shows in the path above the product, so buyers can find it. "
@@ -10764,6 +10990,10 @@ msgstr ""
 #: apps/compliance/models.py
 msgid "The manufacturer's postal address, with street, town and country."
 msgstr "L'adresse postale du fabricant, avec rue, ville et pays."
+
+#: apps/events/templates/events/admin/map_picker_panel.html
+msgid "The map shows the typed point."
+msgstr "La carte affiche le point saisi."
 
 #: apps/compliance/models.py
 msgid ""
@@ -12654,6 +12884,14 @@ msgstr ""
 "Voici les navigateurs et les appareils connectés à ton compte. Si tu n'en reconnais pas un, "
 "termine sa session et change ton mot de passe."
 
+#: apps/catalog/templates/admin/catalog/brand/merge.html
+msgid ""
+"These brands are removed. Their products move to the brand you choose, and their old page "
+"addresses redirect to it."
+msgstr ""
+"Ces marques sont supprimées. Leurs produits passent à la marque que vous choisissez, et les "
+"anciennes adresses de leurs pages redirigent vers elle."
+
 #: apps/compliance/templates/compliance/subprocessors.html
 msgid ""
 "These providers process personal data on our behalf. Each one is bound by a data processing "
@@ -13373,9 +13611,11 @@ msgstr "Fuseau horaire"
 msgid "Times above are read in this time zone, e.g. Europe/Rome."
 msgstr "Les heures ci-dessus sont interprétées dans ce fuseau horaire, par exemple Europe/Rome."
 
-#: apps/manager/event_forms.py apps/manager/event_image_form.py apps/manager/fitment_shop_views.py
-#: apps/manager/media.py apps/manager/product_views.py
-#: apps/manager/templates/manager/platform/product.html
+#: apps/catalog/templates/catalog/admin/orphan_images.html
+#: apps/catalog/templates/catalog/admin/rendition_monitor.html
+#: apps/cms/templates/cms/admin/image_review.html apps/manager/event_forms.py
+#: apps/manager/event_image_form.py apps/manager/fitment_shop_views.py apps/manager/media.py
+#: apps/manager/product_views.py apps/manager/templates/manager/platform/product.html
 msgid "Title"
 msgstr "Titre"
 
@@ -13790,6 +14030,11 @@ msgstr ""
 msgid "Upload an image"
 msgstr "Téléverser une image"
 
+#: apps/catalog/templates/catalog/admin/orphan_images.html
+#: apps/catalog/templates/catalog/admin/rendition_monitor.html
+msgid "Uploaded"
+msgstr "Importée"
+
 #: apps/manager/media.py
 msgid "Uploading…"
 msgstr "Téléversement…"
@@ -13895,7 +14140,8 @@ msgstr "Numéro de TVA ou d'identification fiscale (TIN)"
 #: apps/catalog/templates/catalog/includes/listing_filters.html
 #: apps/compliance/templates/email/compliance/safety_case_overdue/body.html
 #: apps/compliance/templates/email/compliance/safety_case_overdue/body.txt
-#: apps/events/templates/events/_filters.html apps/events/templates/events/event_page.html
+#: apps/events/templates/events/_filters.html apps/events/templates/events/admin/policies.html
+#: apps/events/templates/events/admin/review.html apps/events/templates/events/event_page.html
 #: apps/manager/templates/manager/layout.html
 #: apps/manager/templates/manager/platform/terminations.html
 #: apps/manager/templates/manager/shop/dashboard.html
@@ -13914,6 +14160,10 @@ msgstr "Vendeur fermé"
 #: themes/base/templates/components/help_entry.html
 msgid "Vendor guide"
 msgstr "Guide des vendeurs"
+
+#: apps/events/templates/events/admin/policies.html
+msgid "Vendor moderation policies"
+msgstr "Règles de modération des vendeurs"
 
 #: apps/manager/templates/manager/platform/trust_rule_preview.html
 msgid "Vendors checked"
@@ -14038,6 +14288,20 @@ msgstr "En attente du vendeur"
 #: themes/ride/templates/components/cart_line.html themes/ride/templates/orders/_package.html
 msgid "Warning"
 msgstr "Attention"
+
+#: apps/cms/templates/cms/admin/content_snippet_confirm_delete.html
+msgid ""
+"Warning: this snippet is still used by %(counter)s page. If you delete it, that page will stop "
+"showing this text."
+msgid_plural ""
+"Warning: this snippet is still used by %(counter)s pages. If you delete it, those pages will stop "
+"showing this text."
+msgstr[0] ""
+"Attention : cet extrait est encore utilisé par %(counter)s page. Si vous le supprimez, cette page "
+"n’affichera plus ce texte."
+msgstr[1] ""
+"Attention : cet extrait est encore utilisé par %(counter)s pages. Si vous le supprimez, ces pages "
+"n’afficheront plus ce texte."
 
 #: apps/compliance/forms.py
 msgid ""

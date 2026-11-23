@@ -179,7 +179,7 @@ def test_budget_keys_are_parsed_as_kilobytes() -> None:
 
 
 @pytest.mark.parametrize("value", [0, -5, "70", 70.5, True, None])
-@pytest.mark.parametrize("key", ["css_budget_kb", "js_budget_kb"])
+@pytest.mark.parametrize("key", ["css_budget_kb", "js_budget_kb", "lazy_js_budget_kb"])
 def test_invalid_budget_values_are_rejected(key: str, value: object) -> None:
     with pytest.raises(ThemeError):
         parse_manifest(manifest(**{key: value}), dirname="ride")

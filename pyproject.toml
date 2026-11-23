@@ -48,7 +48,7 @@ dev = [
   "pyyaml>=6.0.3",
   "types-pyyaml>=6.0",
   "check-jsonschema>=0.39.0",
-  "cyclonedx-bom>=7.6.0,<8",
+  "cyclonedx-bom>=7.6.0,<9",
   # SEC.5: property-based tests over the hostile-input corpus (tests/hostile_input.py).
   # Exact pin on purpose: the derandomized `ci` profile (conftest.py) replays the same examples
   # only on the same Hypothesis version, and Hypothesis releases several times a week. A bump

@@ -92,6 +92,18 @@ def test_help_en_prose_is_british() -> None:
     assert british.help_violations() == []
 
 
+def test_the_role_matrix_labels_are_british_english() -> None:
+    """I18N.23 follow-up: SECTION_LABELS are plain strings, so the msgid sweep misses them."""
+    from apps.manager import roles
+
+    bad = {
+        key: british.american_words(label)
+        for key, label in roles.SECTION_LABELS.items()
+        if british.american_words(label)
+    }
+    assert bad == {}
+
+
 def test_help_markdown_line_numbers_survive_a_fenced_block(tmp_path: Path) -> None:
     """#1010 nit: a fence is blanked line for line, so a later US word keeps its line."""
     (tmp_path / "a.md").write_text(
