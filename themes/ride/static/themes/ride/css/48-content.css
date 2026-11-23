@@ -68,7 +68,7 @@
     object-fit: cover;
   }
 
-  @media (min-width: 48rem) {
+  @media (min-width: 40rem) {
     .post-summary__row {
       flex-direction: row;
       align-items: stretch;
