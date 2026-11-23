@@ -15,6 +15,7 @@ from django.test import RequestFactory
 from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.themes import views
+from tests.i18n import translated
 
 pytestmark = pytest.mark.usefixtures("english_interface")
 
@@ -57,7 +58,7 @@ def test_the_500_page_is_a_full_bleed_hero_with_a_display_code(request_: HttpReq
     assert re.search(r'<section class="error-hero full-bleed"', html)
     assert re.search(r'<p class="error-hero__code" aria-hidden="true">500</p>', html)
     assert len(re.findall(r"<h1\b", html)) == 1
-    assert "Something went wrong" in html.split("<h1", 1)[1].split("</h1>", 1)[0]
+    assert translated("Something went wrong") in html.split("<h1", 1)[1].split("</h1>", 1)[0]
     assert 'class="btn btn-primary" href="/"' in html
     assert 'id="error-search"' not in html  # static page: the search belongs to the 404
 
@@ -106,4 +107,6 @@ def test_the_error_css_uses_tokens_only_and_the_illustration() -> None:
     assert "images/error-road.svg" in source
     assert "@layer overrides {" in source
     assert not re.search(r"#[0-9a-fA-F]{3,8}\b", source), "colours only through tokens"
-    assert "prefers-reduced-motion" not in source or "animation" not in source
+    # Static page: no animation or transition exists, so there is no motion to switch off.
+    rules = re.sub(r"/\*.*?\*/", "", source, flags=re.S)
+    assert not re.search(r"\b(animation|transition|scroll-behavior)\b", rules)

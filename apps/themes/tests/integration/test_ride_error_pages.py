@@ -1,8 +1,10 @@
 """THM.30: the `ride` 404 and 500 pages against the real stack (spec 14 §14.9)."""
 
+import re
+
 import pytest
 from django.http import HttpRequest
-from django.test import Client, RequestFactory
+from django.test import Client, RequestFactory, override_settings
 from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.themes import views
@@ -31,3 +33,17 @@ def test_the_404_page_has_the_hero_search_and_no_garage_menu(client: Client) -> 
     assert 'class="error-hero__code" aria-hidden="true">404<' in html
     assert 'id="error-search"' in html
     assert 'class="garage' not in html
+
+
+@override_settings(ADMIN_ALLOWED_NETWORKS=["192.0.2.0/24"])
+def test_a_refused_admin_path_gets_the_ride_404_without_leaking_the_path(client: Client) -> None:
+    refused = client.get("/django-admin/login/", REMOTE_ADDR="203.0.113.9")
+    unknown = client.get("/no-such-page-here/", REMOTE_ADDR="203.0.113.9")
+    # The language switcher's `next` value carries the requested path, like for any 404.
+    token = re.compile(r'value="[^"]*"')
+    html = token.sub("", refused.content.decode())
+    assert refused.status_code == unknown.status_code == 404
+    assert 'data-theme="ride"' in html
+    assert 'class="error-hero__code" aria-hidden="true">404<' in html
+    assert "django-admin" not in html
+    assert "Location" not in refused
