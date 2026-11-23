@@ -49,6 +49,9 @@ from .foundation import BUNDLE_OUTPUT, foundation_files
 from .vendored import VENDOR_DIR
 
 LAZY_JS_DIR = "lazy/"  # scripts under js/lazy/ are imported on demand: the JS budget skips them
+# Each lazy script, compressed. They are outside the page budget, so this cap keeps one from growing
+# unnoticed. Shipped ones are about 2 KB; 8 KB leaves room to grow and still flags a framework.
+LAZY_JS_BUDGET = 8 * 1024
 CSS_BUDGET = 45 * 1024  # theme.css, compressed (§14.7)
 JS_BUDGET = 40 * 1024  # all JavaScript of a page, htmx and Alpine included, compressed (§14.7)
 MAX_FONT_FILES = 4
@@ -116,6 +119,24 @@ def check_sizes(
                 f"over the {_kb(js_budget)} budget",
             )
         )
+    return failures
+
+
+def check_lazy_sizes(
+    slug: str, lazy: Mapping[str, bytes], *, budget: int = LAZY_JS_BUDGET
+) -> list[GateFailure]:
+    """The per-file cap of the on-demand scripts under `js/lazy/` (§14.7)."""
+    failures = []
+    for name in sorted(lazy):
+        size = compressed_size(lazy[name])
+        if size > budget:
+            failures.append(
+                GateFailure(
+                    slug,
+                    "size",
+                    f"lazy script {name} is {_kb(size)} compressed, over the {_kb(budget)} cap",
+                )
+            )
     return failures
 
 
@@ -293,10 +314,12 @@ def _check_theme(
             scripts = dict(vendor)
             if bundle is not None:
                 scripts[BUNDLE_OUTPUT] = bundle.encode("utf-8")
+            lazy: dict[str, bytes] = {}
             for s in chain:
                 for name, module in read_js_modules(root / s, s).items():
                     if name.startswith(LAZY_JS_DIR):
-                        continue  # loaded on demand, not shipped by every page (§14.7)
+                        lazy[name] = module.encode("utf-8")  # on demand: capped file by file
+                        continue
                     scripts[f"themes/{s}/js/{name}"] = module.encode("utf-8")
             manifest = registry[slug]
             failures += check_sizes(
@@ -305,6 +328,11 @@ def _check_theme(
                 scripts,
                 css_budget=(manifest.css_budget_kb or CSS_BUDGET // 1024) * 1024,
                 js_budget=(manifest.js_budget_kb or JS_BUDGET // 1024) * 1024,
+            )
+            failures += check_lazy_sizes(
+                slug,
+                lazy,
+                budget=(manifest.lazy_js_budget_kb or LAZY_JS_BUDGET // 1024) * 1024,
             )
     assets = theme_assets(theme_dir, slug)
     licences = read_licences(theme_dir)
