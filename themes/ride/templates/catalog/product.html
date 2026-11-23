@@ -23,6 +23,7 @@
 
     <div class="row g-4 my-0 py-4">
       <div class="col-lg-7">
+        <div class="product-gallery-card card"><div class="card-body p-2">
         {% if gallery_items or not variant_gallery_items %}{# no image at all: the gallery placeholder (THM.19) #}
           {% include "components/gallery.html" with id="product-images" label=_("Product images") images=gallery_items only %}
         {% endif %}
@@ -35,13 +36,19 @@
           </section>{% endfor %}
         </div>
         {% endif %}
+        </div></div>
       </div>
 
       <section class="product-buy col-lg-5" aria-labelledby="product-buy-heading">
         <div class="card">
           <div class="card-body">
             <h2 id="product-buy-heading" class="visually-hidden">{% translate "Price and availability" %}</h2>
-            <p class="product-sku text-body-secondary">{% translate "SKU" %}: <span class="product-sku-value">{{ page_data.product.sku }}</span></p>
+            <p class="product-buy__title h3" aria-hidden="true">{{ page_data.title }}</p>{# the banner h1 is the page's only heading #}
+            {% seller_name page_data.vendor as seller %}
+            <ul class="product-meta list-unstyled text-body-secondary">
+              <li class="product-sku">{% translate "SKU" %}: <span class="product-sku-value">{{ page_data.product.sku }}</span></li>
+              {% if seller %}<li class="product-vendor">{% translate "Sold by" %} <a href="{{ vendor_url }}">{{ seller }}</a></li>{% endif %}
+            </ul>
             {% if page_data.retired %}
               <p class="product-retired alert alert-secondary" role="note">{% translate "This product is no longer available." %}</p>
             {% elif page_data.on_request %}
@@ -57,7 +64,7 @@
                 <input type="hidden" name="product" value="{{ page_data.product.public_id }}">
                 <input type="hidden" name="next" value="{{ request.path }}">
                 {% if page_data.variants %}
-                  <fieldset class="product-variants mb-3">
+                  <fieldset class="product-variants product-pills mb-3">
                     <legend class="h6">{% translate "Choose a version" %}</legend>
                     <ul class="list-unstyled mb-0">
                       {% for variant in page_data.variants %}
@@ -76,7 +83,6 @@
                 <div id="add-to-cart-result" class="mt-3"></div>
               </form>
             {% endif %}
-            {% seller_name page_data.vendor as seller %}{% if seller %}<p class="product-vendor mt-3 mb-0">{% translate "Sold by" %} <a href="{{ vendor_url }}">{{ seller }}</a></p>{% endif %}
           </div>
         </div>
       </section>
@@ -135,7 +141,7 @@
     {% if related %}
       <section class="product-related mb-4" aria-labelledby="product-related-heading">
         <h2 id="product-related-heading" class="h4">{% translate "You may also like" %}</h2>
-        <ul class="product-grid row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3 list-unstyled">
+        <ul class="product-grid product-strip row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3 list-unstyled">
           {% for card in related %}<li class="col">{% include "catalog/includes/product_card.html" %}</li>{% endfor %}
         </ul>
       </section>
