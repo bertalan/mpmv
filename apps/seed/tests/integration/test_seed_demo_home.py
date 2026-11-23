@@ -139,13 +139,19 @@ def test_the_blog_and_its_posts_exist_and_are_reachable_in_every_language(
         assert client.get(posts.first().url).status_code == 200
 
 
-def test_the_header_menu_of_every_language_points_to_pages_of_that_language(
-    demo_seed: ChangeSet,
+def test_the_header_menu_of_every_language_has_live_pages_of_its_language_or_the_source(
+    demo_seed: ChangeSet, client: Client
 ) -> None:
+    """A page without a translation falls back to the source page (spec 09), never to a dead
+    link or a page of a third language."""
+    allowed = {Locale.get_default().pk}
     for menu in NavigationMenu.objects.filter(location="header"):
         assert len(menu.links) >= 3
         for link in menu.links:
-            assert link.value["page"].locale_id == menu.locale_id
+            page = link.value["page"]
+            assert page.live
+            assert page.locale_id in allowed | {menu.locale_id}
+            assert client.get(page.url).status_code == 200
 
 
 def test_an_editors_post_title_and_footer_column_survive_a_second_run(demo_seed: ChangeSet) -> None:
