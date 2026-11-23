@@ -11,6 +11,7 @@ from wagtail.models import Locale
 
 from apps.cms.models import StandardPage
 from apps.cms.seed import seed_text
+from apps.core.i18n import configured_languages, primary_language
 from apps.seed import data
 from apps.seed.demo_home import Texts, _publish, _seeded_about, pick
 
@@ -29,7 +30,13 @@ CONTACT: Final = data.PageSeed(
 SUPPORT_EMAIL: Final = f"support@{data.EMAIL_DOMAIN}"
 AUTHORITY_EMAIL: Final = f"authorities@{data.EMAIL_DOMAIN}"
 USER_CONTACT_URL: Final = f"https://{data.EMAIL_DOMAIN}/contact"
-CONTACT_LANGUAGES: Final = ["en", "it"]
+
+
+def contact_languages() -> list[str]:
+    """The configured languages the contact texts exist in (the primary one if none)."""
+    codes = [code for code in configured_languages() if code in CONTACT.body]
+    return codes or [primary_language()]
+
 
 CONTACT_LINES: Final[dict[str, Texts]] = {
     "support": {
@@ -154,3 +161,9 @@ def _flat_value(blocks: list[Any]) -> list[Any]:
 def _flat(page: StandardPage) -> list[Any]:
     raw = page.body.get_prep_value()
     return [[item["type"], item["value"]] for item in raw]
+
+
+def is_seed_contact(page: StandardPage) -> bool:
+    """Whether `page` still has exactly the body the seed wrote in its language."""
+    seeded = _flat_value(contact_body(page.locale.language_code))
+    return _flat(page) == seeded

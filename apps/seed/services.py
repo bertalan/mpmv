@@ -358,9 +358,9 @@ def _platform(run: _Run) -> None:
             dac7_authority_country=data.ITALY,
             support_email=demo_pages.SUPPORT_EMAIL,
             authority_contact_email=demo_pages.AUTHORITY_EMAIL,
-            authority_contact_languages=list(demo_pages.CONTACT_LANGUAGES),
+            authority_contact_languages=demo_pages.contact_languages(),
             user_contact_url=demo_pages.USER_CONTACT_URL,
-            user_contact_languages=list(demo_pages.CONTACT_LANGUAGES),
+            user_contact_languages=demo_pages.contact_languages(),
             valid_from=data.SEED_EPOCH,
         )
         run.add(configure_platform_operator(operator, ctx=run.ctx))
@@ -916,14 +916,21 @@ def _product_images(run: _Run, vendor: Vendor, spec: data.VendorSeed) -> None:
     for item in data.PRODUCTS[spec.letter]:
         sku = f"{spec.sku_prefix}-{item.code}"
         product = Product.objects.filter(vendor=vendor, sku=sku).first()
-        if product is None or product.images.exists():
+        title = f"{data.PRODUCT_IMAGE_PREFIX}{sku}"
+        # A product with an image, or whose generated image an editor removed (the library entry
+        # stays), is left alone.
+        if (
+            product is None
+            or product.images.exists()
+            or MediaImage.objects.filter(title=title, author=data.IMAGE_AUTHOR).exists()
+        ):
             continue
         content = placeholder_webp(sku, data.product_image_colour(sku), scale=0.5)
         run.add(
             media.upload_image(
                 product,
                 file=ImageFile(_named_bytes(content), name=f"demo-{sku.lower()}.webp"),
-                title=f"{data.PRODUCT_IMAGE_PREFIX}{sku}",
+                title=title,
                 licence=licence,
                 author=data.IMAGE_AUTHOR,
                 alt_text=_text(item.title, _source()),
@@ -1499,13 +1506,16 @@ def _seed_pages(model: Any, slugs: Iterable[str]) -> list[Any]:
 def _reset_cms(run: _Run) -> None:
     for page in _seed_pages(
         StandardPage,
-        [
-            _text(s.slug, _source())
-            for s in (data.HOW_IT_WORKS, data.SHOWCASE, data.SHOP, demo_pages.CONTACT)
-        ],
+        [_text(s.slug, _source()) for s in (data.HOW_IT_WORKS, data.SHOWCASE, data.SHOP)],
     ):
         run.changes.delete("cms.standardpage", page.url_path, {})
         page.delete()
+    # The Contact page is removed only while it still has the seed's text: an editor's page that
+    # happens to use the slug stays.
+    for page in _seed_pages(StandardPage, [_text(demo_pages.CONTACT.slug, _source())]):
+        if demo_pages.is_seed_contact(page):
+            run.changes.delete("cms.standardpage", page.url_path, {})
+            page.delete()
     for page in _seed_pages(
         LegalPage, [_text(spec.slug, _source()) for spec in data.LEGAL_PAGES.values()]
     ):

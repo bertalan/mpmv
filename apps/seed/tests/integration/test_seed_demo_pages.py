@@ -4,6 +4,8 @@ fourth menu entry and an image for every product; a second run changes nothing.
 Language-agnostic: the primary language and the seed's own texts, never 'en' or a fixed slug.
 """
 
+from typing import Any
+
 import pytest
 from django.test import Client
 from django.urls import reverse
@@ -13,8 +15,8 @@ from apps.catalog.models import Product
 from apps.cms.models import BlogIndexPage, HomePage, NavigationMenu, StandardPage
 from apps.cms.seed import seed_text
 from apps.core.changeset import ChangeSet
-from apps.core.i18n import primary_language
-from apps.core.models import MediaImage
+from apps.core.i18n import configured_languages, primary_language
+from apps.core.models import MediaImage, PlatformOperator
 from apps.seed import data, demo_pages
 from apps.seed.services import TEST_CONTEXT, reset, seed
 
@@ -94,3 +96,35 @@ def test_reset_removes_the_generated_product_images(demo_seed: ChangeSet) -> Non
     assert MediaImage.objects.filter(title__startswith=prefix).exists()
     reset(ctx=TEST_CONTEXT)
     assert not MediaImage.objects.filter(title__startswith=prefix).exists()
+
+
+def test_the_operator_contact_languages_are_configured_languages(demo_seed: ChangeSet) -> None:
+    operator = PlatformOperator.objects.get()
+    for codes in (operator.authority_contact_languages, operator.user_contact_languages):
+        assert codes
+        assert set(codes) <= set(configured_languages())
+
+
+def test_the_contact_languages_follow_the_configured_languages(settings: Any) -> None:
+    settings.LANGUAGES = [("it", "Italian"), ("de", "German")]
+    settings.LANGUAGE_CODE = "it"
+    assert demo_pages.contact_languages() == ["it", "de"]
+    settings.LANGUAGES = [("fr", "French"), ("es", "Spanish")]
+    settings.LANGUAGE_CODE = "fr"
+    assert demo_pages.contact_languages() == ["fr"]  # no text of its own: the primary one only
+
+
+def test_a_product_whose_image_an_editor_removed_gets_no_new_one(demo_seed: ChangeSet) -> None:
+    product = Product.objects.first()
+    assert product is not None
+    product.images.all().delete()
+    seed(ctx=TEST_CONTEXT)
+    assert not product.images.exists()
+
+
+def test_reset_keeps_a_contact_page_an_editor_wrote(demo_seed: ChangeSet) -> None:
+    page = contact()
+    page.body = [("paragraph", "<p>Written by an editor.</p>")]
+    page.save_revision().publish()
+    reset(ctx=TEST_CONTEXT)
+    assert StandardPage.objects.filter(pk=page.pk).exists()
