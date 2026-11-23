@@ -304,6 +304,7 @@ def save_palette(
     ratio in `violations`) before anything is written, also on a dry run. The predefined
     palettes cannot be overwritten; the builder starts from them and saves under its own slug.
     """
+    slug = slug.strip().lower()
     if slug in PRESETS:
         raise PaletteRejected(
             [PaletteViolation("reserved", slug, "a predefined palette cannot be overwritten")]

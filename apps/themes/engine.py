@@ -770,6 +770,9 @@ def nearest_compliant(colour: str, against: str, min_ratio: float) -> str | None
     the contrast (darker when `against` is lighter than `colour`, lighter otherwise), by the
     smallest step (0.001 L) that passes; chroma shrinks only to stay inside sRGB. Returns
     `colour` itself when it already passes, and None when no lightness in that direction does.
+    The search is one-directional (towards more contrast against `against`), so None means "not
+    found in that direction", not "impossible": for a foreground role the fallback is
+    `suggest_foreground` on the locked background.
 
     Contrast is WCAG 2.2 `(L1 + 0.05) / (L2 + 0.05)` with the relative luminance of
     https://www.w3.org/TR/WCAG22/#dfn-relative-luminance, see `contrast_ratio`.

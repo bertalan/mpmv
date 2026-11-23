@@ -87,3 +87,15 @@ def test_a_predefined_palette_cannot_be_overwritten_by_the_builder() -> None:
     with pytest.raises(PaletteRejected):
         save_palette("red", "Red", derive_palette(BASE), ctx=CTX)
     assert BrandPalette.objects.get(slug="red").primary == PRESETS["red"]["primary"]
+
+
+@pytest.mark.parametrize("slug", ["RED", " Red ", "Blue"])
+def test_a_case_variant_of_a_predefined_slug_is_refused(slug: str) -> None:
+    with pytest.raises(PaletteRejected):
+        save_palette(slug, "Lookalike", derive_palette(BASE), ctx=CTX)
+    assert BrandPalette.objects.count() == len(PRESETS)
+
+
+def test_the_slug_is_stored_normalised() -> None:
+    save_palette(" Mine ", "Mine", derive_palette(BASE), ctx=CTX)
+    assert BrandPalette.objects.filter(slug="mine").exists()
