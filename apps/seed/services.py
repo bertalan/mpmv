@@ -106,7 +106,7 @@ from apps.vendors.models import (
     VendorTranslation,
 )
 
-from . import data
+from . import data, demo_home
 from .images import placeholder_webp
 
 PUBLISHED = translations.PUBLISHED
@@ -1096,42 +1096,6 @@ def _set_body(page: Any, body: list[Any]) -> bool:
     return bool(_stripped(page.body.get_prep_value()) != before)
 
 
-def _shop_body(
-    language: str, images: dict[str, MediaImage], how: Any, vendors: list[Vendor], terms: list[Term]
-) -> list[Any]:
-    """The demo shop page: the product content the home showed before CMS.19."""
-    heading, text, label = _pick(data.HOME_HERO, language)
-    return [
-        (
-            "hero",
-            {
-                "heading": heading,
-                "text": text,
-                "image": images["home-hero"],
-                "alt_text": _text(data.HOME_HERO_ALT, language),
-                "links": [{"page": how, "url": "", "label": label}],
-            },
-        ),
-        ("paragraph", _text(data.DEMO_NOTICE, language)),
-        (
-            "featured",
-            {
-                "heading": _text(data.HOME_FEATURED, language),
-                "cards": [("term", {"term": term, "label": "", "text": ""}) for term in terms],
-            },
-        ),
-        (
-            "featured",
-            {
-                "heading": _text(data.HOME_VENDORS, language),
-                "cards": [
-                    ("vendor", {"vendor": vendor, "label": "", "text": ""}) for vendor in vendors
-                ],
-            },
-        ),
-    ]
-
-
 def _landing_body(images: dict[str, MediaImage], shop: StandardPage) -> list[Any]:
     """The vendor-recruitment home (CMS.19): English example copy, existing blocks only."""
     apply_url = absolute_url(None, reverse("vendors:apply"))  # a full URL, as the link block asks
@@ -1240,11 +1204,23 @@ def _cms(run: _Run, images: dict[str, MediaImage], vendors: list[Vendor]) -> Non
         for node in data.TERMS
     ]
 
+    blog, posts = demo_home.seed_blog(run, home, locales, images)
+
     def shop_body(language: str) -> list[Any]:
-        local_how = how.get_translation_or_none(locales[language]) or how
-        return _shop_body(language, images, local_how, vendors, terms)
+        locale = locales[language]
+        return demo_home.shop_home_body(
+            language,
+            images,
+            how=how.get_translation_or_none(locale) or how,
+            blog=blog.get_translation_or_none(locale) or blog,
+            posts=[post.get_translation_or_none(locale) or post for post in posts],
+            vendors=vendors,
+            term=terms[0],
+            notice=_text(data.DEMO_NOTICE, language),
+        )
 
     shop = _standard_page(run, home, locales, images["home-hero"], data.SHOP, shop_body)
+    demo_home.seed_navigation(run, locales, [("shop", shop), ("blog", blog)])
     _recruitment_home(run, home, images, shop)
 
 
