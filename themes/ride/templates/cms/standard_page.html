@@ -2,7 +2,7 @@
 {% load wagtailcore_tags image_credits responsive_images seo_robots cms_tags %}
 {% comment %}
 Standard page of `ride` (THM.9 part 1): the app template's content (same noindex head, image with
-its credit and caption, body blocks) under the page banner, which holds the only h1 and the
+its credit and caption, body blocks) under the page banner (THM.29: with an image, a split block of image and text), which holds the only h1 and the
 breadcrumb (`page_trail`). No inline script or style.
 {% endcomment %}
 {% block head %}{{ block.super }}{% if page.noindex %}{% robots_meta "noindex" %}{% endif %}{% endblock %}
@@ -13,12 +13,18 @@ breadcrumb (`page_trail`). No inline script or style.
     <div class="page-content">
       {% if page.image %}
         {% image_credit_of page.image as credit %}
-        <figure class="figure d-block">
-          {% responsive_image page.image "content" alt=page.image_alt_text priority=True %}
-          {% if page.image_caption or credit %}<figcaption class="figure-caption">{{ page.image_caption }}{% if credit %} {% include "core/components/image_credit.html" %}{% endif %}</figcaption>{% endif %}
-        </figure>
+        <div class="split">
+          <div class="split__media">
+            <figure class="figure d-block">
+              {% responsive_image page.image "content" alt=page.image_alt_text priority=True %}
+              {% if page.image_caption or credit %}<figcaption class="figure-caption">{{ page.image_caption }}{% if credit %} {% include "core/components/image_credit.html" %}{% endif %}</figcaption>{% endif %}
+            </figure>
+          </div>
+          <div class="split__text">{% for block in page.body %}{% include_block block %}{% endfor %}</div>
+        </div>
+      {% else %}
+        {% for block in page.body %}{% include_block block %}{% endfor %}
       {% endif %}
-      {% for block in page.body %}{% include_block block %}{% endfor %}
     </div>
   </article>
 {% endblock %}

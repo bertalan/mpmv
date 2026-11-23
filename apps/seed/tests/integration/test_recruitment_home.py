@@ -63,7 +63,10 @@ def test_the_home_shows_every_section_and_links_to_apply_and_the_shop(
     for text in SECTIONS:
         assert text in html, text
     assert f'{reverse("vendors:apply")}"' in html
-    shop = StandardPage.objects.get(locale=Locale.get_default(), slug=data.SHOP.slug["en"])
+    shop = StandardPage.objects.get(
+        locale=Locale.get_default(),
+        slug=data.SHOP.slug.get(primary_language()) or data.SHOP.slug["en"],
+    )
     assert f'href="{shop.url}"' in html
     assert client.get(shop.url).status_code == 200
 
@@ -93,3 +96,55 @@ def test_another_language_shows_the_english_landing_without_its_hreflang(
     assert other not in HREFLANG.findall(html)
     assert other not in HREFLANG.findall(client.get("/").content.decode())
     assert primary_language() in HREFLANG.findall(html)
+
+
+def _no_ids(page: HomePage) -> list[dict[str, object]]:
+    return [{k: v for k, v in b.items() if k != "id"} for b in page.body.get_prep_value()]
+
+
+def _make_translated_home(demo_seed: ChangeSet) -> HomePage:
+    """A home an editor translated: a real copy of the source, no longer an alias."""
+    copy: HomePage = HomePage.objects.get(locale__language_code=other_language(), depth=2)
+    copy.alias_of = None
+    copy.save(update_fields=["alias_of"])
+    return copy
+
+
+def test_a_translated_home_with_an_edited_body_is_not_aliased_again(demo_seed: ChangeSet) -> None:
+    copy = _make_translated_home(demo_seed)
+    # Same hero and picture as the seed's, but the editor's own text after it.
+    body = copy.body.get_prep_value()
+    body[1] = {"type": "paragraph", "value": "Translated by the editor"}
+    copy.body = body
+    copy.save_revision().publish()
+    edited = _no_ids(HomePage.objects.get(pk=copy.pk))
+
+    seed(ctx=TEST_CONTEXT)
+
+    again = HomePage.objects.get(pk=copy.pk)
+    assert again.alias_of_id is None
+    assert _no_ids(again) == edited
+
+
+def test_a_translated_home_still_holding_the_seed_body_is_aliased(demo_seed: ChangeSet) -> None:
+    copy = _make_translated_home(demo_seed)
+    assert HomePage.objects.get(pk=copy.pk).alias_of_id is None
+
+    seed(ctx=TEST_CONTEXT)
+
+    assert HomePage.objects.get(pk=copy.pk).alias_of_id == source_home().pk
+    assert seed(ctx=TEST_CONTEXT).is_empty
+
+
+def test_a_pre_cms19_home_holding_the_shop_body_gets_the_landing(demo_seed: ChangeSet) -> None:
+    """Before CMS.19 the home showed the shop content: an untouched one is replaced."""
+    home = source_home()
+    landing = [block.block_type for block in home.body]
+    shop = StandardPage.objects.child_of(home).get(slug=data.SHOP.slug[primary_language()])
+    home.body = shop.body.get_prep_value()
+    home.save_revision().publish()
+    assert [b.block_type for b in HomePage.objects.get(pk=home.pk).body] != landing
+
+    seed(ctx=TEST_CONTEXT)
+
+    assert [b.block_type for b in HomePage.objects.get(pk=home.pk).body] == landing

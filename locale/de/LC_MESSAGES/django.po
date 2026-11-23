@@ -2335,6 +2335,10 @@ msgstr ""
 "ihn verwendet, den neuen Text. Solange der Baustein nicht veröffentlicht ist, wird nichts "
 "angezeigt."
 
+#: apps/themes/admin_views.py
+msgid "Choose a site to switch it to this palette when you save."
+msgstr "Wählen Sie eine Website, die beim Speichern auf diese Palette umgestellt wird."
+
 #: apps/manager/event_forms.py
 msgid "Choose a time zone such as Europe/Rome."
 msgstr "Wählen Sie eine Zeitzone, zum Beispiel Europe/Rome."
@@ -8433,7 +8437,7 @@ msgstr "Angaben zum Verkäufer"
 msgid "Selling mode"
 msgstr "Verkaufsart"
 
-#: apps/cms/templates/cms/form_page.html
+#: apps/cms/templates/cms/form_page.html themes/ride/templates/cms/form_page.html
 msgid "Send"
 msgstr "Senden"
 
@@ -11775,7 +11779,7 @@ msgstr ""
 "Das Schema legt fest, was Kunden auswählen: zum Beispiel eine Marke und ein Modell oder eine Marke"
 " und eine Maschine. Es wird nichts gespeichert, bis Sie auf der Vorschauseite bestätigen."
 
-#: apps/cms/templates/cms/form_page.html
+#: apps/cms/templates/cms/form_page.html themes/ride/templates/cms/form_page.html
 msgid "The security check failed. Please try again."
 msgstr "Die Sicherheitsprüfung ist fehlgeschlagen. Versuche es bitte noch einmal."
 

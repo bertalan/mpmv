@@ -13,6 +13,8 @@ from bs4 import BeautifulSoup
 from django.test import Client, RequestFactory
 from pytest_django.fixtures import Settings as SettingsWrapper
 
+from apps.cms.seed import seed_text
+from apps.core.i18n import primary_language
 from apps.core.models import MediaImageRendition
 from apps.themes import views
 from tests.i18n import translated
@@ -94,9 +96,9 @@ def test_the_banner_holds_the_only_h1_and_the_breadcrumb(
     assert banner.h1 is not None
     nav = banner.select_one("nav.breadcrumb")
     assert nav is not None
-    assert nav["aria-label"] == "Breadcrumb"
+    assert nav["aria-label"] == translated("Breadcrumb")
     labels = [li.get_text(strip=True) for li in nav.select("li")]
-    assert labels[0] == "Home"
+    assert labels[0] == seed_text(primary_language()).home.title
     assert nav.select_one("[aria-current=page]").get_text(strip=True) == labels[-1]
     assert labels[-1] == banner.h1.get_text(strip=True) or kind in {"author", "legal_version"}
     assert len({li.get_text(strip=True) for li in nav.select("li")}) == len(labels)
@@ -107,12 +109,12 @@ def test_the_breadcrumb_follows_the_page_tree(
 ) -> None:
     post = soup(client, paths["post"], "ride", settings)
     labels = [li.get_text(strip=True) for li in post.select(".page-banner nav.breadcrumb li")]
-    assert labels == ["Home", "Blog", "Workshop visit 0"]
+    assert labels == [seed_text(primary_language()).home.title, "Blog", "Workshop visit 0"]
     links = [a["href"] for a in post.select(".page-banner nav.breadcrumb a")]
     assert links[1] == paths["blog"]
     author = soup(client, paths["author"], "ride", settings)
     labels = [li.get_text(strip=True) for li in author.select(".page-banner nav.breadcrumb li")]
-    assert labels == ["Home", "Blog", "Ada Example"]
+    assert labels == [seed_text(primary_language()).home.title, "Blog", "Ada Example"]
 
 
 @pytest.mark.parametrize("kind", PAGE_TYPES)
@@ -137,7 +139,7 @@ def test_the_blog_uses_bootstrap_cards_and_pagination(
     paths = build_content_site(posts=13)
     page = soup(client, paths["blog"], "ride", settings)
     assert len(page.select("article.post-summary.card")) == 12
-    nav = page.select_one("nav[aria-label=Pagination] ul.pagination")
+    nav = page.select_one(f'nav[aria-label="{translated("Pagination")}"] ul.pagination')
     assert nav is not None
     assert nav.select_one("a.page-link[rel=next]")["href"] == "?page=2"
     second = soup(client, f"{paths['blog']}?page=2", "ride", settings)
