@@ -6,6 +6,11 @@ product creation, shipping import...), so the seed exercises the same code paths
 same audit entries as staff and vendors would. Where an app has no service yet (taxonomy terms,
 translations, CMS pages, event pages), the rows are written as the admin would write them.
 
+Languages (I18N.15): source rows are stored under the configured primary language, other rows only
+under configured languages the seed data has text for; English is just the fallback text. The seed
+assumes one primary language per database: re-seeding after the primary language changed is not
+migrated, and the slug lookups (made in the current primary language) would create a second set.
+
 `reset` takes the seed out again, and only the seed: rows are found by the stable keys of
 `apps.seed.data`. Rows the database keeps as legal evidence cannot be deleted (VEN.5: contract
 acceptances and an accepted contract; legal page versions; SEC.4: the audit log), so a
@@ -108,7 +113,7 @@ PUBLISHED = translations.PUBLISHED
 # The seed texts are written in English (some also in Italian, a few in more languages). English
 # is only the fallback text: a row is stored under a configured language, never under "en" unless
 # "en" is configured (I18N.15).
-TEXT_FALLBACK = "en"
+TEXT_FALLBACK = data.TEXT_FALLBACK
 SOLE_PROPRIETOR = vendors_engine.SOLE_PROPRIETORSHIP
 # The audit context of the `demo_seed` test fixture (root conftest); the command has its own.
 TEST_CONTEXT = AuditContext(actor_label="test:demo_seed", source="system")

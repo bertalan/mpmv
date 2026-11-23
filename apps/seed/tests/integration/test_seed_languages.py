@@ -2,7 +2,8 @@
 
 English is not mandatory: with `MPMV_LANGUAGES=it,de` the seed must create no "en" locale and no
 "en" row. The module runs in both setups (the default languages and `it,de`) and checks the
-invariant for whichever languages are configured. Idempotency is in `test_seed.py`.
+invariant for whichever languages are configured, and checks that a second run changes nothing
+(`test_seed.py` does too, but skips itself with fewer than three languages).
 """
 
 import pytest
@@ -11,6 +12,7 @@ from wagtail.models import Locale
 
 from apps.core.changeset import ChangeSet
 from apps.core.i18n import configured_languages, primary_language
+from apps.seed.services import TEST_CONTEXT, seed
 
 pytestmark = pytest.mark.django_db
 
@@ -45,3 +47,8 @@ def test_the_primary_language_has_every_translated_entity(demo_seed: ChangeSet) 
     primary = primary_language()
     for label in ("catalog.ProductTranslation", "vendors.VendorTranslation"):
         assert apps.get_model(label).objects.filter(language=primary).exists()
+
+
+def test_a_second_whole_seed_run_changes_nothing(demo_seed: ChangeSet) -> None:
+    assert not demo_seed.is_empty
+    assert seed(ctx=TEST_CONTEXT).is_empty
