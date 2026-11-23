@@ -131,3 +131,17 @@ def test_a_translated_home_still_holding_the_seed_body_is_aliased(demo_seed: Cha
 
     assert HomePage.objects.get(pk=copy.pk).alias_of_id == source_home().pk
     assert seed(ctx=TEST_CONTEXT).is_empty
+
+
+def test_a_pre_cms19_home_holding_the_shop_body_gets_the_landing(demo_seed: ChangeSet) -> None:
+    """Before CMS.19 the home showed the shop content: an untouched one is replaced."""
+    home = source_home()
+    landing = [block.block_type for block in home.body]
+    shop = StandardPage.objects.child_of(home).get(slug=data.SHOP.slug[primary_language()])
+    home.body = shop.body.get_prep_value()
+    home.save_revision().publish()
+    assert [b.block_type for b in HomePage.objects.get(pk=home.pk).body] != landing
+
+    seed(ctx=TEST_CONTEXT)
+
+    assert [b.block_type for b in HomePage.objects.get(pk=home.pk).body] == landing
