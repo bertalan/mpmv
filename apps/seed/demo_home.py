@@ -94,6 +94,7 @@ MENU_LABELS: Final[dict[str, Texts]] = {
     "shop": {"en": "Shop", "it": "Negozio", "de": "Shop"},
     "blog": {"en": "Blog", "it": "Blog", "de": "Blog"},
     "about": {"en": "About", "it": "Chi siamo", "de": "Über uns"},
+    "contact": {"en": "Contact", "it": "Contatti", "de": "Kontakt"},
 }
 FOOTER_TITLE: Final[Texts] = {"en": "Explore", "it": "Esplora", "de": "Entdecken"}
 SOCIAL: Final = (
@@ -265,14 +266,16 @@ def seed_navigation(
     run: Any,
     locales: dict[str, Locale],
     pages: list[tuple[str, Any]],
+    contact: Any | None = None,
 ) -> None:
-    """The header menu of every language (`pages` is (label key, source page)) and the footer."""
+    """The header menu of every language (`pages` is (label key, source page)), with About and
+    then `contact` (when given) after them, and the footer."""
     for language, locale in locales.items():
         menu = NavigationMenu.objects.filter(locale=locale, location="header").first()
         about = _seeded_about(locale, language)
         if menu is None or about is None or not _is_default_menu(menu, about):
             continue  # an editor's menu stays as it is
-        entries = [*pages, ("about", about)]
+        entries = [*pages, ("about", about), *([("contact", contact)] if contact else [])]
         menu.links = [
             ("page", {"page": _local(page, locale), "label": pick(MENU_LABELS[key], language)})
             for key, page in entries
