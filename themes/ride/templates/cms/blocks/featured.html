@@ -1,0 +1,17 @@
+{% comment %}
+Featured links on `ride` as an icon feature row (THM.29): the app template's content (heading,
+one link and an optional text per card) as a row of columns, each with a decorative arrow icon.
+{% endcomment %}{% if cards %}
+<section class="block block-featured">
+  {% if value.heading %}<h2>{{ value.heading }}</h2>{% endif %}
+  <ul class="feature-row cards list-unstyled row row-cols-1 row-cols-md-3 g-4">
+    {% for card in cards %}
+      <li class="col feature-row__item">
+        {% include "components/icon.html" with name="arrow-right" only %}
+        <a href="{{ card.href }}">{{ card.label }}</a>
+        {% if card.text %}<p>{{ card.text|linebreaksbr }}</p>{% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}

@@ -7,7 +7,11 @@ document.documentElement.classList.remove("no-js");
 // link shows only after the page is scrolled `is-scrolled` (CSS). No smooth scroll is set here.
 (function () {
   var root = document.documentElement;
-  function update() { root.classList.toggle("is-scrolled", window.scrollY > 400); }
+  // `is-away` (THM.21) turns the transparent header over the hero solid as soon as the page moves.
+  function update() {
+    root.classList.toggle("is-scrolled", window.scrollY > 400);
+    root.classList.toggle("is-away", window.scrollY > 8);
+  }
   window.addEventListener("scroll", update, { passive: true });
   update();
 })();

@@ -1,16 +1,12 @@
-{% load i18n wagtailcore_tags theme_tags %}{% comment %}
+{% load i18n wagtailcore_tags theme_tags responsive_images %}{% comment %}
 A page of blog articles on Bootstrap (THM.9 part 1): the context and data of the app's
 cms/includes/post_list.html (one `<article>` each with its date, author and summary, a
-`posts` paginator page, `blog`, `request`, `previous_url`, `next_url`, `empty`), as cards, then
+`posts` paginator page, `blog`, `request`, `previous_url`, `next_url`, `empty`), as cards (THM.28:
+image left, date and author; the first post of the first page is featured on the band surface, the
+others sit on the light one, each surface naming its own text and link colours), then
 Bootstrap's `.pagination` with the previous and next links (`rel`) and the page status.
 {% endcomment %}{% for post in posts %}
-  <article class="post-summary card mb-3">
-    <div class="card-body">
-      <h2 class="card-title h4"><a href="{% pageurl post %}">{{ post.title }}</a></h2>
-      {% include "cms/includes/article_meta.html" with post=post blog=blog request=request only %}
-      {% if post.summary %}<p class="card-text">{{ post.summary }}</p>{% endif %}
-    </div>
-  </article>
+  {% if forloop.first and posts.number == 1 %}{% include "cms/includes/post_card.html" with post=post blog=blog request=request featured=True only %}{% else %}{% include "cms/includes/post_card.html" with post=post blog=blog request=request only %}{% endif %}
 {% empty %}
   <p class="alert alert-secondary">{{ empty }}</p>
 {% endfor %}

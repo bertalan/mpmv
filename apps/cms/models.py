@@ -77,6 +77,7 @@ from wagtail.models import (
 from wagtail_localize.fields import BaseTranslatableField, SynchronizedField, TranslatableField
 from wagtail_localize.models import Translation
 
+from apps.core import images as rendition_images
 from apps.core.fields import LanguageField
 from apps.core.images import rendition_or_original
 from apps.core.nfc_forms import NFCInlinePanel, NFCModelForm, NFCPageForm
@@ -1388,7 +1389,7 @@ class BlogIndexPage(RoutablePageMixin, Page):  # type: ignore[misc]
             BlogPostPage.objects.child_of(self)
             .live()
             .public()
-            .select_related("author")
+            .select_related("author", "image")
             .order_by("-date", "-first_published_at", "-pk")
         )
 
@@ -1419,6 +1420,9 @@ class BlogIndexPage(RoutablePageMixin, Page):  # type: ignore[misc]
             posts: PaginatorPage[Any] = paginator.page(request.GET.get("page", 1))
         except (EmptyPage, PageNotAnInteger) as error:
             raise Http404 from error
+        # One query for the page's renditions: a card renders its image without querying.
+        posts.object_list = list(posts.object_list)
+        rendition_images.prefetch_renditions(post.image for post in posts.object_list)
         context["posts"] = posts
         context["previous_url"] = (
             f"?page={posts.previous_page_number()}" if posts.has_previous() else ""

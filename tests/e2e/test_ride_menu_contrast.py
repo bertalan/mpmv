@@ -69,6 +69,7 @@ HERO = {
 # its effective background. Background images are not measured (none sits under the menu).
 CONTRAST_JS = """
 (root) => {
+  const SCRIM = %SCRIM%;
   const ctx = document.createElement('canvas').getContext('2d', {willReadFrequently: true});
   const rgba = (css) => {
     ctx.clearRect(0, 0, 1, 1);
@@ -94,8 +95,17 @@ CONTRAST_JS = """
   const background = (el) => {
     const layers = [];
     for (let node = el; node && node.nodeType === 1; node = node.parentElement) {
-      const bg = parse(getComputedStyle(node).backgroundColor);
+      const style = getComputedStyle(node);
+      const bg = parse(style.backgroundColor);
       if (bg[3] > 0) layers.push(bg);
+      // THM.21: a bar with a scrim gradient over the hero image. Worst case: the gradient's
+      // lightest end (the overlay colour at SCRIM) over a white image, with nothing else under it.
+      if (style.backgroundImage.includes('linear-gradient')) {
+        const root = getComputedStyle(document.documentElement);
+        const overlay = parse(root.getPropertyValue('--color-overlay').trim());
+        layers.push([overlay[0], overlay[1], overlay[2], SCRIM]);
+        break;
+      }
       if (bg[3] >= 1) break;
     }
     let colour = [255, 255, 255, 1];
@@ -132,6 +142,10 @@ CONTRAST_JS = """
   return out;
 }
 """
+
+
+# The gradient's lightest end in 20-header-footer.css.
+CONTRAST_JS = CONTRAST_JS.replace("%SCRIM%", "0.7")
 
 
 @pytest.fixture(autouse=True)

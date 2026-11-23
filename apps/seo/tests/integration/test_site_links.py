@@ -143,9 +143,20 @@ def test_every_listed_link_answers_without_404_or_500(
     assert broken == {}
 
 
-def test_the_storefront_header_links_to_the_page(client: Client) -> None:
+def _header(html: str) -> str:
+    return html.split('<header class="site-header">', 1)[1].split("</header>", 1)[0]
+
+
+def test_the_storefront_header_links_to_the_page_for_staff(staff_client: Client) -> None:
     page = StandardPageFactory.create(title="About us")
-    html = client.get(page.get_url()).content.decode()
-    header = html.split('<header class="site-header">', 1)[1].split("</header>", 1)[0]
+    header = _header(staff_client.get(page.get_url()).content.decode())
     label = re.escape(translated("Site links"))
     assert re.search(rf'<nav id="site-nav"[^>]*>.*<a href="/_links/">{label}</a>', header, re.S)
+
+
+def test_the_storefront_menu_has_no_staff_link_for_visitors_and_customers(client: Client) -> None:
+    """THM.21: an anonymous visitor or a signed-in customer sees no link to the staff page."""
+    page = StandardPageFactory.create(title="About us")
+    assert "/_links/" not in _header(client.get(page.get_url()).content.decode())
+    client.force_login(UserFactory.create())
+    assert "/_links/" not in _header(client.get(page.get_url()).content.decode())
