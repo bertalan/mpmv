@@ -23,7 +23,7 @@
 
     <div class="row g-4 my-0 py-4">
       <div class="col-lg-7">
-        <div class="product-gallery-card card"><div class="card-body p-2">
+        <div class="product-gallery-card card surface-light"><div class="card-body p-2">
         {% if gallery_items or not variant_gallery_items %}{# no image at all: the gallery placeholder (THM.19) #}
           {% include "components/gallery.html" with id="product-images" label=_("Product images") images=gallery_items only %}
         {% endif %}
@@ -40,7 +40,7 @@
       </div>
 
       <section class="product-buy col-lg-5" aria-labelledby="product-buy-heading">
-        <div class="card">
+        <div class="card surface-light">
           <div class="card-body">
             <h2 id="product-buy-heading" class="visually-hidden">{% translate "Price and availability" %}</h2>
             <p class="product-buy__title h3" aria-hidden="true">{{ page_data.title }}</p>{# the banner h1 is the page's only heading #}

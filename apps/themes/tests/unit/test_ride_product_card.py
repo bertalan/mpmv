@@ -58,3 +58,18 @@ def test_the_card_css_uses_tokens_only_and_lifts_only_without_reduced_motion() -
     assert ".product-card:hover" in css
     assert "product-card__media" in css
     assert "var(--s-focus)" in css
+
+
+PRODUCT_CSS = THEMES / "ride/static/themes/ride/css/46-product.css"
+
+
+@pytest.mark.parametrize("palette", sorted(PRESETS))
+def test_the_unselected_variant_pill_border_passes_3_to_1_on_the_light_card(palette: str) -> None:
+    """THM.26: the radio is invisible, so the pill border is the control (WCAG 1.4.11)."""
+    tokens = resolved(palette)
+    assert contrast_ratio(tokens["color.border-control"], tokens["surface.light.bg"]) >= 3.0
+    css = PRODUCT_CSS.read_text(encoding="utf-8")
+    pill = css.split(".product-pills label {", 1)[1].split("}", 1)[0]
+    assert "var(--color-border-control)" in pill
+    assert "--radius-pill" not in pill
+    assert "var(--s-focus)" in css.split(".product-pills :focus-visible + label", 1)[1]

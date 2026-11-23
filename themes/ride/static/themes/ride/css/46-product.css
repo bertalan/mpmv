@@ -45,7 +45,7 @@
      are one scrolling strip. */
   .product-buy .card,
   .product-gallery-card {
-    background: var(--color-surface);
+    background: var(--s-bg);
     border-color: var(--color-border);
     border-radius: var(--radius-card);
   }
@@ -85,8 +85,8 @@
     gap: var(--space-xs);
     block-size: 100%;
     padding: var(--space-xs) var(--space-m);
-    border: 2px solid var(--color-border);
-    border-radius: var(--radius-pill);
+    border: 2px solid var(--color-border-control); /* the radio is invisible: 3:1 (WCAG 1.4.11) */
+    border-radius: var(--radius-control); /* a pill radius cuts into wrapped lines */
   }
 
   .product-pills :checked + label {
@@ -94,7 +94,7 @@
   }
 
   .product-pills :focus-visible + label {
-    outline: var(--focus-width) solid var(--color-focus);
+    outline: var(--focus-width) solid var(--s-focus);
     outline-offset: var(--focus-offset);
   }
 
