@@ -41,6 +41,7 @@ from wagtail.models import Locale
 
 from apps.accounts.models import User
 from apps.catalog import engine as catalog_engine
+from apps.catalog import media
 from apps.catalog import services as catalog_services
 from apps.catalog.attributes import (
     Attribute,
@@ -106,7 +107,7 @@ from apps.vendors.models import (
     VendorTranslation,
 )
 
-from . import data, demo_home
+from . import data, demo_home, demo_pages
 from .images import placeholder_webp
 
 PUBLISHED = translations.PUBLISHED
@@ -191,6 +192,7 @@ def seed(*, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
         for vendor, spec in zip(vendors, data.VENDORS, strict=True):
             _sales_terms(run, vendor, spec)
             _products(run, vendor, spec, catalog)
+            _product_images(run, vendor, spec)
             _shipping(run, vendor, spec)
         images = _images(run)
         _cms(run, images, vendors)
@@ -208,6 +210,7 @@ def reset(*, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
         _reset_cms(run)
         for vendor in vendors:
             _reset_vendor(run, vendor)
+        _reset_product_images(run)
         _reset_catalog_structure(run)
         _reset_carriers(run)
     return run.changes
@@ -353,6 +356,11 @@ def _platform(run: _Run) -> None:
             tax_regime=PlatformOperator.TaxRegime.STANDARD,
             commission_vat_mode=PlatformOperator.CommissionVatMode.STANDARD,
             dac7_authority_country=data.ITALY,
+            support_email=demo_pages.SUPPORT_EMAIL,
+            authority_contact_email=demo_pages.AUTHORITY_EMAIL,
+            authority_contact_languages=demo_pages.contact_languages(),
+            user_contact_url=demo_pages.USER_CONTACT_URL,
+            user_contact_languages=demo_pages.contact_languages(),
             valid_from=data.SEED_EPOCH,
         )
         run.add(configure_platform_operator(operator, ctx=run.ctx))
@@ -901,6 +909,50 @@ def _products(run: _Run, vendor: Vendor, spec: data.VendorSeed, catalog: _Catalo
             )
 
 
+def _product_images(run: _Run, vendor: Vendor, spec: data.VendorSeed) -> None:
+    """THM.23: a generated image for every seeded product that has none (placeholder shapes, no
+    download), through the CAT.4 upload service; the first one is the cover."""
+    licence = ImageLicence.objects.get(code=OWN_WORK_LICENCE)
+    for item in data.PRODUCTS[spec.letter]:
+        sku = f"{spec.sku_prefix}-{item.code}"
+        product = Product.objects.filter(vendor=vendor, sku=sku).first()
+        title = f"{data.PRODUCT_IMAGE_PREFIX}{sku}"
+        # A product with an image, or whose generated image an editor removed (the library entry
+        # stays), is left alone.
+        if (
+            product is None
+            or product.images.exists()
+            or MediaImage.objects.filter(title=title, author=data.IMAGE_AUTHOR).exists()
+        ):
+            continue
+        content = placeholder_webp(sku, data.product_image_colour(sku), scale=0.5)
+        run.add(
+            media.upload_image(
+                product,
+                file=ImageFile(_named_bytes(content), name=f"demo-{sku.lower()}.webp"),
+                title=title,
+                licence=licence,
+                author=data.IMAGE_AUTHOR,
+                alt_text=_text(item.title, _source()),
+                ctx=run.ctx,
+            )
+        )
+        row = product.images.get()
+        run.files.append(row.image.file.name)
+        run.add(media.set_cover(row, automatic=True, ctx=run.ctx))
+
+
+def _reset_product_images(run: _Run) -> None:
+    """Delete the library entries of the generated product images (their products are gone)."""
+    images = MediaImage.objects.filter(
+        title__startswith=data.PRODUCT_IMAGE_PREFIX, author=data.IMAGE_AUTHOR
+    )
+    for image in images:
+        if not image.product_images.exists():
+            run.changes.delete("core.mediaimage", image.title, {})
+            image.delete()
+
+
 # --- Shipping: carriers, then each vendor's zones and methods as a configuration file
 
 
@@ -1220,7 +1272,11 @@ def _cms(run: _Run, images: dict[str, MediaImage], vendors: list[Vendor]) -> Non
         )
 
     shop = _standard_page(run, home, locales, images["home-hero"], data.SHOP, shop_body)
-    demo_home.seed_navigation(run, locales, [("shop", shop), ("blog", blog)])
+    demo_pages.seed_about(run, locales, images)
+    contact = _standard_page(
+        run, home, locales, images["how-it-works"], demo_pages.CONTACT, demo_pages.contact_body
+    )
+    demo_home.seed_navigation(run, locales, [("shop", shop), ("blog", blog)], contact)
     _recruitment_home(run, home, images, shop)
 
 
@@ -1454,6 +1510,13 @@ def _reset_cms(run: _Run) -> None:
     ):
         run.changes.delete("cms.standardpage", page.url_path, {})
         page.delete()
+    # The Contact page is removed only while it still has the seed's text: an editor's page that
+    # happens to use the slug stays.
+    for page in _seed_pages(StandardPage, [_text(demo_pages.CONTACT.slug, _source())]):
+        if demo_pages.is_seed_contact(page):
+            demo_home.remove_contact_entries({page.pk})
+            run.changes.delete("cms.standardpage", page.url_path, {})
+            page.delete()
     for page in _seed_pages(
         LegalPage, [_text(spec.slug, _source()) for spec in data.LEGAL_PAGES.values()]
     ):

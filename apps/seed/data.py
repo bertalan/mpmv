@@ -9,7 +9,9 @@ The stable keys below (slugs, SKUs, codes, emails) are what makes a row seed-own
 its rows again by these keys, and `--reset` removes only rows that carry them.
 """
 
+import colorsys
 import datetime as dt
+import zlib
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, Final
@@ -1566,3 +1568,11 @@ IMAGES: Final[dict[str, tuple[str, tuple[int, int, int]]]] = {
     "event-workshop": ("Demo placeholder: online workshop", (130, 100, 160)),
 }
 IMAGE_AUTHOR: Final = "MPMV demo seed (generated)"
+PRODUCT_IMAGE_PREFIX: Final = "Demo product image: "
+
+
+def product_image_colour(sku: str) -> tuple[int, int, int]:
+    """A stable, soft colour per SKU for its generated image."""
+    hue = (zlib.crc32(sku.encode()) % 360) / 360
+    red, green, blue = colorsys.hsv_to_rgb(hue, 0.45, 0.8)
+    return (round(red * 255), round(green * 255), round(blue * 255))
