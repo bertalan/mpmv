@@ -163,9 +163,6 @@ def assert_matches_baseline(
     mode = require_visual_mode()
     page.set_viewport_size({"width": width, "height": 900})
     page.wait_for_timeout(100)  # the layout settles after the resize
-    # `document.fonts.ready` alone can resolve before a lazily requested face (the 600/700
-    # Barlow Condensed headings) is fetched, so load every declared face explicitly.
-    page.evaluate("async () => { await Promise.all([...document.fonts].map((f) => f.load())); }")
     page.evaluate("() => document.fonts.ready")
     actual = ACTUAL_DIR / theme / f"{name}-{width}.png"
     actual.parent.mkdir(parents=True, exist_ok=True)
