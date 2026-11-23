@@ -242,3 +242,19 @@ def help_context(context: dict[str, Any]) -> dict[str, str] | None:
         "page_type": engine.help_page_type(label),
         "language": translation.get_language() or settings.LANGUAGE_CODE,
     }
+
+
+@register.simple_tag
+def legal_anchors(body: Any) -> dict[str, str]:
+    """Anchor id by block id for the legal sections of a body (THM.29)."""
+    sections = [
+        (str(c.value["section"]), str(c.id)) for c in body if c.block_type == "legal_section"
+    ]
+    anchors = engine.legal_section_anchors(sections)
+    return {block_id: anchor for (_, block_id), anchor in zip(sections, anchors, strict=True)}
+
+
+@register.filter
+def anchor_of(anchors: dict[str, str], block_id: Any) -> str:
+    """The anchor of one block ('' when it has none)."""
+    return anchors.get(str(block_id), "")

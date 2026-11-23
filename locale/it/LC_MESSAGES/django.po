@@ -8357,7 +8357,7 @@ msgstr "Dati del venditore"
 msgid "Selling mode"
 msgstr "Modalità di vendita"
 
-#: apps/cms/templates/cms/form_page.html
+#: apps/cms/templates/cms/form_page.html themes/ride/templates/cms/form_page.html
 msgid "Send"
 msgstr "Invia"
 
@@ -11657,7 +11657,7 @@ msgstr ""
 "Lo schema dice cosa sceglie il cliente: per esempio una marca e un modello, o un marchio e una "
 "macchina. Nulla viene scritto finché non confermi nella pagina di anteprima."
 
-#: apps/cms/templates/cms/form_page.html
+#: apps/cms/templates/cms/form_page.html themes/ride/templates/cms/form_page.html
 msgid "The security check failed. Please try again."
 msgstr "Il controllo di sicurezza non è riuscito. Riprova."
 

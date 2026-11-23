@@ -1,0 +1,35 @@
+{% extends "layouts/base.html" %}
+{% load i18n wagtailcore_tags captcha cms_tags %}
+{% comment %}
+Editor-built form page on `ride` (THM.29): the app template's content (intro, captcha failure,
+error summary, the same POST form to the page URL, captcha widget, submit button) under the page
+banner (the only h1, the breadcrumb): the intro as the text column, the form as a card.
+{% endcomment %}
+{% block head %}{{ block.super }}{% captcha_script %}{% endblock %}
+{% block content %}
+  <article class="form-page">
+    {% page_trail page as trail %}
+    {% include "components/page_banner.html" with title=page.title items=trail only %}
+    <div class="page-content contact-layout">
+      <div class="contact-address">
+        {% if page.intro %}<div class="form-page__intro">{{ page.intro|richtext }}</div>{% endif %}
+      </div>
+      <div class="contact-form-card card"><div class="card-body">
+        {% if captcha_failed %}
+          <p class="form-page__error alert alert-danger" role="alert">{% translate "The security check failed. Please try again." %}</p>
+        {% endif %}
+        {% include "components/error_summary.html" with form=form autofocus=True only %}
+        <form action="{% pageurl page %}" method="post" novalidate>
+          {% csrf_token %}
+          {% for field in form %}{% include "components/field.html" with field=field only %}{% endfor %}
+          {% captcha_widget %}
+          {% if page.submit_label %}
+            {% include "components/button.html" with label=page.submit_label type="submit" only %}
+          {% else %}
+            {% include "components/button.html" with label=_("Send") type="submit" only %}
+          {% endif %}
+        </form>
+      </div></div>
+    </div>
+  </article>
+{% endblock %}
