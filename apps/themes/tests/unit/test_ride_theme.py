@@ -72,7 +72,10 @@ def test_ride_tokens_meet_the_token_contract(tokens: dict[str, str]) -> None:
 
 
 def test_the_compressed_css_is_within_the_budget(theme_css: str) -> None:
-    assert compressed_size(theme_css.encode()) < CSS_BUDGET
+    # ride's own budget is in its manifest (§14.7: 48 KB); `base` keeps the 45 KB default.
+    budget_kb = tomllib.loads((RIDE / "theme.toml").read_text())["css_budget_kb"]
+    assert budget_kb * 1024 > CSS_BUDGET
+    assert compressed_size(theme_css.encode()) < budget_kb * 1024
 
 
 # --- Colours (brief): values and every text pair
