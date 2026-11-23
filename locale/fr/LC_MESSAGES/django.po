@@ -8430,7 +8430,7 @@ msgstr "Coordonnées du vendeur"
 msgid "Selling mode"
 msgstr "Mode de vente"
 
-#: apps/cms/templates/cms/form_page.html
+#: apps/cms/templates/cms/form_page.html themes/ride/templates/cms/form_page.html
 msgid "Send"
 msgstr "Envoyer"
 
@@ -11757,7 +11757,7 @@ msgstr ""
 "marque et une machine. Rien n'est enregistré tant que vous n'avez pas confirmé sur la page "
 "d'aperçu."
 
-#: apps/cms/templates/cms/form_page.html
+#: apps/cms/templates/cms/form_page.html themes/ride/templates/cms/form_page.html
 msgid "The security check failed. Please try again."
 msgstr "La vérification de sécurité a échoué. Réessaie."
 
