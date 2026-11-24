@@ -159,6 +159,24 @@ def test_the_product_page_passes_the_gates(
     shot(f"{width}-product")
 
 
+def test_the_related_strip_scrolls_sideways_on_a_narrow_screen(
+    page: Page, live_server: LiveServer
+) -> None:
+    """THM.26: the related products are one horizontal strip, not a wrapped grid."""
+    page.set_viewport_size({"width": 375, "height": 800})
+    page.goto(f"{live_server.url}{PRODUCT}")
+    strip = page.locator(".product-related .product-strip")
+    expect(strip.locator(".product-card")).to_have_count(3)
+    metrics = strip.evaluate(
+        "(el) => ({scroll: el.scrollWidth, client: el.clientWidth, "
+        "overflow: getComputedStyle(el).overflowX, wrap: getComputedStyle(el).flexWrap})"
+    )
+    assert metrics["scroll"] > metrics["client"], metrics
+    assert metrics["overflow"] == "auto"
+    assert metrics["wrap"] == "nowrap"
+    assert page.evaluate(NO_SIDEWAYS_SCROLL), "the strip must not widen the page"
+
+
 @pytest.mark.parametrize("width", [360, 768, 1280])
 def test_the_storefront_passes_the_gates(
     width: int, page: Page, live_server: LiveServer, shot: Callable[[str], Path]
