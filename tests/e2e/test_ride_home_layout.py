@@ -12,6 +12,7 @@ from pytest_django.live_server_helper import LiveServer
 
 from apps.cms.models import HomePage, StandardPage
 from apps.core.i18n import primary_language
+from apps.seed import data
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import csp_violations
 from tests.e2e.test_ride_home import _ride_home, open_home  # noqa: F401 (autouse fixture)
@@ -21,14 +22,57 @@ pytestmark = pytest.mark.django_db(transaction=True)
 
 
 @pytest.fixture(autouse=True)
-def _tiles_on_the_home(_ride_home: None) -> None:  # noqa: F811
+def _demo_landing_with_tiles(_ride_home: None) -> None:
+    """The body of the seeded vendor-recruitment home (CMS.19, the demo texts of apps/seed/data)
+    with one block of tiles added: hero, three text sections, quotes, tiles, FAQ, two bands."""
     home = HomePage.objects.get(locale__language_code=primary_language())
     about = StandardPage.objects.get(locale=home.locale, depth=home.depth + 1)
-    card = {"page": about, "label": "", "text": "Read more"}
-    body = [(child.block_type, child.value) for child in home.body]
-    body.insert(1, ("featured", {"heading": "Browse", "cards": [("page", card)] * 3}))
-    body.append(("paragraph", "<p>Closing section.</p>"))
-    home.body = body
+
+    def card(label: str, text: str) -> tuple[str, dict[str, object]]:
+        return ("page", {"page": about, "label": label, "text": text})
+
+    def band(heading: str, text: str) -> tuple[str, dict[str, object]]:
+        link = {"page": None, "url": "/about/", "label": "Apply now"}
+        return ("cta", {"heading": heading, "text": text, "link": link})
+
+    hero = (home.body[0].block_type, home.body[0].value)
+    home.body = [
+        hero,
+        ("paragraph", data.LANDING_BENEFITS),
+        (
+            "featured",
+            {
+                "heading": "Browse",
+                "cards": [
+                    card("The shop", "Demo products from our sellers"),
+                    card("The blog", "Notes from the workshops"),
+                    card("About us", "Who we are"),
+                ],
+            },
+        ),
+        ("paragraph", data.LANDING_STEPS),
+        ("paragraph", data.LANDING_FEES),
+        (
+            "strip",
+            {
+                "heading": data.LANDING_QUOTES_HEADING,
+                "cards": [
+                    ("testimonial", {"quote": quote, "author": author, "role": role})
+                    for quote, author, role in data.LANDING_QUOTES
+                ],
+                "per_view": "2",
+            },
+        ),
+        (
+            "faq",
+            {
+                "heading": data.LANDING_FAQ_HEADING,
+                "items": [{"question": q, "answer": a} for q, a in data.LANDING_FAQ],
+            },
+        ),
+        band(*data.LANDING_CTA),
+        band(*data.LANDING_SHOP_CTA),
+    ]
     home.save_revision().publish()
 
 

@@ -351,20 +351,7 @@ def shop_home_body(
                         "heading": t["slide_three"],
                     },
                 ],
-                "links": [
-                    {"page": blog, "url": "", "label": pick(BLOG_TITLE, language)},
-                    {"page": how, "url": "", "label": pick(MENU_LABELS["about"], language)},
-                ],
-            },
-        ),
-        (
-            "featured",
-            {
-                "heading": t["vendors"],
-                "cards": [
-                    ("vendor", {"vendor": vendor, "label": "", "text": ""})
-                    for vendor in vendors[:3]
-                ],
+                "links": [],
             },
         ),
         ("paragraph", notice),

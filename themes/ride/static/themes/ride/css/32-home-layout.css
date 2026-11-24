@@ -39,6 +39,11 @@
     margin-block-end: 0;
   }
 
+  /* A carousel closes its block: the margin it keeps below it (35-carousels.css) is not rhythm. */
+  .home-section .ride-carousel.carousel:last-child {
+    margin-block-end: 0;
+  }
+
   /* --- Tiles: the card's picture, or the theme's own artwork, under a scrim; the title is
      laid over it. The whole tile is one link (the title's stretched link). */
 
