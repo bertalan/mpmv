@@ -80,7 +80,10 @@ def test_the_404_page_has_the_display_code_a_way_home_and_a_search() -> None:
     assert f'class="btn btn-primary" href="{reverse("home")}"' in html
     form = html.split('for="error-search"', 1)[1].split("</form>", 1)[0]
     assert 'name="s"' in form
-    assert re.search(r'<form[^>]+role="search"[^>]+action="/"', html.split("error-hero", 1)[1])
+    action = re.escape(reverse("wagtail_serve", args=[""]))
+    assert re.search(
+        rf'<form[^>]+role="search"[^>]+action="{action}"', html.split("error-hero", 1)[1]
+    )
 
 
 @pytest.mark.usefixtures("ride")
