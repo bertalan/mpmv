@@ -178,6 +178,13 @@ class Vendor(BaseModel):
         editable=False,
         help_text="1 for the first onboarding, one more each time staff reopen the closed vendor.",
     )
+    # Set only by staff through `services.set_business_only` (VEN.41): it exempts nothing from
+    # the contact or activation rules.
+    business_only = models.BooleanField(
+        default=False,
+        editable=False,
+        help_text="Staff only: the seller sells to buyers with a verified VAT number only.",
+    )
     country = CountryField(
         help_text=_(
             "The country where your business is established, as in the company register. It"
