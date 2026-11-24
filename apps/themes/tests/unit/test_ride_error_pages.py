@@ -11,11 +11,16 @@ from pathlib import Path
 
 import pytest
 from django.http import HttpRequest
+from django.templatetags.static import static
 from django.test import RequestFactory
 from django.urls import reverse
 from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.themes import views
+from apps.themes.contract import TEXT
+from apps.themes.engine import contrast_ratio
+from apps.themes.palettes import PRESETS, resolve_with_palette
+from apps.themes.services import get_registry, theme_tokens, themes_dir
 from tests.i18n import translated
 
 pytestmark = pytest.mark.usefixtures("english_interface")
@@ -28,7 +33,7 @@ SAFE_LIBRARIES = {"i18n", "static"}  # no database, session or request needed
 
 @pytest.fixture
 def request_() -> HttpRequest:
-    return RequestFactory().get("/broken/")
+    return RequestFactory().get(reverse("wagtail_serve", args=["broken/"]))
 
 
 @pytest.fixture
@@ -68,13 +73,14 @@ def test_the_500_page_is_a_full_bleed_hero_with_a_display_code(request_: HttpReq
 def test_the_500_page_loads_no_palette_or_site_settings_css(request_: HttpRequest) -> None:
     html = views.server_error(request_).content.decode()
     assert html.count('rel="stylesheet"') == 1
-    assert "/static/themes/ride/theme.css" in html
+    assert static("themes/ride/theme.css") in html
     assert 'class="garage' not in html
 
 
 @pytest.mark.usefixtures("ride")
 def test_the_404_page_has_the_display_code_a_way_home_and_a_search() -> None:
-    html = views._render_plain(RequestFactory().get("/nope/"), "404.html")
+    request = RequestFactory().get(reverse("wagtail_serve", args=["nope/"]))
+    html = views._render_plain(request, "404.html")
     assert re.search(r'<p class="error-hero__code" aria-hidden="true">404</p>', html)
     assert len(re.findall(r"<h1\b", html)) == 1
     assert f'class="btn btn-primary" href="{reverse("home")}"' in html
@@ -88,9 +94,28 @@ def test_the_404_page_has_the_display_code_a_way_home_and_a_search() -> None:
 
 @pytest.mark.usefixtures("ride")
 def test_the_404_page_does_not_echo_the_path_or_the_query() -> None:
-    html = views._render_plain(RequestFactory().get("/secret-x/?s=probe-y"), "404.html")
+    request = RequestFactory().get(reverse("wagtail_serve", args=["secret-x/"]), {"s": "probe-y"})
+    html = views._render_plain(request, "404.html")
     assert "secret-x" not in html
     assert "probe-y" not in html
+
+
+@pytest.mark.parametrize("slug", sorted(PRESETS))
+def test_the_error_hero_text_has_enough_contrast_in_every_ride_palette(slug: str) -> None:
+    """The hero is `color.text-inverse` on `color.surface-inverse`, which a palette sets (band)."""
+    tokens = resolve_with_palette(
+        get_registry().chain("ride"), theme_tokens(themes_dir()), PRESETS[slug]
+    )
+    ratio = contrast_ratio(tokens["color.text-inverse"], tokens["color.surface-inverse"])
+    assert ratio >= TEXT, f"{slug}: {ratio:.2f}"
+
+
+def test_the_error_hero_sits_flush_under_the_header() -> None:
+    """`.site-main` pads its top by `--space-l`; the display hero pulls that padding back."""
+    rules = (STATIC / "css" / "62-error-pages.css").read_text()
+    block = re.search(r"\.error-page--display\s*\{([^}]*)\}", rules)
+    assert block is not None
+    assert "margin-block-start: calc(-1 * var(--space-l))" in block.group(1)
 
 
 def test_the_illustration_is_an_own_work_svg_under_4kb_listed_in_the_licences() -> None:
