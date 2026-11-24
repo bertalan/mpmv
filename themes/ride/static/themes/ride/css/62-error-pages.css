@@ -2,6 +2,11 @@
    illustration, a large display code and the title in the inverse text colour (contrast comes
    from the token pair). Colours only through tokens; no animation. */
 @layer overrides {
+  /* The hero meets the dark header: it takes back the top padding of `.site-main`. */
+  .error-page--display {
+    margin-block-start: calc(-1 * var(--space-l));
+  }
+
   .error-hero {
     display: grid;
     justify-items: center;
