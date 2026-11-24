@@ -1,0 +1,14 @@
+/* Palette builder preview (THM.34 2/2): the candidate palette's custom properties are set on
+   .palette-preview by the generated stylesheet; everything here only reads them. */
+.palette-picker { margin-inline-start: 0.5rem; vertical-align: middle; }
+.palette-preview { display: grid; gap: 1rem; margin-block: 1rem; max-width: 40rem; }
+.palette-preview[hidden] { display: none; }
+.palette-preview .pp-band { display: flex; gap: 1.5rem; padding: 0.75rem 1rem; background: var(--color-surface-inverse); color: var(--color-text-inverse); }
+.palette-preview .pp-band a { color: var(--color-text-inverse); text-decoration: underline; }
+.palette-preview .pp-body { background: #fff; color: #1b2026; padding: 1rem; border: 1px solid var(--color-border-control); }
+.palette-preview .pp-link { color: var(--color-link); text-decoration: underline; }
+.palette-preview .pp-button { background: var(--color-accent); color: var(--color-on-accent); border: 0; padding: 0.5rem 1rem; font: inherit; }
+.palette-preview .pp-button:hover { background: var(--color-accent-hover); }
+.palette-preview .pp-card { display: grid; gap: 0.25rem; padding: 0.75rem; background: var(--color-accent-tint); border: 1px solid var(--color-border-control); }
+.palette-preview .pp-price { font-weight: 700; color: var(--color-accent); }
+.palette-preview .pp-badge { justify-self: start; padding: 0.125rem 0.5rem; background: var(--color-secondary); color: var(--color-on-secondary); }

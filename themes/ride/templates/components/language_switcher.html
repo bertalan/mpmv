@@ -1,0 +1,28 @@
+{% load i18n theme_tags %}{% comment %}
+Language menu of the `ride` theme (THM.35): one compact toggle showing the current language, built
+on the disclosure pattern (a `<button>` with `aria-expanded` that shows or hides a list; no `menu`
+role). The accessible name is "Language: " plus the endonym; the globe is decorative. Each item is
+its own CSRF POST form to `switch_language` with the THM.3 base switcher's hidden fields, so where
+it leads is unchanged (spec 09 §9.2, I18N.11, I18N.22). Its text is the endonym, with its `lang`;
+the flag is decorative. Without JavaScript (`html.no-js`) the toggle is hidden and the list is
+shown expanded, so the menu still switches language. `js/language-menu.js` toggles `is-open`,
+closes on Escape (focus back on the toggle), on Tab out of the menu and on a click outside it.
+
+Context: `languages` (CMS `LanguageLink`s or Django language info dicts), `current_language`,
+`next_url`.
+{% endcomment %}{% language_menu languages current_language as menu %}<nav class="language-switcher language-menu" aria-label="{% translate 'Language' %}" data-language-menu>
+  <button type="button" class="language-menu__toggle" aria-expanded="false" aria-controls="language-menu-list">{% include "components/icon.html" with name="globe" only %}<span><span class="visually-hidden">{% translate "Language" %}: </span><span lang="{{ menu.current.code }}">{{ menu.current.label|capfirst }}</span></span>{% include "components/icon.html" with name="chevron-down" only %}</button>
+  <ul class="language-menu__list" id="language-menu-list">
+    {% for item in menu.items %}
+      <li>
+        <form action="{% url 'switch_language' %}" method="post">
+          {% csrf_token %}
+          {% if item.url %}<input type="hidden" name="exact" value="1">
+          <input type="hidden" name="notice" value="{% if item.available %}0{% else %}1{% endif %}">
+          {% endif %}<input type="hidden" name="next" value="{% firstof item.url next_url %}">
+          <button type="submit" class="language-menu__item" name="language" value="{{ item.code }}" lang="{{ item.code }}"{% if item.current %} aria-current="true" disabled{% endif %}>{% if item.flag %}<img class="language-menu__flag" src="{{ item.flag }}" alt="" aria-hidden="true" width="24" height="16">{% endif %}{{ item.label|capfirst }}</button>
+        </form>
+      </li>
+    {% endfor %}
+  </ul>
+</nav>

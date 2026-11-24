@@ -373,3 +373,34 @@ def test_ride_header_top_matches_its_visual_baseline(
     page.wait_for_function("() => [...document.images].every((img) => img.complete)", timeout=5000)
     for width in HEADER_WIDTHS:
         assert_matches_baseline(page, theme="ride", name=f"header-{name}", width=width)
+
+
+@pytest.mark.parametrize("state", ["closed", "open"])
+@pytest.mark.parametrize("width", HEADER_WIDTHS)
+def test_ride_language_menu_matches_its_visual_baseline(
+    state: str,
+    width: int,
+    page: Page,
+    live_server: LiveServer,
+    settings: SettingsWrapper,
+    paths: dict,  # type: ignore[type-arg]
+) -> None:
+    """THM.35: the header's language toggle with the list closed and open, `ride`, 375 and 1280 px
+    (at 375 the toggle is in the menu drawer), baselines `ride/header-language-<state>-<w>.png`."""
+    require_visual_mode()
+    settings.MPMV_THEME_DEFAULT = "ride"
+    page.emulate_media(reduced_motion="reduce")
+    page.clock.set_fixed_time(utc(2026, 11, 18, 10))
+    page.set_viewport_size({"width": width, "height": 900})
+    response = page.goto(f"{live_server.url}{PAGES['listing'].format(**paths)}")
+    assert response is not None
+    assert response.status == 200
+    page.wait_for_load_state("load")
+    expect(page.locator("html")).to_have_attribute("data-theme", "ride")
+    if width < 1024:
+        page.locator(".nav-toggle").click()
+    if state == "open":
+        page.locator(".language-menu__toggle").click()
+        expect(page.locator(".language-menu__list")).to_be_visible()
+    page.wait_for_function("() => [...document.images].every((img) => img.complete)", timeout=5000)
+    assert_matches_baseline(page, theme="ride", name=f"header-language-{state}", width=width)

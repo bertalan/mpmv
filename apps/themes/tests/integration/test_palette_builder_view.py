@@ -225,3 +225,70 @@ def test_a_post_without_a_csrf_token_is_refused(mfa_login: MfaLogin) -> None:
     response = post(strict, action="save", primary="#0B5C7A")
     assert response.status_code == 403
     assert not BrandPalette.objects.filter(slug="mine").exists()
+
+
+# --- THM.34 2/2: the live parts (JSON check, generated preview stylesheet, script)
+
+
+def test_the_page_loads_its_script_and_preview_container_without_inline_code(
+    client: Client, mfa_login: MfaLogin
+) -> None:
+    mfa_login(client, builder_user())
+    html = client.get(reverse(URL)).content.decode()
+    assert re.search(r'<script[^>]+src="[^"]*themes/palette-builder\.js"[^>]+nonce="[^"]+"', html)
+    assert 'data-check-url="' in html
+    assert 'data-preview-url="' in html
+    assert 'data-picker-label="colour picker"' in html
+    assert 'data-check-error="The check could not be reached.' in html
+    assert 'class="palette-preview"' in html
+    assert 'id="palette-preview-css"' in html
+
+
+def test_the_check_endpoint_reports_pairs_ratios_and_the_shade_to_use(
+    client: Client, mfa_login: MfaLogin
+) -> None:
+    mfa_login(client, builder_user())
+    response = client.get(
+        reverse("themes_admin:palette_check"), {"start": "red", "primary": "#FFE600"}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["failing"] >= 1
+    assert data["valid"] is False
+    failed = [row for row in data["rows"] if not row["passes"]]
+    assert failed
+    assert all(re.fullmatch(r"\d+\.\d\d", row["ratio"]) for row in failed)
+    fixes = [row["suggestion"] for row in failed if row["suggestion"]]
+    assert fixes
+    assert fixes[0]["field"] == "primary"
+    assert re.fullmatch(r"#[0-9A-F]{6}", fixes[0]["colour"])
+    ok = client.get(reverse("themes_admin:palette_check"), {"start": "red"}).json()
+    assert ok["valid"] is True
+    assert ok["failing"] == 0
+
+
+def test_the_check_endpoint_refuses_a_bad_colour_and_users_without_permission(
+    client: Client, mfa_login: MfaLogin
+) -> None:
+    mfa_login(client, user_with("access_admin"))
+    assert refused(client.get(reverse("themes_admin:palette_check")))
+    assert refused(client.get(reverse("themes_admin:palette_preview")))
+    other = Client()
+    mfa_login(other, builder_user())
+    bad = other.get(reverse("themes_admin:palette_check"), {"primary": "red;}"})
+    assert bad.status_code == 400
+    assert other.get(reverse("themes_admin:palette_preview"), {"primary": "x"}).status_code == 400
+
+
+def test_the_preview_stylesheet_is_generated_scoped_and_never_cached(
+    client: Client, mfa_login: MfaLogin
+) -> None:
+    mfa_login(client, builder_user())
+    response = client.get(reverse("themes_admin:palette_preview"), {"primary": "#0B5C7A"})
+    assert response.status_code == 200
+    assert response["Content-Type"].startswith("text/css")
+    assert "no-store" in response["Cache-Control"]
+    body = response.content.decode()
+    assert body.startswith(".palette-preview{")
+    assert "--color-accent:#0B5C7A" in body
+    assert client.post(reverse("themes_admin:palette_preview")).status_code == 405
