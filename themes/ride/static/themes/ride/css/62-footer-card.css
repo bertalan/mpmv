@@ -1,0 +1,171 @@
+/* Ride: footer rows, vendor strip, torn top edge and the consent card (THM.22). A surface that
+   sets its background also sets its text, link and focus colours, from the band tokens. */
+@layer overrides {
+  /* --- Vendor strip above the footer, on the muted surface. */
+
+  .site-footer-strip {
+    background-color: var(--surface-muted-bg);
+    color: var(--surface-muted-text);
+    padding-block: var(--space-l) var(--space-xl);
+  }
+
+  .site-footer-strip a {
+    color: var(--surface-muted-link);
+  }
+
+  .site-footer-strip__inner {
+    inline-size: 100%;
+    max-inline-size: var(--measure-page);
+    margin-inline: auto;
+    padding-inline: var(--space-m);
+  }
+
+  /* --- Footer: band surface with a torn top edge drawn over the section above. */
+
+  .site-footer {
+    position: relative;
+    background-color: var(--surface-band-bg);
+    color: var(--surface-band-text);
+  }
+
+  .site-footer::before {
+    content: "";
+    position: absolute;
+    inset-block-end: 100%;
+    inset-inline: 0;
+    block-size: 1.5rem;
+    background-color: var(--surface-band-bg);
+    mask: url(images/edge-torn.svg) center bottom / 100% 100% no-repeat;
+    pointer-events: none;
+  }
+
+  .site-footer a,
+  .site-footer p,
+  .site-footer__heading {
+    color: var(--surface-band-text);
+  }
+
+  .site-footer a:focus-visible {
+    outline-color: var(--surface-band-focus);
+  }
+
+  .site-footer__top,
+  .site-footer__inner,
+  .site-footer__bar {
+    inline-size: 100%;
+    max-inline-size: var(--measure-page);
+    margin-inline: auto;
+    padding-inline: var(--space-m);
+  }
+
+  .site-footer__top {
+    display: grid;
+    gap: var(--space-l) var(--space-xl);
+    align-items: start;
+    padding-block: var(--space-section-end) var(--space-l);
+  }
+
+  .site-footer__inner {
+    padding-block: 0 var(--space-l);
+  }
+
+  .site-footer__socials {
+    min-inline-size: 0;
+  }
+
+  .site-footer .site-footer__social {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--space-xs) var(--space-l);
+  }
+
+  .site-footer__social .icon {
+    flex: none;
+    inline-size: 1.25rem;
+    block-size: 1.25rem;
+  }
+
+  .site-footer__bar {
+    box-sizing: border-box;
+  }
+
+  @media (width >= 40rem) {
+    .site-footer__top {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    .site-footer__socials {
+      grid-column: 1 / -1;
+    }
+  }
+
+  /* --- Consent: a compact card on the band surface, flush with the bottom edge. Reject and
+     accept share every rule, so neither is pushed. */
+
+  .consent-card.consent-banner {
+    --bs-alert-bg: var(--surface-band-bg);
+    --bs-alert-color: var(--surface-band-text);
+    --bs-alert-border-color: var(--surface-band-bg);
+    padding: var(--space-s) var(--space-m);
+    background: var(--surface-band-bg);
+    color: var(--surface-band-text);
+    font-size: 0.875rem;
+    line-height: 1.35;
+  }
+
+  .consent-card.consent-banner form {
+    gap: var(--space-xs);
+  }
+
+  .consent-card.consent-banner p {
+    margin: 0;
+    color: var(--surface-band-text);
+  }
+
+  .consent-card.consent-banner .consent-banner__title {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--surface-band-heading);
+  }
+
+  .consent-card.consent-banner a {
+    color: var(--surface-band-link);
+  }
+
+  .consent-card.consent-banner :focus-visible {
+    outline-color: var(--surface-band-focus);
+  }
+
+  .consent-card .consent-banner__details > summary {
+    color: var(--surface-band-link);
+    min-block-size: var(--target-min);
+  }
+
+  .consent-card .consent-banner__details legend,
+  .consent-card .consent-banner__details label,
+  .consent-card .consent-category__help {
+    color: var(--surface-band-text);
+  }
+
+  .consent-card .consent-actions {
+    display: flex;
+    gap: var(--space-s);
+  }
+
+  .consent-card .consent-actions .btn,
+  .consent-card .consent-banner__details .btn {
+    flex: 1 1 0;
+    min-block-size: var(--target-min);
+    min-inline-size: 0;
+    border: 2px solid var(--surface-band-button-bg);
+    background: var(--surface-band-button-bg);
+    color: var(--surface-band-button-fg);
+  }
+
+  .consent-card .consent-actions .btn:hover,
+  .consent-card .consent-banner__details .btn:hover {
+    background: var(--surface-band-button-hover);
+    border-color: var(--surface-band-button-hover);
+    color: var(--surface-band-button-fg);
+  }
+}

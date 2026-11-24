@@ -62,6 +62,16 @@ license = "CC0-1.0"
 files = ["images/edge-torn.svg", "images/texture-topo.svg"]
 
 [[asset]]
+name = "Social brand glyphs"
+kind = "image"
+source = "https://github.com/simple-icons/simple-icons/tree/13.0.0"
+author = "Simple Icons Collaborators"
+license = "CC0-1.0"
+# Release 13.0.0 (CC0-1.0): one path per network of the CMS.17 list, as `social-<network>`
+# symbols in icons/sprite.svg (THM.22). The brand marks remain the property of their owners.
+files = ["icons/sprite.svg"]
+
+[[asset]]
 name = "Bootstrap"
 kind = "framework"
 source = "https://github.com/twbs/bootstrap/releases/tag/v5.3.9"
