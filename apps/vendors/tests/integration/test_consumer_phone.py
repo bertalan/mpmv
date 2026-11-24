@@ -35,7 +35,7 @@ def ready_to_activate(**fields: object) -> Vendor:
     return vendor
 
 
-def test_every_vendor_sells_to_consumers_while_no_business_only_seller_exists() -> None:
+def test_every_vendor_sells_to_consumers() -> None:
     assert sells_to_consumers(VendorFactory.create())
 
 

@@ -388,6 +388,7 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
     search_fields = ("display_name", "legal_name", "slug", "vat_number", "contact_email")
     readonly_fields = (
         "status",
+        "business_only",
         "public_id",
         "audit_trail",
         "onboarding",
@@ -401,7 +402,19 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
         "updated_at",
     )
     fieldsets = (
-        (None, {"fields": ("display_name", "slug", "status", "public_id", "audit_trail")}),
+        (
+            None,
+            {
+                "fields": (
+                    "display_name",
+                    "slug",
+                    "status",
+                    "business_only",
+                    "public_id",
+                    "audit_trail",
+                )
+            },
+        ),
         ("Onboarding", {"fields": ("onboarding", "onboarding_round", "reopen", "claim_status")}),
         ("Payout readiness", {"fields": ("missing_for_payout",)}),
         (
