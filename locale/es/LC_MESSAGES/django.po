@@ -4076,6 +4076,7 @@ msgid "Go to slide %(count)s of %(total)s"
 msgstr "Ir a la diapositiva %(count)s de %(total)s"
 
 #: themes/base/templates/layouts/error.html themes/ride/templates/layouts/error.html
+#: themes/ride/templates/layouts/error_display.html
 msgid "Go to the home page"
 msgstr "Ir a la página de inicio"
 
@@ -6908,7 +6909,7 @@ msgstr "Página %(page)s"
 msgid "Page %(page)s of %(count)s"
 msgstr "Página %(page)s de %(count)s"
 
-#: themes/base/templates/404.html
+#: themes/base/templates/404.html themes/ride/templates/404.html
 msgid "Page not found"
 msgstr "Página no encontrada"
 
@@ -8502,7 +8503,7 @@ msgstr "Buscar por nombre"
 msgid "Search by name, SKU, brand or vendor, then click the product."
 msgstr "Busque por nombre, SKU, marca o vendedor y después haga clic en el producto."
 
-#: themes/base/templates/components/search_form.html
+#: themes/base/templates/components/search_form.html themes/ride/templates/404.html
 msgid "Search products"
 msgstr "Buscar productos"
 
@@ -9136,7 +9137,7 @@ msgstr ""
 "con nosotros. Para continuar, abra este enlace, confirme su dirección de correo electrónico y "
 "elija una contraseña."
 
-#: themes/base/templates/500.html
+#: themes/base/templates/500.html themes/ride/templates/500.html
 msgid "Something went wrong"
 msgstr "Algo ha salido mal"
 
@@ -11339,7 +11340,7 @@ msgstr ""
 "El método de envío del paquete (%(method)s) no entrega en %(place)s, por lo que la dirección no "
 "puede cambiarse a ese destino."
 
-#: themes/base/templates/404.html
+#: themes/base/templates/404.html themes/ride/templates/404.html
 msgid "The page you asked for does not exist or has moved."
 msgstr "La página que ha solicitado no existe o se ha movido."
 
@@ -14256,7 +14257,7 @@ msgstr ""
 "No podemos cumplirlo, por ejemplo la mercancía no está disponible: la comisión de reembolso se "
 "cobra a la tienda"
 
-#: themes/base/templates/500.html
+#: themes/base/templates/500.html themes/ride/templates/500.html
 msgid "We could not complete your request. Please try again in a few minutes."
 msgstr "No hemos podido completar tu solicitud. Inténtalo de nuevo en unos minutos."
 

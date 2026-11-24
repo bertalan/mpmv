@@ -87,7 +87,9 @@ def test_the_page_passes_the_gates(
     page.add_init_script(RECORD_CSP_VIOLATIONS)
     page.set_viewport_size({"width": width, "height": 900})
     open_page(page, live_server, site, kind)
-    expect(page.locator("main .page-banner h1")).to_have_count(1)
+    # THM.30: the error pages lead with the error hero, every other page with the banner.
+    hero = ".error-hero" if kind in ("404", "500") else ".page-banner"
+    expect(page.locator(f"main {hero} h1")).to_have_count(1)
     expect(page.locator("h1")).to_have_count(1)
     assert page.evaluate(NO_SIDEWAYS_SCROLL), f"sideways scroll at {width}px"
     violations = run_axe(page)

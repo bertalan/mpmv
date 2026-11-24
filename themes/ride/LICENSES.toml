@@ -62,6 +62,17 @@ license = "CC0-1.0"
 files = ["images/edge-torn.svg", "images/texture-topo.svg"]
 
 [[asset]]
+name = "Ride error-page illustration"
+kind = "image"
+source = "https://github.com/bertalan/mpmv"
+author = "MPMV project"
+license = "CC0-1.0"
+# Our own work, drawn from scratch as plain paths (THM.30), no reference artwork: a winding road
+# with a dashed centre line under contour lines, as the full-bleed background of the 404 and 500
+# pages. Under 4 KB.
+files = ["images/error-road.svg"]
+
+[[asset]]
 name = "Social brand glyphs"
 kind = "image"
 source = "https://github.com/simple-icons/simple-icons/tree/13.0.0"
