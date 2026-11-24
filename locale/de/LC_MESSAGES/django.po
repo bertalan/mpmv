@@ -126,6 +126,12 @@ msgid_plural "%(counter)s items"
 msgstr[0] "%(counter)s Artikel"
 msgstr[1] "%(counter)s Artikel"
 
+#: apps/themes/admin_views.py
+msgid "%(counter)s pair fails."
+msgid_plural "%(counter)s pairs fail."
+msgstr[0] "%(counter)s Paar besteht nicht."
+msgstr[1] "%(counter)s Paare bestehen nicht."
+
 #: apps/catalog/templates/catalog/listing.html apps/catalog/templates/catalog/search.html
 #: themes/ride/templates/catalog/listing.html themes/ride/templates/catalog/search.html
 msgid "%(counter)s product"
@@ -1893,6 +1899,10 @@ msgstr "Saldo"
 msgid "Balance (EUR)"
 msgstr "Saldo (EUR)"
 
+#: apps/themes/admin_views.py
+msgid "Band"
+msgstr "Leiste"
+
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
 msgid "Based on a notice"
@@ -3296,6 +3306,10 @@ msgstr "Streitfälle"
 msgid "Do it once"
 msgstr "Einmal ausführen"
 
+#: apps/themes/admin_views.py
+msgid "Do not apply to a site"
+msgstr "Auf keiner Website anwenden"
+
 #: apps/manager/fitment_views.py
 msgid "Do not expect fitment"
 msgstr "Keine Fahrzeugzuordnung erwarten"
@@ -3699,6 +3713,10 @@ msgstr "Jeden Monat an einem Tag"
 msgid "Every other session has ended. The platform staff were told."
 msgstr "Alle anderen Sitzungen wurden beendet. Das Plattformpersonal wurde informiert."
 
+#: apps/themes/admin_views.py
+msgid "Every pair passes."
+msgstr "Alle Paare bestehen die Prüfung."
+
 #: apps/manager/session_views.py
 msgid "Every session of that account has ended."
 msgstr "Alle Sitzungen dieses Kontos wurden beendet."
@@ -3795,6 +3813,10 @@ msgstr "Tatsachen und Umstände"
 #: apps/compliance/templates/email/compliance/termination_notice/body.txt
 msgid "Facts and circumstances relied on"
 msgstr "Zugrunde gelegte Tatsachen und Umstände"
+
+#: apps/themes/admin_views.py
+msgid "Fail"
+msgstr "Nicht bestanden"
 
 #: apps/catalog/templates/catalog/admin/rendition_monitor.html
 msgid "Failed render jobs"
@@ -5726,6 +5748,10 @@ msgstr "Von dieser Person gibt es noch keine Artikel."
 msgid "No articles have been published yet."
 msgstr "Es wurden noch keine Artikel veröffentlicht."
 
+#: apps/themes/admin_views.py
+msgid "No base colour to change for this pair."
+msgstr "Für dieses Paar gibt es keine Grundfarbe zum Ändern."
+
 #: apps/manager/amendment_forms.py
 msgid "No change"
 msgstr "Keine Änderung"
@@ -5790,6 +5816,10 @@ msgstr "Kein Paket wartet auf eine Änderung."
 #: apps/manager/templates/manager/platform/orders.html
 msgid "No package was cancelled in this period."
 msgstr "In diesem Zeitraum wurde kein Paket storniert."
+
+#: apps/themes/admin_views.py
+msgid "No palette to start from."
+msgstr "Keine Palette zum Ausgehen."
 
 #: apps/accounts/mfa_views.py
 msgid "no passkey registered"
@@ -7007,9 +7037,25 @@ msgstr ""
 "Bezahlte, noch nicht versandte Pakete, die ältesten zuerst. Versandte und abgeschlossene Pakete "
 "finden Sie über die Bestellnummer oben."
 
+#: apps/themes/admin_views.py
+msgid "Palette %(name)s saved."
+msgstr "Palette %(name)s gespeichert."
+
+#: apps/themes/admin_views.py
+msgid "Palette builder"
+msgstr "Palettengenerator"
+
+#: apps/themes/admin_views.py
+msgid "Palette name"
+msgstr "Name der Palette"
+
 #: apps/orders/customer_views.py apps/orders/models.py
 msgid "Partly refunded"
 msgstr "Teilweise erstattet"
+
+#: apps/themes/admin_views.py
+msgid "Pass"
+msgstr "Bestanden"
 
 #: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
 #: apps/accounts/templates/accounts/mfa/setup.html
@@ -7630,6 +7676,10 @@ msgstr "Preis auf Anfrage"
 #: themes/ride/templates/orders/customer_order.html
 msgid "Price with VAT"
 msgstr "Preis inkl. MwSt."
+
+#: apps/themes/admin_views.py
+msgid "Primary"
+msgstr "Primär"
 
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Print"
@@ -8487,6 +8537,13 @@ msgstr "Block speichern"
 msgid "Save draft"
 msgstr "Entwurf speichern"
 
+#: apps/themes/admin_views.py
+msgid ""
+"Save is off while a pair fails. Use the suggested shade or pick another colour, then check again."
+msgstr ""
+"Speichern ist gesperrt, solange ein Paar durchfällt. Verwenden Sie den vorgeschlagenen Farbton "
+"oder wählen Sie eine andere Farbe und prüfen Sie dann erneut."
+
 #: apps/manager/templates/manager/shop/profile.html
 msgid "Save logo"
 msgstr "Logo speichern"
@@ -8590,6 +8647,10 @@ msgstr "Im Shop suchen"
 #: themes/ride/templates/catalog/search.html
 msgid "Search: %(query)s"
 msgstr "Suche: %(query)s"
+
+#: apps/themes/admin_views.py
+msgid "Secondary (accent)"
+msgstr "Sekundär (Akzent)"
 
 #: apps/accounts/templates/accounts/mfa/setup.html themes/base/templates/components/user_tools.html
 #: themes/ride/templates/accounts/mfa/setup.html
@@ -9271,6 +9332,10 @@ msgstr "Standardklausel zu anwendbarem Recht und Gerichtsstand"
 #: apps/manager/trust_views.py
 msgid "Stars from which a review is shown"
 msgstr "Sterne, ab denen eine Bewertung angezeigt wird"
+
+#: apps/themes/admin_views.py
+msgid "Start from"
+msgstr "Ausgehen von"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Start review"
@@ -14093,6 +14158,10 @@ msgstr "Wird hochgeladen …"
 msgid "Use a passkey"
 msgstr "Passkey verwenden"
 
+#: apps/themes/admin_views.py
+msgid "Use a six digit hex colour such as #C40417."
+msgstr "Verwenden Sie eine sechsstellige Hex-Farbe, zum Beispiel #C40417."
+
 #: apps/accounts/templates/accounts/mfa/setup.html themes/ride/templates/accounts/mfa/setup.html
 msgid "Use an authenticator app"
 msgstr "Authenticator-App verwenden"
@@ -14100,6 +14169,14 @@ msgstr "Authenticator-App verwenden"
 #: apps/manager/money_views.py
 msgid "Use dates like 2026-03-31. The period filter was ignored."
 msgstr "Verwenden Sie Daten wie 2026-03-31. Der Zeitraumfilter wurde ignoriert."
+
+#: apps/themes/admin_views.py
+msgid "Use letters or digits in the name."
+msgstr "Verwenden Sie Buchstaben oder Ziffern im Namen."
+
+#: apps/themes/admin_views.py
+msgid "Use on this site"
+msgstr "Auf dieser Website verwenden"
 
 #: apps/accounts/templates/accounts/mfa/verify.html themes/ride/templates/accounts/mfa/verify.html
 msgid "Use recovery code"
@@ -14112,6 +14189,10 @@ msgstr "Standardwert des Shops verwenden"
 #: apps/accounts/templates/accounts/mfa/setup.html themes/ride/templates/accounts/mfa/setup.html
 msgid "Use this device's screen lock or a security key."
 msgstr "Verwenden Sie die Bildschirmsperre dieses Geräts oder einen Sicherheitsschlüssel."
+
+#: apps/themes/admin_views.py
+msgid "Use this: %(colour)s for %(field)s"
+msgstr "Diese verwenden: %(colour)s für %(field)s"
 
 #: apps/manager/fitment_views.py apps/manager/templates/manager/platform/fitment_node.html
 msgid "Used by"
