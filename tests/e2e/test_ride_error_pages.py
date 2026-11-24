@@ -1,7 +1,8 @@
 """E2E (THM.30): the `ride` 404 and 500 pages, rendered with `DEBUG=False`.
 
-Baselines (THM.10 harness, theme `ride`, 375 and 1280 px) and the axe audit. The 500 page is
-reached through a test URLconf whose view raises; the project's own `handler500` answers.
+The 500 baseline (THM.10 harness, theme `ride`, 375 and 1280 px) and the axe audit of both
+pages. The 500 page is reached through a test URLconf whose view raises; the project's own
+`handler500` answers.
 """
 
 import pytest
@@ -51,11 +52,10 @@ def test_the_error_page_has_no_axe_violation(
     assert not violations, format_violations(violations)
 
 
-@pytest.mark.parametrize("name", PAGES)
-def test_the_error_page_matches_its_visual_baseline(
-    name: str, page: Page, live_server: LiveServer
-) -> None:
+def test_the_500_page_matches_its_visual_baseline(page: Page, live_server: LiveServer) -> None:
+    """The 404 baseline is `not-found` in `test_visual_baselines` (360, 768 and 1280 px)."""
     require_visual_mode()
+    name = "error-500"
     target, status = PAGES[name]
     page.emulate_media(reduced_motion="reduce")
     page.set_viewport_size({"width": 1280, "height": 900})
