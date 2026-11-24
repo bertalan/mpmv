@@ -106,6 +106,32 @@ def test_preview_uses_the_candidate_colours_through_the_generated_stylesheet(
     assert csp_violations(page) == []
 
 
+def test_a_failed_check_keeps_the_last_result_says_so_and_keeps_save_off(
+    page: Page, live_server: LiveServer
+) -> None:
+    open_builder(page, live_server)
+    rows = page.locator("#palette-pairs tbody tr")
+    expect(rows.first).to_be_visible()
+    count = rows.count()
+    page.route("**/palette/check/**", lambda route: route.abort())
+    type_colour(page, "#id_primary", "#0B5C7A")
+    expect(page.locator("#palette-failing")).to_contain_text("could not be reached")
+    expect(page.locator('button[value="save"]')).to_be_disabled()
+    expect(page.locator("#palette-save-reason")).to_contain_text("could not be reached")
+    assert rows.count() == count  # the last good list is still there
+    page.unroute("**/palette/check/**")
+    type_colour(page, "#id_primary", "#0B5C7A")
+    expect(page.locator("#palette-failing")).to_contain_text("Every pair passes")
+    expect(page.locator('button[value="save"]')).to_be_enabled()
+
+
+def test_the_colour_picker_has_a_label_from_the_server(page: Page, live_server: LiveServer) -> None:
+    open_builder(page, live_server)
+    expect(page.locator("#id_primary + input[type=color]")).to_have_attribute(
+        "aria-label", re.compile(r"Primary.*, colour picker")
+    )
+
+
 def test_builder_has_no_axe_violation_passing_and_failing(
     page: Page, live_server: LiveServer
 ) -> None:

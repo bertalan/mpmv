@@ -115,6 +115,8 @@ def _render(
             "failing": failing,
             "errors": errors,
             "base_roles": BASE_ROLES,
+            "picker_label": _("colour picker"),
+            "check_error": _("The check could not be reached. Save is off until it works again."),
             "check_url": reverse("themes_admin:palette_check"),
             "preview_url": reverse("themes_admin:palette_preview"),
         },

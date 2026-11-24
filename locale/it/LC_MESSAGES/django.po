@@ -2628,6 +2628,10 @@ msgstr "Raccolta"
 msgid "Colour"
 msgstr "Colore"
 
+#: apps/themes/admin_views.py
+msgid "colour picker"
+msgstr "selettore di colore"
+
 #: apps/events/templates/email/events/event_changes_requested/body.html
 #: apps/events/templates/email/events/event_changes_requested/body.txt
 msgid "Comment"
@@ -9894,6 +9898,11 @@ msgstr "La modifica è confermata e il vecchio logo è stato eliminato."
 #: apps/manager/views.py
 msgid "The change was reverted and the owners were told."
 msgstr "La modifica è stata annullata e i titolari sono stati avvisati."
+
+#: apps/themes/admin_views.py
+msgid "The check could not be reached. Save is off until it works again."
+msgstr ""
+"Il controllo non è raggiungibile. Il salvataggio resta disattivato finché non funziona di nuovo."
 
 #: apps/vendors/models.py
 msgid ""

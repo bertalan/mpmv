@@ -238,6 +238,8 @@ def test_the_page_loads_its_script_and_preview_container_without_inline_code(
     assert re.search(r'<script[^>]+src="[^"]*themes/palette-builder\.js"[^>]+nonce="[^"]+"', html)
     assert 'data-check-url="' in html
     assert 'data-preview-url="' in html
+    assert 'data-picker-label="colour picker"' in html
+    assert 'data-check-error="The check could not be reached.' in html
     assert 'class="palette-preview"' in html
     assert 'id="palette-preview-css"' in html
 

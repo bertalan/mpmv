@@ -2662,6 +2662,10 @@ msgstr "Sammlung"
 msgid "Colour"
 msgstr "Farbe"
 
+#: apps/themes/admin_views.py
+msgid "colour picker"
+msgstr "Farbwähler"
+
 #: apps/events/templates/email/events/event_changes_requested/body.html
 #: apps/events/templates/email/events/event_changes_requested/body.txt
 msgid "Comment"
@@ -5819,7 +5823,7 @@ msgstr "In diesem Zeitraum wurde kein Paket storniert."
 
 #: apps/themes/admin_views.py
 msgid "No palette to start from."
-msgstr "Keine Palette zum Ausgehen."
+msgstr "Keine Ausgangspalette."
 
 #: apps/accounts/mfa_views.py
 msgid "no passkey registered"
@@ -9335,7 +9339,7 @@ msgstr "Sterne, ab denen eine Bewertung angezeigt wird"
 
 #: apps/themes/admin_views.py
 msgid "Start from"
-msgstr "Ausgehen von"
+msgstr "Ausgangspalette"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Start review"
@@ -10000,6 +10004,10 @@ msgstr "Die Änderung ist bestätigt und das alte Logo wurde gelöscht."
 #: apps/manager/views.py
 msgid "The change was reverted and the owners were told."
 msgstr "Die Änderung wurde rückgängig gemacht und die Inhaber wurden informiert."
+
+#: apps/themes/admin_views.py
+msgid "The check could not be reached. Save is off until it works again."
+msgstr "Die Prüfung ist nicht erreichbar. Speichern bleibt gesperrt, bis sie wieder funktioniert."
 
 #: apps/vendors/models.py
 msgid ""

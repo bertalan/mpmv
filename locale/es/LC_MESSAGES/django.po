@@ -2628,6 +2628,10 @@ msgstr "Colección"
 msgid "Colour"
 msgstr "Color"
 
+#: apps/themes/admin_views.py
+msgid "colour picker"
+msgstr "selector de color"
+
 #: apps/events/templates/email/events/event_changes_requested/body.html
 #: apps/events/templates/email/events/event_changes_requested/body.txt
 msgid "Comment"
@@ -9903,6 +9907,11 @@ msgstr "El cambio está confirmado y el logotipo anterior se ha eliminado."
 #: apps/manager/views.py
 msgid "The change was reverted and the owners were told."
 msgstr "El cambio se ha revertido y se ha avisado a los titulares."
+
+#: apps/themes/admin_views.py
+msgid "The check could not be reached. Save is off until it works again."
+msgstr ""
+"No se puede acceder a la comprobación. El guardado sigue desactivado hasta que vuelva a funcionar."
 
 #: apps/vendors/models.py
 msgid ""

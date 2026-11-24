@@ -32,6 +32,16 @@ if (form && form.dataset.checkUrl) {
     return node;
   };
 
+  const showReason = (text) => {
+    if (!reason) {
+      reason = document.createElement("p");
+      reason.id = "palette-save-reason";
+      save.parentElement.append(reason);
+    }
+    reason.textContent = text;
+    save.setAttribute("aria-describedby", "palette-save-reason");
+  };
+
   const render = (data) => {
     body.replaceChildren(
       ...data.rows.map((row) => {
@@ -60,24 +70,31 @@ if (form && form.dataset.checkUrl) {
       save.removeAttribute("aria-describedby");
       if (reason) reason.textContent = "";
     } else {
-      if (!reason) {
-        reason = document.createElement("p");
-        reason.id = "palette-save-reason";
-        save.parentElement.append(reason);
-      }
-      reason.textContent = data.reason;
-      save.setAttribute("aria-describedby", "palette-save-reason");
+      showReason(data.reason);
     }
+  };
+
+  // The check is out of reach: keep the last good pair list, say so in the live region and keep
+  // Save off, because the colours in the fields are no longer the ones that were checked.
+  const fail = () => {
+    summary.textContent = form.dataset.checkError;
+    save.disabled = true;
+    showReason(form.dataset.checkError);
   };
 
   const refresh = async () => {
     const mine = ++serial;
     const params = query();
     if (roles.some((r) => params.get(r) && !hex.test(params.get(r)))) return; // still typing
-    const response = await fetch(`${form.dataset.checkUrl}?${params}`, { credentials: "same-origin" });
-    if (!response.ok || mine !== serial) return; // a newer change has already been asked
-    render(await response.json());
-    link.href = `${form.dataset.previewUrl}?${params}`;
+    try {
+      const response = await fetch(`${form.dataset.checkUrl}?${params}`, { credentials: "same-origin" });
+      if (mine !== serial) return; // a newer change has already been asked
+      if (!response.ok) throw new Error(String(response.status));
+      render(await response.json());
+      link.href = `${form.dataset.previewUrl}?${params}`;
+    } catch (error) {
+      if (mine === serial) fail();
+    }
   };
 
   const schedule = () => {
@@ -91,7 +108,7 @@ if (form && form.dataset.checkUrl) {
     const picker = document.createElement("input");
     picker.type = "color";
     picker.className = "palette-picker";
-    picker.setAttribute("aria-label", `${document.querySelector(`label[for="id_${role}"]`).textContent.trim()} (picker)`);
+    picker.setAttribute("aria-label", `${document.querySelector(`label[for="id_${role}"]`).textContent.trim()}, ${form.dataset.pickerLabel}`);
     picker.value = hex.test(text.value) ? text.value.toLowerCase() : "#000000";
     text.after(picker);
     picker.addEventListener("input", () => {

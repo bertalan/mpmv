@@ -29,7 +29,7 @@
     </div>
   {% endif %}
 
-  <form method="post" action="{% url 'themes_admin:palette_builder' %}" id="palette-builder" data-check-url="{{ check_url }}" data-preview-url="{{ preview_url }}">
+  <form method="post" action="{% url 'themes_admin:palette_builder' %}" id="palette-builder" data-picker-label="{{ picker_label }}" data-check-error="{{ check_error }}" data-check-url="{{ check_url }}" data-preview-url="{{ preview_url }}">
     {% csrf_token %}
     <input type="hidden" name="start" value="{{ form.start.value }}">
     {% for field in form %}
