@@ -60,3 +60,15 @@ def test_a_value_that_is_not_a_colour_is_an_error() -> None:
 
 def test_a_passing_pair_has_no_suggestion() -> None:
     assert all(r.suggestion is None for r in build_report({}, START).rows if r.result.passes)
+
+
+def test_preview_css_scopes_every_palette_token_to_the_preview_container() -> None:
+    from apps.themes.builder import preview_css
+
+    css = preview_css(build_report({"primary": "#0B5C7A"}, START).palette)
+    assert css.startswith(".palette-preview{")
+    assert "--color-accent:#0B5C7A" in css
+    assert "--color-link:#0B5C7A" in css
+    assert ":root" not in css
+    assert "<" not in css
+    assert "@import" not in css

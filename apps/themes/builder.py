@@ -8,8 +8,8 @@ for a failing pair the nearest compliant shade of the base colour that can move.
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
-from .engine import derive_palette, nearest_compliant
-from .palettes import PairResult, pair_report
+from .engine import css_name, derive_palette, nearest_compliant
+from .palettes import PairResult, pair_report, palette_tokens
 
 BASE_ROLES = ("primary", "secondary", "band")
 
@@ -67,3 +67,12 @@ def build_report(
     palette = derive_palette(base, start=start, surfaces=surfaces)
     rows = [PairRow(r, suggest(r, palette)) for r in pair_report(palette, surfaces)]
     return BuilderReport(palette, rows)
+
+
+def preview_css(palette: Mapping[str, str]) -> str:
+    """The stylesheet of the live preview: the palette's custom properties on `.palette-preview`
+    only, so the candidate colours never touch the admin around it. Every value is a validated
+    hex colour (`derive_palette`), so nothing a user typed reaches the CSS as anything else."""
+    tokens = palette_tokens(palette)
+    body = ";".join(f"{css_name(name)}:{tokens[name]}" for name in sorted(tokens))
+    return f".palette-preview{{{body}}}\n"

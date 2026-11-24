@@ -11,7 +11,11 @@ from . import admin_views
 
 @hooks.register("register_admin_urls")  # type: ignore[untyped-decorator]
 def themes_admin_urls() -> list[URLPattern | URLResolver]:
-    patterns = [path("palette/", admin_views.palette_builder, name="palette_builder")]
+    patterns = [
+        path("palette/", admin_views.palette_builder, name="palette_builder"),
+        path("palette/check/", admin_views.palette_check, name="palette_check"),
+        path("palette/preview.css", admin_views.palette_preview, name="palette_preview"),
+    ]
     return [path("themes/", include((patterns, "themes_admin"), namespace="themes_admin"))]
 
 
