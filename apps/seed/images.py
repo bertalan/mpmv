@@ -19,8 +19,9 @@ def _shade(colour: tuple[int, int, int], factor: float) -> tuple[int, int, int]:
     return (r, g, b)
 
 
-def placeholder_webp(key: str, colour: tuple[int, int, int]) -> bytes:
-    """A 1200x675 WebP of soft circles and bands on `colour`, the same for the same `key`."""
+def placeholder_webp(key: str, colour: tuple[int, int, int], *, scale: float = 1.0) -> bytes:
+    """A 1200x675 WebP (times `scale`) of soft circles and bands on `colour`, the same for the
+    same `key` and scale."""
     rng = random.Random(zlib.crc32(key.encode()))  # noqa: S311 - drawing, not security
     image = Image.new("RGB", (WIDTH, HEIGHT), _shade(colour, 1.15))
     draw = ImageDraw.Draw(image)
@@ -36,6 +37,8 @@ def placeholder_webp(key: str, colour: tuple[int, int, int]) -> bytes:
         )
     draw.rectangle((40, HEIGHT - 110, 420, HEIGHT - 40), fill=(255, 255, 255))
     draw.rectangle((60, HEIGHT - 90, 400, HEIGHT - 60), fill=_shade(colour, 0.7))
+    if scale != 1.0:
+        image = image.resize((round(WIDTH * scale), round(HEIGHT * scale)))
     buffer = io.BytesIO()
     image.save(buffer, format="WEBP", quality=80, method=4)
     return buffer.getvalue()

@@ -95,6 +95,7 @@ pill = "999px"
 round = "50%"
 
 [shadow]
+card-hover = "0 8px 20px color-mix(in srgb, var(--color-overlay) 18%, transparent)"
 button-hover = "0 6px 16px color-mix(in srgb, var(--color-accent) 28%, transparent)"
 
 # Image overlay scrim (THM.20): `opacity` is the strong end (hero, tiles), `soft` the light one.

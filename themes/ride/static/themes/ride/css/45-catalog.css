@@ -31,15 +31,18 @@
     float: none;
   }
 
-  .product-card .card-title a {
-    color: inherit;
-    text-decoration: none;
+  /* THM.25: the card sits on its own light surface (`surface-light` sets background, text, link
+     and focus colours, so nothing depends on the section around it). Image first, then title,
+     vendor line and price block; the title link is the one target (`stretched-link`). */
+  .product-card {
+    overflow: hidden;
+    border-color: var(--color-border);
+    border-radius: var(--radius-card);
   }
 
-  .product-card .card-title a:hover,
-  .product-card .card-title a:focus-visible {
-    color: var(--color-accent);
-    text-decoration: underline;
+  .product-card__media {
+    overflow: hidden;
+    background-color: var(--color-surface-sunken);
   }
 
   .product-card .card-img-top {
@@ -47,11 +50,60 @@
     block-size: auto;
     aspect-ratio: 1;
     object-fit: cover;
+    border-radius: 0;
+  }
+
+  .product-card .card-title a {
+    color: var(--s-heading);
+    text-decoration: none;
+  }
+
+  .product-card .card-title a:hover,
+  .product-card .card-title a:focus-visible {
+    color: var(--s-link);
+    text-decoration: underline;
   }
 
   .product-card:has(a:focus-visible) {
-    outline: var(--focus-width) solid var(--color-focus);
+    outline: var(--focus-width) solid var(--s-focus);
     outline-offset: var(--focus-offset);
+  }
+
+  .product-card-vendor {
+    margin-block-end: var(--space-xs);
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+  }
+
+  /* The price block: the amount large, the owner's indicative-price note small under it. */
+  .product-card-price {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 var(--space-xs);
+    color: var(--s-heading);
+    font-family: var(--font-display);
+    font-size: var(--step-1);
+    font-weight: 700;
+  }
+
+  .product-card-price .price-note {
+    flex-basis: 100%;
+    color: var(--color-text-muted);
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    font-weight: 400;
+  }
+
+  /* THM.25: the filter column is a card on the light surface. */
+  .listing-filters.card {
+    border-color: var(--color-border);
+    border-radius: var(--radius-card);
+  }
+
+  .listing-filters a:focus-visible,
+  .listing-filters :focus-visible {
+    outline-color: var(--s-focus);
   }
 
   /* WCAG 2.5.8: a page link is at least 44 px (24 px is the floor). */
@@ -98,6 +150,20 @@
     min-block-size: 2.75rem;
   }
 
+
+  /* The hover lift: only for a visitor with no motion preference. */
+  @media (prefers-reduced-motion: no-preference) {
+    .product-card {
+      transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease;
+    }
+
+    .product-card:hover {
+      transform: translateY(-0.25rem);
+      box-shadow: var(--shadow-card-hover);
+    }
+  }
 
   @media (prefers-reduced-motion: reduce) {
     .product-card,

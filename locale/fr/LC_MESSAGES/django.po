@@ -9129,6 +9129,7 @@ msgstr "Vendu par %(name)s"
 
 #: apps/catalog/templates/catalog/includes/other_sellers.html
 #: themes/ride/templates/catalog/includes/other_sellers.html
+#: themes/ride/templates/catalog/includes/product_card.html
 msgid "Sold by %(seller)s"
 msgstr "Vendu par %(seller)s"
 

@@ -41,6 +41,7 @@ from wagtail.models import Locale
 
 from apps.accounts.models import User
 from apps.catalog import engine as catalog_engine
+from apps.catalog import media
 from apps.catalog import services as catalog_services
 from apps.catalog.attributes import (
     Attribute,
@@ -78,6 +79,7 @@ from apps.core.services import (
 from apps.core.site_root import sync_default_site
 from apps.core.site_url import absolute_url
 from apps.core.text import slugify
+from apps.core.validity import NoValidRow
 from apps.events.models import EventIndexPage, EventPage
 from apps.events.services import ensure_event_indexes
 from apps.payments import connect as payments_connect
@@ -92,7 +94,7 @@ from apps.shipping.models import (
 )
 from apps.shipping.services import delete_config, save_config
 from apps.tax import services as tax_services
-from apps.tax.models import TaxRate, VendorTaxProfile
+from apps.tax.models import TaxRate, VendorTaxProfile, VendorTaxProfileTranslation
 from apps.vendors import engine as vendors_engine
 from apps.vendors import services as vendors_services
 from apps.vendors import terms_services
@@ -106,7 +108,7 @@ from apps.vendors.models import (
     VendorTranslation,
 )
 
-from . import data
+from . import data, demo_home, demo_pages
 from .images import placeholder_webp
 
 PUBLISHED = translations.PUBLISHED
@@ -191,6 +193,7 @@ def seed(*, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
         for vendor, spec in zip(vendors, data.VENDORS, strict=True):
             _sales_terms(run, vendor, spec)
             _products(run, vendor, spec, catalog)
+            _product_images(run, vendor, spec)
             _shipping(run, vendor, spec)
         images = _images(run)
         _cms(run, images, vendors)
@@ -208,6 +211,7 @@ def reset(*, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
         _reset_cms(run)
         for vendor in vendors:
             _reset_vendor(run, vendor)
+        _reset_product_images(run)
         _reset_catalog_structure(run)
         _reset_carriers(run)
     return run.changes
@@ -353,6 +357,11 @@ def _platform(run: _Run) -> None:
             tax_regime=PlatformOperator.TaxRegime.STANDARD,
             commission_vat_mode=PlatformOperator.CommissionVatMode.STANDARD,
             dac7_authority_country=data.ITALY,
+            support_email=demo_pages.SUPPORT_EMAIL,
+            authority_contact_email=demo_pages.AUTHORITY_EMAIL,
+            authority_contact_languages=demo_pages.contact_languages(),
+            user_contact_url=demo_pages.USER_CONTACT_URL,
+            user_contact_languages=demo_pages.contact_languages(),
             valid_from=data.SEED_EPOCH,
         )
         run.add(configure_platform_operator(operator, ctx=run.ctx))
@@ -438,6 +447,35 @@ def _tax_rates(run: _Run) -> None:
                 valid_from=data.SEED_EPOCH,
             )
             run.add(tax_services.configure_tax_rate(new, ctx=run.ctx))
+
+
+def _tax_legal_notes(run: _Run, vendor: Vendor, spec: data.VendorSeed) -> None:
+    """The legal note of the vendor's current tax profile, in each language that misses one.
+
+    An `other` exemption without a note decides no VAT (TAX.13), so the shop would show its
+    products without a consumer price (TAX.12, ORD.19). Only the seed's own regime gets a note,
+    and an existing note is never changed: staff may have reworded it.
+    """
+    if not spec.legal_note:
+        return
+    try:
+        profile = tax_services.current_tax_profile(vendor)
+    except NoValidRow:
+        return
+    seeded = (spec.vat_regime, spec.exempt_reason, spec.exempt_country)
+    if (profile.regime, profile.exempt_reason, profile.exempt_country) != seeded:
+        return
+    present = set(profile.translations.values_list("language", flat=True))
+    for language in _stored_languages(spec.legal_note):
+        if language in present:
+            continue
+        note = VendorTaxProfileTranslation(
+            profile=profile,
+            language=language,
+            status=PUBLISHED,
+            legal_note=_text(spec.legal_note, language),
+        )
+        run.add(tax_services.save_legal_note(note, ctx=run.ctx))
 
 
 # --- Catalog structure: attributes, categories, a landing taxonomy, brands
@@ -758,6 +796,7 @@ def _vendor(run: _Run, index: int, spec: data.VendorSeed, contract: VendorContra
         run.add(
             tax_services.configure_vendor_tax_profile(profile, approver=_operator(run), ctx=run.ctx)
         )
+    _tax_legal_notes(run, vendor, spec)
 
     if spec.payout_account:
         run.add(payments_connect.record_demo_account(vendor, number=index + 1, ctx=run.ctx))
@@ -899,6 +938,50 @@ def _products(run: _Run, vendor: Vendor, spec: data.VendorSeed, catalog: _Catalo
                     product, price_net=item.price, sale_price_net=item.sale_price, ctx=run.ctx
                 )
             )
+
+
+def _product_images(run: _Run, vendor: Vendor, spec: data.VendorSeed) -> None:
+    """THM.23: a generated image for every seeded product that has none (placeholder shapes, no
+    download), through the CAT.4 upload service; the first one is the cover."""
+    licence = ImageLicence.objects.get(code=OWN_WORK_LICENCE)
+    for item in data.PRODUCTS[spec.letter]:
+        sku = f"{spec.sku_prefix}-{item.code}"
+        product = Product.objects.filter(vendor=vendor, sku=sku).first()
+        title = f"{data.PRODUCT_IMAGE_PREFIX}{sku}"
+        # A product with an image, or whose generated image an editor removed (the library entry
+        # stays), is left alone.
+        if (
+            product is None
+            or product.images.exists()
+            or MediaImage.objects.filter(title=title, author=data.IMAGE_AUTHOR).exists()
+        ):
+            continue
+        content = placeholder_webp(sku, data.product_image_colour(sku), scale=0.5)
+        run.add(
+            media.upload_image(
+                product,
+                file=ImageFile(_named_bytes(content), name=f"demo-{sku.lower()}.webp"),
+                title=title,
+                licence=licence,
+                author=data.IMAGE_AUTHOR,
+                alt_text=_text(item.title, _source()),
+                ctx=run.ctx,
+            )
+        )
+        row = product.images.get()
+        run.files.append(row.image.file.name)
+        run.add(media.set_cover(row, automatic=True, ctx=run.ctx))
+
+
+def _reset_product_images(run: _Run) -> None:
+    """Delete the library entries of the generated product images (their products are gone)."""
+    images = MediaImage.objects.filter(
+        title__startswith=data.PRODUCT_IMAGE_PREFIX, author=data.IMAGE_AUTHOR
+    )
+    for image in images:
+        if not image.product_images.exists():
+            run.changes.delete("core.mediaimage", image.title, {})
+            image.delete()
 
 
 # --- Shipping: carriers, then each vendor's zones and methods as a configuration file
@@ -1096,42 +1179,6 @@ def _set_body(page: Any, body: list[Any]) -> bool:
     return bool(_stripped(page.body.get_prep_value()) != before)
 
 
-def _shop_body(
-    language: str, images: dict[str, MediaImage], how: Any, vendors: list[Vendor], terms: list[Term]
-) -> list[Any]:
-    """The demo shop page: the product content the home showed before CMS.19."""
-    heading, text, label = _pick(data.HOME_HERO, language)
-    return [
-        (
-            "hero",
-            {
-                "heading": heading,
-                "text": text,
-                "image": images["home-hero"],
-                "alt_text": _text(data.HOME_HERO_ALT, language),
-                "links": [{"page": how, "url": "", "label": label}],
-            },
-        ),
-        ("paragraph", _text(data.DEMO_NOTICE, language)),
-        (
-            "featured",
-            {
-                "heading": _text(data.HOME_FEATURED, language),
-                "cards": [("term", {"term": term, "label": "", "text": ""}) for term in terms],
-            },
-        ),
-        (
-            "featured",
-            {
-                "heading": _text(data.HOME_VENDORS, language),
-                "cards": [
-                    ("vendor", {"vendor": vendor, "label": "", "text": ""}) for vendor in vendors
-                ],
-            },
-        ),
-    ]
-
-
 def _landing_body(images: dict[str, MediaImage], shop: StandardPage) -> list[Any]:
     """The vendor-recruitment home (CMS.19): English example copy, existing blocks only."""
     apply_url = absolute_url(None, reverse("vendors:apply"))  # a full URL, as the link block asks
@@ -1240,11 +1287,27 @@ def _cms(run: _Run, images: dict[str, MediaImage], vendors: list[Vendor]) -> Non
         for node in data.TERMS
     ]
 
+    blog, posts = demo_home.seed_blog(run, home, locales, images)
+
     def shop_body(language: str) -> list[Any]:
-        local_how = how.get_translation_or_none(locales[language]) or how
-        return _shop_body(language, images, local_how, vendors, terms)
+        locale = locales[language]
+        return demo_home.shop_home_body(
+            language,
+            images,
+            how=how.get_translation_or_none(locale) or how,
+            blog=blog.get_translation_or_none(locale) or blog,
+            posts=[post.get_translation_or_none(locale) or post for post in posts],
+            vendors=vendors,
+            term=terms[0],
+            notice=_text(data.DEMO_NOTICE, language),
+        )
 
     shop = _standard_page(run, home, locales, images["home-hero"], data.SHOP, shop_body)
+    demo_pages.seed_about(run, locales, images)
+    contact = _standard_page(
+        run, home, locales, images["how-it-works"], demo_pages.CONTACT, demo_pages.contact_body
+    )
+    demo_home.seed_navigation(run, locales, [("shop", shop), ("blog", blog)], contact)
     _recruitment_home(run, home, images, shop)
 
 
@@ -1478,6 +1541,13 @@ def _reset_cms(run: _Run) -> None:
     ):
         run.changes.delete("cms.standardpage", page.url_path, {})
         page.delete()
+    # The Contact page is removed only while it still has the seed's text: an editor's page that
+    # happens to use the slug stays.
+    for page in _seed_pages(StandardPage, [_text(demo_pages.CONTACT.slug, _source())]):
+        if demo_pages.is_seed_contact(page):
+            demo_home.remove_contact_entries({page.pk})
+            run.changes.delete("cms.standardpage", page.url_path, {})
+            page.delete()
     for page in _seed_pages(
         LegalPage, [_text(spec.slug, _source()) for spec in data.LEGAL_PAGES.values()]
     ):

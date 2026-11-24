@@ -1,5 +1,6 @@
 {% load i18n %}{# The filter form of a listing (CAT.8) of `ride` (THM.7): a GET form on the page's own URL on Bootstrap form classes, no JavaScript. #}
-<section class="listing-filters" aria-labelledby="listing-filters-heading">
+<section class="listing-filters card surface-light" aria-labelledby="listing-filters-heading">
+  <div class="card-body">
   <h2 id="listing-filters-heading" class="h5">{% translate "Filters" %}</h2>
   <form method="get" action="{{ location }}" role="search" aria-labelledby="listing-filters-heading">
     {# Applied filters with no control below (the category, a term not offered): a GET form replaces the whole query. #}
@@ -35,4 +36,5 @@
     {% endif %}
     <button type="submit" class="btn btn-primary">{% translate "Apply filters" %}</button>
   </form>
+  </div>
 </section>
