@@ -80,6 +80,7 @@ SCOPES = (
     "apps/vendors/forms.py",  # the application and confirm forms (VEN.22)
     "apps/vendors/templates/vendors/claim",  # the vendor claim pages (I18N.10 follow-up)
     "apps/vendors/views.py",  # the claim page refusals
+    "apps/themes/admin_views.py",  # the palette builder page and its live check (THM.34)
     "themes/base/templates/layouts",
     "themes/ride/templates/components/header.html",  # the Bootstrap navbar and offcanvas (THM.15)
     "themes/ride/templates/components/footer.html",  # social nav label, back to top (THM.15)

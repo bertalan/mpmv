@@ -1,5 +1,7 @@
 {% extends "wagtailadmin/generic/base.html" %}
-{% load i18n wagtailadmin_tags %}
+{% load i18n static wagtailadmin_tags %}
+{% block extra_css %}{{ block.super }}<link rel="stylesheet" href="{% static 'themes/palette-builder.css' %}">{% endblock %}
+{% block extra_js %}{{ block.super }}<script src="{% static 'themes/palette-builder.js' %}" nonce="{{ csp_nonce }}" defer></script>{% endblock %}
 {% block main_content %}
   <p>{% blocktranslate %}Choose up to three base colours. Every other colour is derived from them, and every pair of text and background is checked against the contrast minimums of WCAG 2.2 AA. A palette that fails a pair cannot be saved.{% endblocktranslate %}</p>
 
@@ -27,7 +29,7 @@
     </div>
   {% endif %}
 
-  <form method="post" action="{% url 'themes_admin:palette_builder' %}" id="palette-builder">
+  <form method="post" action="{% url 'themes_admin:palette_builder' %}" id="palette-builder" data-picker-label="{{ picker_label }}" data-check-error="{{ check_error }}" data-check-url="{{ check_url }}" data-preview-url="{{ preview_url }}">
     {% csrf_token %}
     <input type="hidden" name="start" value="{{ form.start.value }}">
     {% for field in form %}
@@ -73,6 +75,17 @@
         </tbody>
       </table>
     {% endif %}
+
+    <h2>{% translate "Preview" %}</h2>
+    <link rel="stylesheet" id="palette-preview-css" href="{{ preview_url }}?start={{ form.start.value|urlencode }}">
+    <div class="palette-preview" id="palette-preview" hidden>
+      <div class="pp-band"><span>{% translate "Menu on the band" %}</span><a href="#palette-preview">{% translate "Shop" %}</a><a href="#palette-preview">{% translate "Events" %}</a></div>
+      <div class="pp-body">
+        <p>{% translate "Body text with a" %} <a class="pp-link" href="#palette-preview">{% translate "link" %}</a>.</p>
+        <p><button class="pp-button" type="button">{% translate "Primary button" %}</button></p>
+        <div class="pp-card"><span>{% translate "Product card" %}</span><span class="pp-price">€ 49,00</span><span class="pp-badge">{% translate "New" %}</span></div>
+      </div>
+    </div>
 
     <div>
       <button class="button button-secondary" type="submit" name="action" value="check">{% translate "Check contrast" %}</button>
