@@ -165,12 +165,14 @@ def test_listing_cards_are_wide_with_the_placeholder_in_the_image_box(
         page.goto(f"{live_server.url}{path}")
         cards = page.evaluate(CARD_BOXES, ".product-card")
         assert cards, path
+        # THM.26: the related products are one horizontally scrolling strip, not a wrapping grid.
+        strip = page.locator(".product-strip").count() > 0
         for card in cards:
             # At least 15rem (240 px) on a wide screen; on a phone full width or two in a row.
             floor = 240 if width == 1280 else (width - 2 * 16 - 24) / 2
             assert card["width"] >= floor, (path, card)
             assert card["image"] >= card["width"] - 4, (path, card)  # the image fills the card
-        if width == 375:
+        if width == 375 and not strip:
             tops = [card["top"] for card in cards]
             assert max(sum(1 for t in tops if abs(t - top) < 1) for top in tops) <= 2, path
         placeholders = page.locator(".product-card img.product-card-placeholder")

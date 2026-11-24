@@ -167,6 +167,16 @@ SCOPES = (
     # The ride 404 and 500 pages (THM.30): the same msgids as base's.
     "themes/ride/templates/404.html",
     "themes/ride/templates/500.html",
+    # Admin, editor and Manager-login templates (I18N.20 part 3b, slice 4): what staff and vendors
+    # see in the brand merge, the image lists, the render monitor, the events moderation screens,
+    # the ride Manager login and the error page. Formal register.
+    "apps/catalog/templates/admin",
+    "apps/catalog/templates/catalog/admin",
+    "apps/cms/templates/cms/admin/image_review.html",
+    "apps/cms/templates/cms/admin/content_snippet_confirm_delete.html",
+    "apps/events/templates/events/admin",
+    "themes/ride/templates/manager",
+    "themes/ride/templates/layouts",
 )
 # Single storefront modules whose strings the Manager texts quote (shop policy headings).
 EXTRA_FILES = (

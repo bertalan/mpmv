@@ -29,7 +29,7 @@ from apps.core.models import AuditLog
 from apps.core.tests.factories import utc
 from apps.events.models import EventPage
 from apps.payments.models import ConnectedAccount
-from apps.seed import data
+from apps.seed import data, demo_home
 from apps.seed.apps import check_not_allowed_on_live
 from apps.seed.services import (
     TEST_CONTEXT,
@@ -224,12 +224,24 @@ def test_the_command_reports_the_changes_and_the_time() -> None:
     assert lines[-1].startswith("0 changes changed in ")
 
 
+def _shop_slug(language: str) -> str:
+    return data.SHOP.slug.get(language) or data.SHOP.slug["en"]
+
+
+def _shop_heading(language: str) -> str:
+    """The demo shop page's hero heading, as the seed writes it (THM.23)."""
+    return demo_home.pick(demo_home.HERO["heading"], language)
+
+
 STOREFRONT = (
     ("/", data.LANDING_HERO[0]),  # CMS.19: English example content in every language
     (f"{language_prefix(other_language())}/", data.LANDING_HERO[0]),
     (f"{language_prefix(third_language())}/", data.LANDING_HERO[0]),
-    ("/demo-shop/", "Made by independent makers"),
-    (f"{language_prefix(other_language())}/demo-negozio/", "Fatto da artigiani indipendenti"),
+    (f"/{_shop_slug(primary_language())}/", _shop_heading(primary_language())),
+    (
+        f"{language_prefix(other_language())}/{_shop_slug(other_language())}/",
+        _shop_heading(other_language()),
+    ),
     (localized("/product-category/demo-home-kitchen/"), "Stoneware dinner plate"),
     (
         localized("/product-category/demo-casa-e-cucina/", other_language()),

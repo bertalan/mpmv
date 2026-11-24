@@ -41,27 +41,79 @@
     font-weight: 700;
   }
 
-  .product-buy .card {
-    background: var(--color-surface);
+  /* THM.26: gallery and buy box are cards; large price; variants as pills; the related products
+     are one scrolling strip. */
+  .product-buy .card,
+  .product-gallery-card {
+    background: var(--s-bg);
     border-color: var(--color-border);
+    border-radius: var(--radius-card);
+  }
+
+  .product-meta {
+    margin-block-end: var(--space-s);
   }
 
   .product-price {
-    font-family: var(--font-display);
+    font: 700 clamp(1.75rem, 5vw, 2.25rem) / 1.2 var(--font-display);
     color: var(--color-heading);
   }
 
-  .product-variants .form-check {
-    min-block-size: var(--target-primary);
+  .product-pills ul {
     display: flex;
-    align-items: center;
+    flex-wrap: wrap;
     gap: var(--space-xs);
   }
 
-  .product-variants .form-check-input {
-    float: none;
+  .product-pills .form-check {
+    position: relative;
+    min-block-size: var(--target-primary);
+    padding: 0;
+  }
+
+  .product-pills .form-check-input {
+    position: absolute;
+    inset: 0;
     margin: 0;
-    flex: none;
+    opacity: 0;
+  }
+
+  .product-pills label {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    block-size: 100%;
+    padding: var(--space-xs) var(--space-m);
+    border: 2px solid var(--color-border-control); /* the radio is invisible: 3:1 (WCAG 1.4.11) */
+    border-radius: var(--radius-control); /* a pill radius cuts into wrapped lines */
+  }
+
+  .product-pills :checked + label {
+    border-color: var(--color-accent);
+  }
+
+  .product-pills :focus-visible + label {
+    outline: var(--focus-width) solid var(--s-focus);
+    outline-offset: var(--focus-offset);
+  }
+
+  @media (max-width: 40rem) {
+    .product-form .btn-primary {
+      flex: 1 1 100%;
+    }
+  }
+
+  .product-related .product-strip.row {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+  }
+
+  .product-related .product-strip > li {
+    flex: 0 0 min(16rem, 70%);
+    width: auto;
+    scroll-snap-align: start;
   }
 
   /* CAT.23: the variant's own picture in the list (CAT.26: its gallery replaces the product's) */

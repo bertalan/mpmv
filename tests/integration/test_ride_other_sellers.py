@@ -42,7 +42,7 @@ def test_the_ride_block_renders_cards_with_the_seller_name() -> None:
             "catalog/includes/other_sellers.html", {"other_sellers": cards, "currency": "EUR"}
         )
     assert "product-other-sellers" in html
-    assert 'class="product-card card h-100"' in html  # the ride card, not the base one
+    assert 'class="product-card card h-100 surface-light"' in html
     assert "Mug B" in html
     assert "Shop Mug B" in html
     assert "Mug A" not in html
