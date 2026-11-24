@@ -15,6 +15,7 @@ from apps.core.i18n import primary_language
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import csp_violations
 from tests.e2e.test_ride_home import _ride_home, open_home  # noqa: F401 (autouse fixture)
+from tests.e2e.visual import assert_matches_baseline, require_visual_mode
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -92,3 +93,15 @@ def test_no_gap_between_two_sections_is_above_the_section_token(
     )
     assert gaps["gaps"], "the home has at least two sections"
     assert all(0 <= gap <= gaps["limit"] + 1 for gap in gaps["gaps"]), gaps
+
+
+@pytest.mark.parametrize("width", [375, 1280])
+def test_the_home_sections_match_their_visual_baseline(
+    width: int, page: Page, live_server: LiveServer
+) -> None:
+    require_visual_mode()
+    open_home(page, live_server, width, 900)
+    page.evaluate("document.querySelector('#consent-banner')?.remove()")
+    assert_matches_baseline(
+        page, theme="ride", name="home-layout", width=width, selector=".site-main"
+    )
