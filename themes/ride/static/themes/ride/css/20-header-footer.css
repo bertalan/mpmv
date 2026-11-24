@@ -477,3 +477,95 @@
     }
   }
 }
+
+/* Language menu (THM.35): a compact toggle (globe, current endonym, chevron) and a disclosure list.
+   The list is a light panel that sets its own text colour (the rule at the top of this file); it
+   sits under the toggle from 64rem and in the flow inside the menu drawer. Without JavaScript
+   (html.no-js) the toggle is hidden and the list is shown expanded. The flag's 1 px outline is the
+   control-border token, at least 3:1 on the dark band and on the light surface of every palette. */
+@layer overrides {
+  .language-menu {
+    position: relative;
+  }
+
+  .language-menu__toggle,
+  .site-header .language-menu__item {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    min-block-size: var(--target-primary);
+    padding: 0 var(--space-s);
+    border: 1px solid currentcolor;
+    border-radius: var(--radius-control);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .language-menu__toggle[aria-expanded="true"] .icon:last-child {
+    transform: rotate(180deg);
+  }
+
+  .language-menu__list {
+    display: none;
+    position: absolute;
+    inset-block-start: calc(100% + var(--space-xs));
+    inset-inline-end: 0;
+    z-index: 10;
+    min-inline-size: 12rem;
+    margin: 0;
+    padding: var(--space-xs);
+    list-style: none;
+    border: 1px solid var(--color-border-control);
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-raised);
+  }
+
+  .language-menu.is-open .language-menu__list,
+  html.no-js .language-menu__list {
+    display: block;
+  }
+
+  html.no-js .language-menu__toggle {
+    display: none;
+  }
+
+  html.no-js .language-menu__list {
+    position: static;
+  }
+
+  .language-menu form {
+    margin: 0;
+  }
+
+  .site-header .language-menu__list .language-menu__item {
+    inline-size: 100%;
+    border-color: transparent;
+    color: var(--color-text);
+  }
+
+  .site-header .language-menu__list .language-menu__item:hover:not(:disabled) {
+    background: var(--color-accent-tint);
+  }
+
+  .language-menu__item[aria-current="true"] {
+    font-weight: 700;
+  }
+
+  .language-menu__flag {
+    inline-size: 1.5rem;
+    block-size: 1rem;
+    outline: 1px solid var(--color-border-control);
+    outline-offset: -1px;
+  }
+
+  @media (width < 64rem) {
+    .site-header__more .language-menu__list {
+      position: static;
+      margin-block-start: var(--space-xs);
+      box-shadow: none;
+    }
+  }
+}
