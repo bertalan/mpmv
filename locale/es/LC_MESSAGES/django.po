@@ -4993,6 +4993,7 @@ msgstr "Etiqueta"
 #: apps/manager/templates/manager/platform/product.html
 #: apps/manager/templates/manager/shop/events.html
 #: themes/base/templates/components/language_switcher.html
+#: themes/ride/templates/components/language_switcher.html
 msgid "Language"
 msgstr "Idioma"
 
