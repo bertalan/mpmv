@@ -11,9 +11,10 @@ from typing import Any
 import pytest
 from django.template.loader import render_to_string
 
+from apps.themes.build import read_tokens
 from apps.themes.engine import LIGHT_SURFACE, UI_CONTRAST, contrast_ratio
 from apps.themes.flags import LANGUAGE_FLAGS
-from apps.themes.palettes import PRESETS
+from apps.themes.palettes import PRESETS, ROLES, resolve_with_palette
 from apps.themes.services import use_theme
 from apps.themes.tests.builders import SHIPPED_THEMES
 
@@ -131,7 +132,41 @@ def test_the_flags_are_recorded_in_licenses_toml() -> None:
 
 def test_without_javascript_the_list_is_shown_and_the_script_is_loaded_by_the_layout() -> None:
     css = (RIDE / "static/themes/ride/css/20-header-footer.css").read_text()
-    assert "html.no-js .language-menu__list" in css
-    assert "html.no-js .language-menu__toggle" in css
+    # The collapsed state exists only under the class the script adds: no script, no collapse.
+    script = (RIDE / "static/themes/ride/js/language-menu.js").read_text()
+    assert "language-menu--enhanced" in script
+    for rule in re.findall(r"([^{}]+)\{([^}]*)\}", css):
+        selector, body = rule
+        if "language-menu__list" in selector and "display: none" in body:
+            assert "language-menu--enhanced" in selector, selector
+        if "language-menu__toggle" in selector and "display: inline-flex" in body:
+            assert "language-menu--enhanced" in selector, selector
+    assert not re.search(r"\.language-menu__toggle\s*\{[^}]*display: (?:inline-)?flex", css)
     layout = (RIDE / "templates/layouts/base.html").read_text()
     assert "themes/ride/js/language-menu.js" in layout
+
+
+# --- AA contrast under each predefined palette (the toggle on the dark band, the list on the
+# light surface), resolved through the ride chain with the palette on top.
+
+CHAIN = ("ride", "base")
+TOKENS = {slug: read_tokens(SHIPPED_THEMES / slug) for slug in CHAIN}
+
+
+def resolved(palette: str) -> dict[str, str]:
+    return resolve_with_palette(CHAIN, TOKENS, {r: PRESETS[palette][r] for r in ROLES})
+
+
+@pytest.mark.parametrize("slug", sorted(PRESETS))
+def test_the_toggle_and_the_list_pass_aa_under_each_palette(slug: str) -> None:
+    t = resolved(slug)
+    band, surface, tint = t["color.surface-inverse"], t["color.surface"], t["color.accent-tint"]
+    # Toggle: text and its border (currentcolor) on the band, and the same in the drawer.
+    assert contrast_ratio(t["color.text-inverse"], band) >= 4.5
+    # List: item text, current item (same colour, bold), hover shade, panel border.
+    assert contrast_ratio(t["color.text"], surface) >= 4.5
+    assert contrast_ratio(t["color.text"], tint) >= 4.5
+    assert contrast_ratio(t["color.border-control"], surface) >= 3
+    # Focus ring: on the band (toggle) and on the panel and its hover shade (items).
+    for background in (band, surface, tint):
+        assert contrast_ratio(t["color.focus"], background) >= 3, background

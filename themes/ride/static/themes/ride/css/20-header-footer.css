@@ -480,15 +480,20 @@
 
 /* Language menu (THM.35): a compact toggle (globe, current endonym, chevron) and a disclosure list.
    The list is a light panel that sets its own text colour (the rule at the top of this file); it
-   sits under the toggle from 64rem and in the flow inside the menu drawer. Without JavaScript
-   (html.no-js) the toggle is hidden and the list is shown expanded. The flag's 1 px outline is the
+   sits under the toggle from 64rem and in the flow inside the menu drawer. The collapsed state exists
+   only once language-menu.js has set `language-menu--enhanced`: without the script (no JavaScript,
+   a blocked or failing file) the toggle is hidden and the list is shown expanded. The flag's 1 px outline is the
    control-border token, at least 3:1 on the dark band and on the light surface of every palette. */
 @layer overrides {
   .language-menu {
     position: relative;
   }
 
-  .language-menu__toggle,
+  .language-menu__toggle {
+    display: none;
+  }
+
+  .language-menu--enhanced .language-menu__toggle,
   .site-header .language-menu__item {
     display: inline-flex;
     align-items: center;
@@ -508,6 +513,15 @@
   }
 
   .language-menu__list {
+    margin-block-start: var(--space-xs);
+    padding: var(--space-xs);
+    list-style: none;
+    border: 1px solid var(--color-border-control);
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
+  }
+
+  .language-menu--enhanced .language-menu__list {
     display: none;
     position: absolute;
     inset-block-start: calc(100% + var(--space-xs));
@@ -515,25 +529,11 @@
     z-index: 10;
     min-inline-size: 12rem;
     margin: 0;
-    padding: var(--space-xs);
-    list-style: none;
-    border: 1px solid var(--color-border-control);
-    border-radius: var(--radius-card);
-    background: var(--color-surface);
     box-shadow: var(--shadow-raised);
   }
 
-  .language-menu.is-open .language-menu__list,
-  html.no-js .language-menu__list {
+  .language-menu--enhanced.is-open .language-menu__list {
     display: block;
-  }
-
-  html.no-js .language-menu__toggle {
-    display: none;
-  }
-
-  html.no-js .language-menu__list {
-    position: static;
   }
 
   .language-menu form {

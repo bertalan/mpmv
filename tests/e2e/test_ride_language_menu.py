@@ -89,3 +89,15 @@ def test_the_phone_toggle_in_the_drawer_switches_language(
     second = other_language()
     page.locator(f'{LIST} button[value="{second}"]').click()
     expect(page.locator("html")).to_have_attribute("lang", second)
+
+
+def test_without_the_script_the_list_stays_open_and_usable(
+    page: Page, live_server: LiveServer
+) -> None:
+    page.route("**/language-menu.js", lambda route: route.abort())
+    open_page(page, live_server, "/", 1280)
+    expect(page.locator(TOGGLE)).to_be_hidden()
+    second = other_language()
+    expect(page.locator(f'{LIST} button[value="{second}"]')).to_be_visible()
+    page.locator(f'{LIST} button[value="{second}"]').click()
+    expect(page.locator("html")).to_have_attribute("lang", second)
