@@ -68,11 +68,6 @@
     border-radius: var(--card-radius);
     background: var(--color-overlay) url(images/hero-placeholder.svg) center / cover no-repeat;
     color: var(--color-text-inverse);
-    transition: transform 150ms ease;
-  }
-
-  .tile:hover {
-    transform: translateY(-0.25rem);
   }
 
   .tile__scrim {
@@ -107,13 +102,13 @@
     color: var(--color-text-inverse);
   }
 
-  @media (prefers-reduced-motion: reduce) {
+  @media (prefers-reduced-motion: no-preference) {
     .tile {
-      transition: none;
+      transition: transform 150ms ease;
     }
 
     .tile:hover {
-      transform: none;
+      transform: translateY(-0.25rem);
     }
   }
 }
