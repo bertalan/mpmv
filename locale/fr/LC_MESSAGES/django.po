@@ -4115,6 +4115,7 @@ msgid "Go to slide %(count)s of %(total)s"
 msgstr "Aller à la diapositive %(count)s sur %(total)s"
 
 #: themes/base/templates/layouts/error.html themes/ride/templates/layouts/error.html
+#: themes/ride/templates/layouts/error_display.html
 msgid "Go to the home page"
 msgstr "Aller à la page d'accueil"
 
