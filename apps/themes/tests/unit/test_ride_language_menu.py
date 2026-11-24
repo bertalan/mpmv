@@ -130,18 +130,31 @@ def test_the_flags_are_recorded_in_licenses_toml() -> None:
         assert f"flags/{stem}.svg" in listed
 
 
+def unscoped_collapse(css: str) -> list[str]:
+    """Selectors that hide the list or show the toggle without `language-menu--enhanced`. Only
+    innermost blocks are rules (a `@layer` or `@media` wrapper holds braces: no match)."""
+    found = []
+    for selector, body in re.findall(r"([^{}]+)\{([^{}]*)\}", css):
+        hides = "language-menu__list" in selector and "display: none" in body
+        shows = "language-menu__toggle" in selector and "display: inline-flex" in body
+        if (hides or shows) and "language-menu--enhanced" not in selector:
+            found.append(selector.strip())
+    return found
+
+
+def test_the_scoping_check_catches_an_unscoped_rule_inside_a_layer() -> None:
+    css = "@layer overrides {\n  .language-menu__list {\n    display: none;\n  }\n}"
+    assert unscoped_collapse(css) == [".language-menu__list"]
+    scoped = css.replace(".language-menu__list", ".language-menu--enhanced .x")
+    assert unscoped_collapse(scoped) == []
+
+
 def test_without_javascript_the_list_is_shown_and_the_script_is_loaded_by_the_layout() -> None:
     css = (RIDE / "static/themes/ride/css/20-header-footer.css").read_text()
     # The collapsed state exists only under the class the script adds: no script, no collapse.
     script = (RIDE / "static/themes/ride/js/language-menu.js").read_text()
     assert "language-menu--enhanced" in script
-    for rule in re.findall(r"([^{}]+)\{([^}]*)\}", css):
-        selector, body = rule
-        if "language-menu__list" in selector and "display: none" in body:
-            assert "language-menu--enhanced" in selector, selector
-        if "language-menu__toggle" in selector and "display: inline-flex" in body:
-            assert "language-menu--enhanced" in selector, selector
-    assert not re.search(r"\.language-menu__toggle\s*\{[^}]*display: (?:inline-)?flex", css)
+    assert unscoped_collapse(css) == []
     layout = (RIDE / "templates/layouts/base.html").read_text()
     assert "themes/ride/js/language-menu.js" in layout
 
@@ -170,3 +183,11 @@ def test_the_toggle_and_the_list_pass_aa_under_each_palette(slug: str) -> None:
     # Focus ring: on the band (toggle) and on the panel and its hover shade (items).
     for background in (band, surface, tint):
         assert contrast_ratio(t["color.focus"], background) >= 3, background
+
+
+def test_the_phone_drawer_uses_the_band_pair_the_contrast_test_checks() -> None:
+    """The toggle in the offcanvas drawer sits on the drawer's own background: the same band
+    token and text colour as the bar, so the toggle pair above covers it."""
+    css = (RIDE / "static/themes/ride/css/20-header-footer.css").read_text()
+    assert "--bs-offcanvas-bg: var(--color-surface-inverse)" in css
+    assert "--bs-offcanvas-color: var(--color-text-inverse)" in css
