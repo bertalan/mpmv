@@ -6886,6 +6886,10 @@ msgid "Our support team prepared a cart for you from your order %(order_number)s
 msgstr ""
 "Notre équipe support a préparé pour toi un panier à partir de ta commande %(order_number)s :"
 
+#: themes/ride/templates/components/footer.html
+msgid "Our vendors"
+msgstr "Nos vendeurs"
+
 #: apps/manager/staff_draft_views.py apps/orders/customer_views.py
 msgid "out of stock"
 msgstr "en rupture de stock"
