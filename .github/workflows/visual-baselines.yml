@@ -69,10 +69,7 @@ jobs:
       - name: Render baselines
         env:
           MPMV_VISUAL: update
-        run: |
-          uv run pytest -m e2e -k "visual_baseline and palette_builder" -v -rA || true
-          find tests/e2e/baselines/admin tests/e2e/build -name "*.png" 2>/dev/null || true
-          ls -la tests/e2e/baselines/admin
+        run: uv run pytest -m e2e -k visual_baseline
       - name: Store baselines
         uses: actions/upload-artifact@v7
         with:
