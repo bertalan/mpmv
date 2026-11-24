@@ -248,9 +248,8 @@ def trader_contact(vendor: Vendor) -> engine.TraderContact:
 
 
 def sells_to_consumers(vendor: Vendor) -> bool:
-    """Whether `vendor` sells to consumers (B2C). True for every vendor: no business-only seller
-    flag exists yet, and the checkout sells to consumers by default. Such a flag, when one is
-    added, is read here and nowhere else."""
+    """Whether `vendor` sells to consumers (B2C). True for every vendor: the business-only flag
+    (VEN.41, owner decision 2026-11-22) exempts nothing, so phone, email and PEC stay required."""
     return True
 
 
@@ -311,6 +310,7 @@ def _save_vendor(
         )
         if stored is not None:  # a stale instance never undoes a status change or a reopen
             vendor.status, vendor.onboarding_round = stored.status, stored.onboarding_round
+            vendor.business_only = stored.business_only
         after = vendor_snapshot(vendor)
         changes = ChangeSet()
         if stored is None:
@@ -1576,6 +1576,56 @@ def reopen_vendor(
 
     if not dry_run:
         vendor.status, vendor.onboarding_round = engine.ONBOARDING, round_
+    return changes
+
+
+# --- Business-only seller flag (VEN.41, owner decision 2026-11-22)
+
+BUSINESS_ONLY_CHANGED = "vendor.business_only_changed"
+
+
+def set_business_only(
+    vendor: Vendor,
+    value: bool,
+    *,
+    actor: User | AnonymousUser,
+    reason: str,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Staff set or clear the business-only flag of `vendor`, saying why; audited with the
+    reason (old and new value, actor from `ctx`). Run after staff verified the VAT number
+    (TAX.5) and that the seller is a business. A vendor's own request never reaches this
+    service; it only reaches the staff queue. Checked against the stored vendor (row locked);
+    setting the stored value again returns an empty ChangeSet. Raises `PermissionDenied` (see
+    `can_reopen`) or `engine.ReasonRequired`, also on dry-run."""
+    if not can_reopen(actor):
+        raise PermissionDenied("Only platform staff can set the business-only flag.")
+    reason = reason.strip()
+    if not reason:
+        raise engine.ReasonRequired("the business-only flag needs a reason: staff say why")
+    with transaction.atomic():
+        current = (
+            Vendor.objects.select_for_update()
+            .only("business_only", "slug", "public_id")
+            .get(pk=vendor.pk)
+        )
+        changes = ChangeSet()
+        if current.business_only != value:
+            changes.update(
+                MODEL_LABEL,
+                str(current.public_id),
+                before={"business_only": current.business_only, "slug": current.slug},
+                after={"business_only": value, "slug": current.slug, "reason": reason},
+            )
+
+        def apply() -> None:
+            current.business_only = value
+            current.save(update_fields=["business_only", "updated_at"])
+
+        run_mutation(changes, apply, ctx=ctx, action=BUSINESS_ONLY_CHANGED, dry_run=dry_run)
+    if not dry_run:
+        vendor.business_only = value
     return changes
 
 
