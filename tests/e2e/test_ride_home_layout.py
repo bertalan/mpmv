@@ -22,7 +22,7 @@ pytestmark = pytest.mark.django_db(transaction=True)
 
 
 @pytest.fixture(autouse=True)
-def _demo_landing_with_tiles(_ride_home: None) -> None:
+def _demo_landing_with_tiles(_ride_home: None) -> None:  # noqa: F811
     """The body of the seeded vendor-recruitment home (CMS.19, the demo texts of apps/seed/data)
     with one block of tiles added: hero, three text sections, quotes, tiles, FAQ, two bands."""
     home = HomePage.objects.get(locale__language_code=primary_language())
