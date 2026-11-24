@@ -542,6 +542,7 @@
 
   .site-header .language-menu__list .language-menu__item {
     inline-size: 100%;
+    justify-content: flex-start;
     border-color: transparent;
     color: var(--color-text);
   }
