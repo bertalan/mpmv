@@ -1,0 +1,114 @@
+/* Ride: home layout (THM.24, ride fidelity 6/12): the lead line of the hero, image-led tiles with
+   an overlay title, and the section rhythm. The sections sit on alternating surfaces (38-surfaces
+   .css); the rhythm is one padding per section, half of --space-section above and below, so the
+   gap between the contents of two sections never exceeds --space-section. */
+@layer overrides {
+  /* --- Hero: the text is the lead line, set larger than body copy. */
+
+  .hero__text {
+    max-inline-size: 36rem;
+    margin-block: 0 var(--space-l);
+    font-size: var(--step-1);
+    line-height: 1.4;
+  }
+
+  .hero__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-s);
+  }
+
+  /* --- Section rhythm: no outer margin on the blocks inside a section, so the padding is the only
+     space and the gap between two sections is measurable. */
+
+  .home-section {
+    margin-block: 0;
+    padding-block: calc(var(--space-section) / 2);
+  }
+
+  .home-section > * {
+    margin-block: 0;
+    padding-block: 0;
+  }
+
+  .home-section > * > :first-child {
+    margin-block-start: 0;
+  }
+
+  .home-section > * > :last-child {
+    margin-block-end: 0;
+  }
+
+  /* --- Tiles: the card's picture, or the theme's own artwork, under a scrim; the title is
+     laid over it. The whole tile is one link (the title's stretched link). */
+
+  .tile-grid {
+    display: grid;
+    gap: var(--space-m);
+    margin: var(--space-l) 0 0;
+    padding: 0;
+    grid-template-columns: repeat(auto-fill, minmax(min(16rem, 100%), 1fr));
+  }
+
+  .tile {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    min-block-size: 14rem;
+    margin: 0;
+    padding: var(--space-m);
+    overflow: hidden;
+    border-radius: var(--card-radius);
+    background: var(--color-overlay) url(images/hero-placeholder.svg) center / cover no-repeat;
+    color: var(--color-text-inverse);
+    transition: transform 150ms ease;
+  }
+
+  .tile:hover {
+    transform: translateY(-0.25rem);
+  }
+
+  .tile__scrim {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(
+      to top,
+      color-mix(in srgb, var(--color-overlay) calc(var(--scrim-opacity) * 100%), transparent),
+      transparent 90%
+    );
+  }
+
+  .tile__title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: var(--step-2);
+    text-transform: uppercase;
+  }
+
+  .tile__title a {
+    color: var(--color-text-inverse);
+    text-decoration: none;
+  }
+
+  .tile__title a:focus-visible {
+    outline-offset: -0.25rem;
+  }
+
+  .tile__text {
+    margin: var(--space-xs) 0 0;
+    color: var(--color-text-inverse);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tile {
+      transition: none;
+    }
+
+    .tile:hover {
+      transform: none;
+    }
+  }
+}
