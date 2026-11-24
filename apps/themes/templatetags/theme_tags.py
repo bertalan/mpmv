@@ -19,6 +19,7 @@ from django.utils.safestring import SafeString
 
 from .. import engine
 from ..appearance import active_payment_appearance
+from ..flags import flag_path
 from ..services import active_palette, palette_href
 
 register = template.Library()
@@ -143,6 +144,33 @@ def palette_css_href(context: template.Context) -> str:
     if request is None or context.get("minimal_chrome"):
         return ""
     return palette_href(request)
+
+
+def _field(item: Any, name: str) -> Any:
+    return item.get(name) if isinstance(item, dict) else getattr(item, name, None)
+
+
+@register.simple_tag
+def language_menu(languages: Any, current_language: object = "") -> dict[str, Any]:
+    """The items of the `ride` language menu (THM.35): CMS `LanguageLink`s or Django's language
+    info dicts, each with its endonym (`label`), flag URL (empty without one) and `current`; plus
+    the current item. The language codes stay as configured."""
+    items: list[dict[str, Any]] = []
+    for language in languages or []:
+        code = str(_field(language, "code") or "")
+        path = flag_path(code)
+        items.append(
+            {
+                "code": code,
+                "label": str(_field(language, "name_local") or _field(language, "name") or code),
+                "url": _field(language, "url") or "",
+                "available": _field(language, "available"),
+                "current": bool(_field(language, "current")) or code == current_language,
+                "flag": static(path) if path else "",
+            }
+        )
+    current = next((item for item in items if item["current"]), None)
+    return {"items": items, "current": current}
 
 
 @register.simple_tag(takes_context=True)

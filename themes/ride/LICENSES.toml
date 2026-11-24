@@ -92,3 +92,18 @@ license = "MIT"
 # bootstrap.bundle.min.js (code, hashed in VENDORED.toml). The dist zip has no LICENSE file; the
 # one here is the standard MIT text with upstream's copyright line.
 files = ["vendor/bootstrap/LICENSE", "vendor/bootstrap/VENDORED.toml"]
+
+[[asset]]
+name = "Ride language flags"
+kind = "image"
+source = "https://github.com/bertalan/mpmv"
+author = "MPMV project"
+license = "CC0-1.0"
+# THM.35: our own drawings of plain civil flags (no coat of arms) as flat rectangles; the designs
+# of national flags are public domain. The 1 px outline is CSS (the control-border token), not
+# part of the file. Under 1 KB each.
+files = [
+  "flags/bg.svg", "flags/cz.svg", "flags/de.svg", "flags/dk.svg", "flags/es.svg",
+  "flags/fi.svg", "flags/fr.svg", "flags/gb.svg", "flags/gr.svg", "flags/hu.svg",
+  "flags/it.svg", "flags/nl.svg", "flags/pl.svg", "flags/ro.svg", "flags/se.svg",
+]
