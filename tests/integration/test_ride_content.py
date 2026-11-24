@@ -190,7 +190,7 @@ def test_the_404_page_renders_in_ride_with_one_h1(
         assert robots is not None
         assert str(robots["content"]).startswith("noindex")
         assert page.find("a", string=translated("Go to the home page")) is not None
-    assert page.select_one("main .page-banner h1") is not None
+    assert page.select_one("main .error-hero h1") is not None
 
 
 def test_the_500_page_renders_in_ride_without_the_database(settings: SettingsWrapper) -> None:
@@ -202,6 +202,6 @@ def test_the_500_page_renders_in_ride_without_the_database(settings: SettingsWra
     assert [h.get_text(strip=True) for h in page.find_all("h1")] == [
         translated("Something went wrong")
     ]
-    assert page.select_one("main .page-banner h1") is not None
+    assert page.select_one("main .error-hero h1") is not None
     assert page.find("a", string=translated("Go to the home page")) is not None
     assert 'data-theme="ride"' in response.content.decode()

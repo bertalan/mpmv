@@ -6965,7 +6965,7 @@ msgstr "Page %(page)s"
 msgid "Page %(page)s of %(count)s"
 msgstr "Page %(page)s sur %(count)s"
 
-#: themes/base/templates/404.html
+#: themes/base/templates/404.html themes/ride/templates/404.html
 msgid "Page not found"
 msgstr "Page introuvable"
 
@@ -8568,7 +8568,7 @@ msgstr "Rechercher par nom"
 msgid "Search by name, SKU, brand or vendor, then click the product."
 msgstr "Recherchez par nom, SKU, marque ou vendeur, puis cliquez sur le produit."
 
-#: themes/base/templates/components/search_form.html
+#: themes/base/templates/components/search_form.html themes/ride/templates/404.html
 msgid "Search products"
 msgstr "Rechercher des produits"
 
@@ -9204,7 +9204,7 @@ msgstr ""
 "Quelqu'un, probablement vous, a utilisé cette adresse e-mail pour postuler à la vente avec nous. "
 "Pour continuer, ouvrez ce lien, confirmez votre adresse e-mail et choisissez un mot de passe."
 
-#: themes/base/templates/500.html
+#: themes/base/templates/500.html themes/ride/templates/500.html
 msgid "Something went wrong"
 msgstr "Une erreur s'est produite"
 
@@ -11441,7 +11441,7 @@ msgstr ""
 "Le mode d'expédition du colis (%(method)s) ne livre pas à %(place)s ; l'adresse ne peut donc pas "
 "être changée pour celle-ci."
 
-#: themes/base/templates/404.html
+#: themes/base/templates/404.html themes/ride/templates/404.html
 msgid "The page you asked for does not exist or has moved."
 msgstr "La page demandée n'existe pas ou a été déplacée."
 
@@ -14384,7 +14384,7 @@ msgstr ""
 "Nous ne pouvons pas l’honorer, par exemple la marchandise est indisponible : les frais de "
 "remboursement sont facturés à la boutique"
 
-#: themes/base/templates/500.html
+#: themes/base/templates/500.html themes/ride/templates/500.html
 msgid "We could not complete your request. Please try again in a few minutes."
 msgstr "Nous n'avons pas pu traiter ta demande. Réessaie dans quelques minutes."
 

@@ -164,6 +164,9 @@ SCOPES = (
     "apps/cms/templates/cms/term_landing_page.html",
     "apps/cms/templates/cms/vendor_landing_page.html",
     "apps/cms/templates/cms/vendor_recruitment_page.html",
+    # The ride 404 and 500 pages (THM.30): the same msgids as base's.
+    "themes/ride/templates/404.html",
+    "themes/ride/templates/500.html",
     # Admin, editor and Manager-login templates (I18N.20 part 3b, slice 4): what staff and vendors
     # see in the brand merge, the image lists, the render monitor, the events moderation screens,
     # the ride Manager login and the error page. Formal register.

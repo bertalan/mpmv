@@ -1,0 +1,7 @@
+{% extends "layouts/error_display.html" %}
+{% load i18n %}
+{% comment %}Server error (THM.30): fully static, rendered by apps.themes.views.server_error without the database. Loads only `i18n`; no search (it would need the database that may be the cause).{% endcomment %}
+{% block title %}{% translate "Something went wrong" %} · {{ site_name }}{% endblock %}
+{% block code %}500{% endblock %}
+{% block heading %}{% translate "Something went wrong" %}{% endblock %}
+{% block message %}<p>{% translate "We could not complete your request. Please try again in a few minutes." %}</p>{% endblock %}
