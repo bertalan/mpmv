@@ -159,7 +159,6 @@ def test_the_product_page_passes_the_gates(
     shot(f"{width}-product")
 
 
-@pytest.mark.parametrize("width", [360, 768, 1280])
 def test_the_related_strip_scrolls_sideways_on_a_narrow_screen(
     page: Page, live_server: LiveServer
 ) -> None:
@@ -178,6 +177,7 @@ def test_the_related_strip_scrolls_sideways_on_a_narrow_screen(
     assert page.evaluate(NO_SIDEWAYS_SCROLL), "the strip must not widen the page"
 
 
+@pytest.mark.parametrize("width", [360, 768, 1280])
 def test_the_storefront_passes_the_gates(
     width: int, page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
