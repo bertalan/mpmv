@@ -24,6 +24,8 @@ from apps.catalog.tests.factories import (
     CategoryTranslationFactory,
     ProductFactory,
     ProductTranslationFactory,
+    TaxonomyFactory,
+    TermFactory,
     VariantFactory,
     VariantTranslationFactory,
 )
@@ -213,6 +215,7 @@ def test_ride_product_page_matches_its_visual_baseline(
     live_server: LiveServer,
     settings: SettingsWrapper,
     paths: dict,  # type: ignore[type-arg]
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """THM.26: the `ride` product page of a simple, a variant and an on-request product."""
     require_visual_mode()
@@ -244,6 +247,32 @@ def test_ride_product_page_matches_its_visual_baseline(
                 VariantTranslationFactory.create(
                     variant=variant, language="en", label=label, status=PUBLISHED
                 )
+    if kind == "simple":  # the related strip: three products sharing a term with this one
+        from apps.catalog import product_pages
+
+        original = product_pages.related  # the picker shuffles; the baseline needs a fixed order
+        monkeypatch.setattr(
+            product_pages,
+            "related",
+            lambda *args, **kwargs: sorted(
+                original(*args, **kwargs), key=lambda card: card.url or ""
+            ),
+        )
+        term = TermFactory.create(taxonomy=TaxonomyFactory.create(code="style"))
+        shown = Product.objects.get(translations__slug="blue-vase")
+        shown.terms.add(term)
+        for index in range(3):
+            other = ProductFactory.create(
+                vendor=shown.vendor, status=Product.Status.PUBLISHED, price_net=Decimal("30.00")
+            )
+            ProductTranslationFactory.create(
+                product=other,
+                language="en",
+                title=f"Related vase {index + 1}",
+                slug=f"related-vase-{index + 1}",
+                status=PUBLISHED,
+            )
+            other.terms.add(term)
     page.emulate_media(reduced_motion="reduce")
     page.clock.set_fixed_time(utc(2026, 11, 18, 10))
     page.set_viewport_size({"width": 1280, "height": 900})

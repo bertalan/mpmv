@@ -43,7 +43,6 @@
         <div class="card surface-light">
           <div class="card-body">
             <h2 id="product-buy-heading" class="visually-hidden">{% translate "Price and availability" %}</h2>
-            <p class="product-buy__title h3" aria-hidden="true">{{ page_data.title }}</p>{# the banner h1 is the page's only heading #}
             {% seller_name page_data.vendor as seller %}
             <ul class="product-meta list-unstyled text-body-secondary">
               <li class="product-sku">{% translate "SKU" %}: <span class="product-sku-value">{{ page_data.product.sku }}</span></li>

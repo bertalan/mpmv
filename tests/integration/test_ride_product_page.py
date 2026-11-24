@@ -95,15 +95,13 @@ def test_the_gallery_sits_in_a_card(
     assert card.select_one(".ride-gallery") is not None
 
 
-def test_the_buy_box_has_a_title_a_meta_list_and_a_large_price(
+def test_the_buy_box_has_a_meta_list_and_a_large_price_and_no_second_title(
     client: Client, settings: SettingsWrapper, shop: Vendor
 ) -> None:
     soup = _soup(client, settings, "ride", _product(shop, "plain"))
     box = soup.select_one("section.product-buy")
     assert box is not None
-    title = box.select_one(".product-buy__title")
-    assert title is not None
-    assert title.get_text(strip=True) == "Item plain"
+    assert box.select_one(".product-buy__title") is None  # no aria-hidden copy of the h1
     assert len(soup.find_all("h1")) == 1  # the banner keeps the only h1
     meta = box.select_one("ul.product-meta")
     assert meta is not None
