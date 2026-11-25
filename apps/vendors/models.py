@@ -18,6 +18,7 @@ from django.conf import settings
 from django.contrib.postgres.constraints import ExclusionConstraint
 from django.contrib.postgres.fields import DateRangeField, RangeOperators
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator
 from django.db import models, transaction
 from django.db.models.functions import Coalesce
 from django.utils.translation import gettext_lazy as _
@@ -1940,4 +1941,71 @@ class ReturnPolicyVersion(BaseModel):
             "returns_page_url": self.returns_page_url,
             "return_country": str(self.return_country),
             "status": self.status,
+        }
+
+
+class VendorClosure(BaseModel):
+    """A vendor's holiday or shop closure (VEN.20, owner decision Q-73).
+
+    A vendor setting, not an event: buyers can still order, and the shop notice and the checkout
+    say when the package leaves. Dates are calendar dates in the business time zone. There is no
+    free text. Written by `services.add_closure`, `update_closure` and `delete_closure`
+    (audited, with dry-run); ranges may overlap, the shipping engine merges them.
+    """
+
+    vendor_scope: ClassVar[str] = "vendor"
+    objects = VendorScopedManager()
+
+    vendor = models.ForeignKey(
+        Vendor,
+        on_delete=models.CASCADE,
+        related_name="closures",
+        help_text=_("The vendor this closure belongs to."),
+    )
+    start_date = models.DateField(help_text=_("First closed day."))
+    end_date = models.DateField(help_text=_("Last closed day."))
+    repeats_yearly = models.BooleanField(
+        default=False,
+        help_text=_("Tick it if the shop closes on the same days every year."),
+    )
+    notice_days = models.PositiveSmallIntegerField(
+        default=14,
+        validators=[MaxValueValidator(engine.CLOSURE_MAX_NOTICE_DAYS)],
+        help_text=_("How many days before the closure the notice appears (0 to 60)."),
+    )
+
+    class Meta:
+        ordering = ["vendor", "start_date", "end_date"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(end_date__gte=models.F("start_date")),
+                name="vendors_vendorclosure_end_after_start",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(notice_days__lte=engine.CLOSURE_MAX_NOTICE_DAYS),
+                name="vendors_vendorclosure_notice_days_max",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.vendor_id} closed {self.start_date} to {self.end_date}"
+
+    def clean(self) -> None:
+        super().clean()
+        errors = engine.closure_errors(
+            self.start_date,
+            self.end_date,
+            repeats_yearly=self.repeats_yearly,
+            notice_days=self.notice_days,
+        )
+        if errors:
+            raise ValidationError(errors)
+
+    def snapshot(self) -> dict[str, Any]:
+        return {
+            "vendor": str(self.vendor.public_id),
+            "start_date": self.start_date,
+            "end_date": self.end_date,
+            "repeats_yearly": self.repeats_yearly,
+            "notice_days": self.notice_days,
         }

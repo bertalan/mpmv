@@ -3916,6 +3916,10 @@ msgstr "Bestellung suchen"
 msgid "Fingerprint %(hash)s."
 msgstr "Fingerabdruck %(hash)s."
 
+#: apps/vendors/models.py
+msgid "First closed day."
+msgstr "Erster Tag der Schließung."
+
 #: apps/manager/event_forms.py
 msgid "First day"
 msgstr "Erster Tag"
@@ -4436,6 +4440,10 @@ msgstr ""
 "Wie viele Tage ein Verbraucher nach Erhalt Zeit hat, Waren zurückzusenden. Das Gesetz sieht für "
 "Verkäufe an Verbraucher mindestens 14 Tage vor, daher wird eine kleinere Zahl abgelehnt. "
 "Pflichtfeld."
+
+#: apps/vendors/models.py
+msgid "How many days before the closure the notice appears (0 to 60)."
+msgstr "Wie viele Tage vor der Schließung der Hinweis erscheint (0 bis 60)."
 
 #: apps/cms/forms_pages.py
 msgid ""
@@ -5069,6 +5077,10 @@ msgstr "Sprache: %(language)s. Originalsprache der Veranstaltung: %(original)s."
 #: themes/ride/templates/compliance/contact_points.html
 msgid "Languages:"
 msgstr "Sprachen:"
+
+#: apps/vendors/models.py
+msgid "Last closed day."
+msgstr "Letzter Tag der Schließung."
 
 #: apps/manager/event_forms.py
 msgid "Last day"
@@ -12736,6 +12748,10 @@ msgstr ""
 "Der Verkäufer, zu dem diese Standardwerte gehören. Jeder Verkäufer hat einen Satz Standardwerte."
 
 #: apps/vendors/models.py
+msgid "The vendor this closure belongs to."
+msgstr "Der Verkäufer, zu dem diese Schließung gehört."
+
+#: apps/vendors/models.py
 msgid "The vendor this consent belongs to."
 msgstr "Der Verkäufer, zu dem diese Einwilligung gehört."
 
@@ -13544,6 +13560,10 @@ msgstr "Setzen Sie das Häkchen, wenn eine Software bei der Auffindung des Inhal
 #: apps/compliance/forms.py
 msgid "Tick it if software took the decision."
 msgstr "Setzen Sie das Häkchen, wenn eine Software die Entscheidung getroffen hat."
+
+#: apps/vendors/models.py
+msgid "Tick it if the shop closes on the same days every year."
+msgstr "Ankreuzen, wenn der Shop jedes Jahr an denselben Tagen schließt."
 
 #: apps/vendors/models.py
 msgid ""

@@ -2260,3 +2260,37 @@ def trader_contact(
         phone=phone.strip(),
         email=email.strip(),
     )
+
+
+# --- Holiday and closure schedule (VEN.20) -----------------------------------------------------
+
+CLOSURE_MAX_NOTICE_DAYS: Final = 60
+
+
+def _is_leap_day(day: dt.date) -> bool:
+    return day.month == 2 and day.day == 29
+
+
+def closure_errors(
+    start: dt.date, end: dt.date, *, repeats_yearly: bool, notice_days: int
+) -> dict[str, list[str]]:
+    """Invalid fields of a closure range, by field name; empty when it is valid.
+
+    A yearly range lasts less than one year and never starts or ends on 29 February, so it means
+    the same days every year. A one-off range may use any date.
+    """
+    errors: dict[str, list[str]] = {}
+    if end < start:
+        errors["end_date"] = ["The end date cannot be before the start date."]
+    if not 0 <= notice_days <= CLOSURE_MAX_NOTICE_DAYS:
+        errors["notice_days"] = [f"The notice lead time is 0 to {CLOSURE_MAX_NOTICE_DAYS} days."]
+    if repeats_yearly:
+        if _is_leap_day(start):
+            errors["start_date"] = ["A yearly range cannot start on 29 February."]
+        if _is_leap_day(end):
+            errors["end_date"] = ["A yearly range cannot end on 29 February."]
+        if "end_date" not in errors and "start_date" not in errors:
+            same_day_next_year = dt.date(start.year + 1, start.month, start.day)
+            if end >= same_day_next_year:
+                errors["end_date"] = ["A yearly range must last less than one year."]
+    return errors

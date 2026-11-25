@@ -3869,6 +3869,10 @@ msgstr "Cerca l'ordine"
 msgid "Fingerprint %(hash)s."
 msgstr "Impronta %(hash)s."
 
+#: apps/vendors/models.py
+msgid "First closed day."
+msgstr "Primo giorno di chiusura."
+
 #: apps/manager/event_forms.py
 msgid "First day"
 msgstr "Primo giorno"
@@ -4388,6 +4392,10 @@ msgstr ""
 "Quanti giorni ha il consumatore per restituire la merce dopo averla ricevuta. La legge fissa un "
 "minimo di 14 giorni per le vendite ai consumatori, quindi un numero inferiore viene rifiutato. "
 "Obbligatorio."
+
+#: apps/vendors/models.py
+msgid "How many days before the closure the notice appears (0 to 60)."
+msgstr "Quanti giorni prima della chiusura compare l'avviso (da 0 a 60)."
 
 #: apps/cms/forms_pages.py
 msgid ""
@@ -5016,6 +5024,10 @@ msgstr "Lingua: %(language)s. Lingua originale dell’evento: %(original)s."
 #: themes/ride/templates/compliance/contact_points.html
 msgid "Languages:"
 msgstr "Lingue:"
+
+#: apps/vendors/models.py
+msgid "Last closed day."
+msgstr "Ultimo giorno di chiusura."
 
 #: apps/manager/event_forms.py
 msgid "Last day"
@@ -12600,6 +12612,10 @@ msgstr ""
 "predefiniti."
 
 #: apps/vendors/models.py
+msgid "The vendor this closure belongs to."
+msgstr "Il venditore a cui appartiene questa chiusura."
+
+#: apps/vendors/models.py
 msgid "The vendor this consent belongs to."
 msgstr "Il venditore a cui appartiene questo consenso."
 
@@ -13390,6 +13406,10 @@ msgstr "Spunta se un software ha aiutato a trovare il contenuto."
 #: apps/compliance/forms.py
 msgid "Tick it if software took the decision."
 msgstr "Spunta se la decisione è stata presa da un software."
+
+#: apps/vendors/models.py
+msgid "Tick it if the shop closes on the same days every year."
+msgstr "Spunta se il negozio chiude negli stessi giorni ogni anno."
 
 #: apps/vendors/models.py
 msgid ""

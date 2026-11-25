@@ -87,6 +87,7 @@ from .models import (
     Vendor,
     VendorApplication,
     VendorClaim,
+    VendorClosure,
     VendorContract,
     VendorContractTranslation,
     VendorFeatureFlag,
@@ -4022,3 +4023,114 @@ def sells_online(prefix: str = "") -> Q:
     if sales_terms_required():
         condition &= Q(**{f"{prefix}sales_terms_in_force__isnull": False})
     return condition
+
+
+# --- Holiday and closure schedule (VEN.20, owner decision Q-73)
+#
+# A vendor setting with no free text and no moderation: a change takes effect at once. Ranges
+# may overlap (the shipping engine merges them). A range that has ended stays as history: it
+# cannot be edited or deleted; a yearly range never ends.
+
+CLOSURE_MODEL = "vendors.vendorclosure"
+CLOSURE_ADDED = "vendors.closure.added"
+CLOSURE_CHANGED = "vendors.closure.changed"
+CLOSURE_REMOVED = "vendors.closure.removed"
+
+
+def _ended(closure: VendorClosure, today: dt.date) -> bool:
+    return not closure.repeats_yearly and closure.end_date < today
+
+
+def _closure_problems(closure: VendorClosure, today: dt.date) -> None:
+    errors = engine.closure_errors(
+        closure.start_date,
+        closure.end_date,
+        repeats_yearly=closure.repeats_yearly,
+        notice_days=closure.notice_days,
+    )
+    if not errors and _ended(closure, today):
+        errors["end_date"] = ["A range that has already ended cannot be saved."]
+    if errors:
+        raise ValidationError(errors)
+
+
+def _locked_closure(closure: VendorClosure, today: dt.date) -> VendorClosure:
+    stored = VendorClosure.objects.select_for_update().select_related("vendor").get(pk=closure.pk)
+    if _ended(stored, today):
+        raise ValidationError({"end_date": ["A range that has ended stays as history."]})
+    return stored
+
+
+def add_closure(
+    vendor: Vendor,
+    start_date: dt.date,
+    end_date: dt.date,
+    *,
+    repeats_yearly: bool = False,
+    notice_days: int = 14,
+    ctx: AuditContext,
+    today: dt.date | None = None,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Add a closure range for `vendor`, audited; it takes effect at once.
+
+    `today` is the date in the business time zone (default: now there). The range is validated
+    for every adapter, also on dry-run, and raises `ValidationError`.
+    """
+    closure = VendorClosure(
+        vendor=vendor,
+        start_date=start_date,
+        end_date=end_date,
+        repeats_yearly=repeats_yearly,
+        notice_days=notice_days,
+    )
+    _closure_problems(closure, today or business_today())
+    changes = ChangeSet()
+    changes.create(CLOSURE_MODEL, str(closure.public_id), closure.snapshot())
+    return run_mutation(changes, closure.save, ctx=ctx, action=CLOSURE_ADDED, dry_run=dry_run)
+
+
+def update_closure(
+    closure: VendorClosure,
+    *,
+    start_date: dt.date | None = None,
+    end_date: dt.date | None = None,
+    repeats_yearly: bool | None = None,
+    notice_days: int | None = None,
+    ctx: AuditContext,
+    today: dt.date | None = None,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Change a closure range, audited with before and after; None keeps a field. A range that
+    has ended is history and is refused. `before` is read from the database with the row locked."""
+    now = today or business_today()
+    with transaction.atomic():
+        stored = _locked_closure(closure, now)
+        before = stored.snapshot()
+        stored.start_date = stored.start_date if start_date is None else start_date
+        stored.end_date = stored.end_date if end_date is None else end_date
+        if repeats_yearly is not None:
+            stored.repeats_yearly = repeats_yearly
+        if notice_days is not None:
+            stored.notice_days = notice_days
+        _closure_problems(stored, now)
+        changes = ChangeSet()
+        changes.update(CLOSURE_MODEL, str(stored.public_id), before, stored.snapshot())
+        return run_mutation(changes, stored.save, ctx=ctx, action=CLOSURE_CHANGED, dry_run=dry_run)
+
+
+def delete_closure(
+    closure: VendorClosure,
+    *,
+    ctx: AuditContext,
+    today: dt.date | None = None,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Remove a closure range, audited. A range that has ended is history and is refused."""
+    with transaction.atomic():
+        stored = _locked_closure(closure, today or business_today())
+        changes = ChangeSet()
+        changes.delete(CLOSURE_MODEL, str(stored.public_id), stored.snapshot())
+        return run_mutation(
+            changes, stored.delete, ctx=ctx, action=CLOSURE_REMOVED, dry_run=dry_run
+        )
