@@ -749,6 +749,14 @@ msgstr ""
 "Une question que poserait un nouveau vendeur, par exemple 'Combien ça coûte ?'. Obligatoire : la "
 "question ne peut pas être enregistrée sans elle."
 
+#: apps/vendors/services.py
+msgid "A range that has already ended cannot be saved."
+msgstr "Une période déjà terminée ne peut pas être enregistrée."
+
+#: apps/vendors/services.py
+msgid "A range that has ended stays as history."
+msgstr "Une période terminée reste dans l'historique."
+
 #: apps/manager/amendment_views.py
 msgid "a refund to the customer"
 msgstr "un remboursement au client"
@@ -1061,6 +1069,18 @@ msgstr "Une rétractation a déjà été enregistrée pour cette partie."
 #: apps/compliance/templates/compliance/withdrawal_choose.html
 msgid "a withdrawal was already recorded."
 msgstr "une rétractation a déjà été enregistrée."
+
+#: apps/vendors/services.py
+msgid "A yearly range cannot end on 29 February."
+msgstr "Une période annuelle ne peut pas se terminer le 29 février."
+
+#: apps/vendors/services.py
+msgid "A yearly range cannot start on 29 February."
+msgstr "Une période annuelle ne peut pas commencer le 29 février."
+
+#: apps/vendors/services.py
+msgid "A yearly range must last less than one year."
+msgstr "Une période annuelle doit durer moins d'un an."
 
 #: apps/manager/forms.py
 msgid "About the shop"
@@ -10433,6 +10453,10 @@ msgstr ""
 "L'e-mail ou le mot de passe est incorrect, ou le compte est verrouillé pour un moment. Veuillez "
 "réessayer."
 
+#: apps/vendors/services.py
+msgid "The end date cannot be before the start date."
+msgstr "La date de fin ne peut pas précéder la date de début."
+
 #: apps/manager/event_forms.py
 msgid "The event"
 msgstr "L'événement"
@@ -11364,6 +11388,10 @@ msgstr "Le signalement est en cours d'examen."
 #: apps/manager/termination_views.py
 msgid "The notice is withdrawn and the vendor is told."
 msgstr "Le préavis est retiré et le vendeur en est informé."
+
+#: apps/vendors/services.py
+msgid "The notice lead time is 0 to %(days)s days."
+msgstr "Le délai de l'avis va de 0 à %(days)s jours."
 
 #: apps/compliance/templates/email/compliance/termination_withdrawn/subject.txt
 msgid "The notice of termination of your seller account is withdrawn"

@@ -1990,17 +1990,6 @@ class VendorClosure(BaseModel):
     def __str__(self) -> str:
         return f"{self.vendor_id} closed {self.start_date} to {self.end_date}"
 
-    def clean(self) -> None:
-        super().clean()
-        errors = engine.closure_errors(
-            self.start_date,
-            self.end_date,
-            repeats_yearly=self.repeats_yearly,
-            notice_days=self.notice_days,
-        )
-        if errors:
-            raise ValidationError(errors)
-
     def snapshot(self) -> dict[str, Any]:
         return {
             "vendor": str(self.vendor.public_id),

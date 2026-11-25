@@ -135,3 +135,14 @@ def test_overlapping_ranges_are_allowed() -> None:
     add_closure(vendor, D(2027, 8, 1), D(2027, 8, 15), ctx=CTX, today=TODAY)
     add_closure(vendor, D(2027, 8, 10), D(2027, 8, 31), ctx=CTX, today=TODAY)
     assert VendorClosure.objects.filter(vendor=vendor).count() == 2
+
+
+def test_validation_messages_are_translated() -> None:
+    from django.utils import translation
+
+    vendor = VendorFactory.create()
+    with translation.override("it"), pytest.raises(ValidationError) as caught:
+        add_closure(vendor, D(2027, 8, 2), D(2027, 8, 1), ctx=CTX, today=TODAY)
+    assert caught.value.message_dict["end_date"] == [
+        "La data di fine non può precedere la data di inizio."
+    ]

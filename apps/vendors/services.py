@@ -24,6 +24,7 @@ from django.db.models.signals import post_delete, post_save
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.module_loading import import_string
+from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy
 from wagtail.documents import get_document_model
 from wagtail.images import get_image_model
@@ -4041,15 +4042,29 @@ def _ended(closure: VendorClosure, today: dt.date) -> bool:
     return not closure.repeats_yearly and closure.end_date < today
 
 
+def closure_messages() -> dict[str, str]:
+    """The translated text of each `engine.closure_errors` code, in the active language."""
+    return {
+        engine.CLOSURE_END_BEFORE_START: _("The end date cannot be before the start date."),
+        engine.CLOSURE_NOTICE_RANGE: _("The notice lead time is 0 to %(days)s days.")
+        % {"days": engine.CLOSURE_MAX_NOTICE_DAYS},
+        engine.CLOSURE_YEARLY_LEAP_START: _("A yearly range cannot start on 29 February."),
+        engine.CLOSURE_YEARLY_LEAP_END: _("A yearly range cannot end on 29 February."),
+        engine.CLOSURE_YEARLY_TOO_LONG: _("A yearly range must last less than one year."),
+    }
+
+
 def _closure_problems(closure: VendorClosure, today: dt.date) -> None:
-    errors = engine.closure_errors(
+    coded = engine.closure_errors(
         closure.start_date,
         closure.end_date,
         repeats_yearly=closure.repeats_yearly,
         notice_days=closure.notice_days,
     )
+    messages = closure_messages()
+    errors = {field: [messages[code] for code in codes] for field, codes in coded.items()}
     if not errors and _ended(closure, today):
-        errors["end_date"] = ["A range that has already ended cannot be saved."]
+        errors["end_date"] = [_("A range that has already ended cannot be saved.")]
     if errors:
         raise ValidationError(errors)
 
@@ -4057,7 +4072,7 @@ def _closure_problems(closure: VendorClosure, today: dt.date) -> None:
 def _locked_closure(closure: VendorClosure, today: dt.date) -> VendorClosure:
     stored = VendorClosure.objects.select_for_update().select_related("vendor").get(pk=closure.pk)
     if _ended(stored, today):
-        raise ValidationError({"end_date": ["A range that has ended stays as history."]})
+        raise ValidationError({"end_date": [_("A range that has ended stays as history.")]})
     return stored
 
 

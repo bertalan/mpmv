@@ -740,6 +740,14 @@ msgstr ""
 "Una pregunta que haría un vendedor nuevo, por ejemplo «¿Cuánto cuesta?». Obligatorio: sin ella no "
 "se puede guardar la pregunta."
 
+#: apps/vendors/services.py
+msgid "A range that has already ended cannot be saved."
+msgstr "No se puede guardar un periodo que ya ha terminado."
+
+#: apps/vendors/services.py
+msgid "A range that has ended stays as history."
+msgstr "Un periodo terminado queda en el historial."
+
 #: apps/manager/amendment_views.py
 msgid "a refund to the customer"
 msgstr "un reembolso al cliente"
@@ -1054,6 +1062,18 @@ msgstr "Ya se registró un desistimiento para esa parte."
 #: apps/compliance/templates/compliance/withdrawal_choose.html
 msgid "a withdrawal was already recorded."
 msgstr "ya se registró un desistimiento."
+
+#: apps/vendors/services.py
+msgid "A yearly range cannot end on 29 February."
+msgstr "Un periodo anual no puede terminar el 29 de febrero."
+
+#: apps/vendors/services.py
+msgid "A yearly range cannot start on 29 February."
+msgstr "Un periodo anual no puede empezar el 29 de febrero."
+
+#: apps/vendors/services.py
+msgid "A yearly range must last less than one year."
+msgstr "Un periodo anual debe durar menos de un año."
 
 #: apps/manager/forms.py
 msgid "About the shop"
@@ -10353,6 +10373,10 @@ msgstr ""
 "El correo electrónico o la contraseña no son correctos, o la cuenta está bloqueada temporalmente. "
 "Inténtelo de nuevo."
 
+#: apps/vendors/services.py
+msgid "The end date cannot be before the start date."
+msgstr "La fecha de fin no puede ser anterior a la fecha de inicio."
+
 #: apps/manager/event_forms.py
 msgid "The event"
 msgstr "El evento"
@@ -11264,6 +11288,10 @@ msgstr "El aviso está en revisión."
 #: apps/manager/termination_views.py
 msgid "The notice is withdrawn and the vendor is told."
 msgstr "El preaviso se ha retirado y se informa al vendedor."
+
+#: apps/vendors/services.py
+msgid "The notice lead time is 0 to %(days)s days."
+msgstr "La antelación del aviso es de 0 a %(days)s días."
 
 #: apps/compliance/templates/email/compliance/termination_withdrawn/subject.txt
 msgid "The notice of termination of your seller account is withdrawn"
@@ -13408,7 +13436,7 @@ msgstr "Márquelo si la decisión la tomó un software."
 
 #: apps/vendors/models.py
 msgid "Tick it if the shop closes on the same days every year."
-msgstr "Marca si la tienda cierra los mismos días cada año."
+msgstr "Marque si la tienda cierra los mismos días cada año."
 
 #: apps/vendors/models.py
 msgid ""
