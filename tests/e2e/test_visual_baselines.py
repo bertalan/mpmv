@@ -23,6 +23,7 @@ from apps.catalog.tests.factories import (
     CategoryFactory,
     CategoryTranslationFactory,
     ProductFactory,
+    ProductImageFactory,
     ProductTranslationFactory,
     TaxonomyFactory,
     TermFactory,
@@ -31,7 +32,7 @@ from apps.catalog.tests.factories import (
 )
 from apps.cms.tests.factories import BlogPostPageFactory, LegalPageFactory
 from apps.core.models import TranslationStatus
-from apps.core.tests.factories import PlatformOperatorFactory, utc
+from apps.core.tests.factories import MediaImageFactory, PlatformOperatorFactory, utc
 from apps.events.models import EventPage
 from apps.events.tests.factories import EventPageFactory
 from apps.orders.tests.integration.test_checkout_views import vendor
@@ -127,6 +128,12 @@ def test_key_page_matches_its_visual_baseline(
     page.clock.set_fixed_time(utc(2026, 11, 18, 10))  # the page's JS sees one fixed "now"
     page.set_viewport_size({"width": 1280, "height": 900})
     if name == "cart":
+        # ORD.40: the line shows the product's cover; only here, so the product page keeps its baseline.
+        ProductImageFactory.create(
+            product=Product.objects.get(translations__slug="blue-vase"),
+            image=MediaImageFactory.create(),
+            is_cover=True,
+        )
         page.goto(f"{live_server.url}/product/blue-vase/")
         page.get_by_role("button", name=translated("Add to cart")).click()
         expect(page.locator("#add-to-cart-result")).to_contain_text(
