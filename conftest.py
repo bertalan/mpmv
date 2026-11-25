@@ -350,3 +350,11 @@ def _no_footer_cache_leaks_between_tests() -> "Iterator[None]":
     drop_footer_cache()
     yield
     drop_footer_cache()
+
+
+@pytest.fixture(autouse=True)
+def _reset_breach_checker() -> None:
+    """CORE.28: the fake breach checker starts every test empty and up."""
+    from apps.accounts.tests.fakes import FakeBreachChecker
+
+    FakeBreachChecker.reset()

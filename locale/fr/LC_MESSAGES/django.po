@@ -13361,6 +13361,10 @@ msgstr "Cette page n'est pas encore disponible dans ta langue."
 msgid "This parent does not exist."
 msgstr "Ce parent n'existe pas."
 
+#: apps/accounts/breach.py
+msgid "This password has appeared in a known data breach. Please choose a different one."
+msgstr "Ce mot de passe figure dans une fuite de données connue. Veuillez en choisir un autre."
+
 #: apps/compliance/templates/compliance/includes/destination_notice.html
 msgid ""
 "This product cannot be shipped to %(country)s: its safety warnings are not yet available in a "
@@ -15989,6 +15993,10 @@ msgstr ""
 #: apps/manager/event_block_forms.py
 msgid "Your own products, up to 12. Required."
 msgstr "Vos propres produits, 12 au maximum. Obligatoire."
+
+#: apps/accounts/breach.py
+msgid "Your password must not appear in a known data breach."
+msgstr "Le mot de passe ne doit figurer dans aucune fuite de données connue."
 
 #: apps/manager/templates/manager/shop/payments.html
 msgid "Your payout account is active. Customers can buy your products online."

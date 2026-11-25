@@ -32,6 +32,25 @@ def check_captcha_settings(
     ]
 
 
+def check_breach_check_url(app_configs: Any, **kwargs: Any) -> list[CheckMessage]:
+    """The real breach client must call an https URL (CORE.28); a fake checker has no URL."""
+    if not settings.BREACH_CHECK_ENABLED:
+        return []
+    from .breach import HibpRangeChecker
+
+    if import_string(settings.BREACH_CHECKER) is not HibpRangeChecker:
+        return []
+    if str(settings.BREACH_CHECK_URL).startswith("https://"):
+        return []
+    return [
+        Error(
+            "BREACH_CHECK_URL must start with https://.",
+            hint="Set MPMV_BREACH_CHECK_URL to an https URL, or unset it for the default.",
+            id="accounts.E002",
+        )
+    ]
+
+
 AUTHENTICATION = "django.contrib.auth.middleware.AuthenticationMiddleware"
 OTP = "django_otp.middleware.OTPMiddleware"
 MFA = "apps.accounts.middleware.MfaRequiredMiddleware"

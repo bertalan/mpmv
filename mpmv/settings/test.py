@@ -39,6 +39,9 @@ COMPLIANCE_COUNTRY_LANGUAGES_CACHE_SECONDS = 0  # the same reason: tests roll ba
 # URL is the local discard port in case a test builds the real HTTP client from these settings.
 VIES_CLIENT = "apps.tax.tests.fakes.RefusingViesClient"
 VIES_API_URL = "http://127.0.0.1:9/"
+# CORE.28: the suite never reaches the breach API; tests use the fake (accounts tests fakes).
+BREACH_CHECKER = "apps.accounts.tests.fakes.FakeBreachChecker"
+BREACH_CHECK_URL = "http://127.0.0.1:9/"
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]  # fast hashing in tests only
 
 # Parallel runs (several agents or worktrees) each get their own test database.
