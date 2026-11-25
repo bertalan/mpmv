@@ -97,3 +97,43 @@ def test_validator_refuses_a_breached_password_and_passes_when_down() -> None:
     FakeBreachChecker.down = True
     BreachedPasswordValidator().validate(password)
     BreachedPasswordValidator().validate(secrets.token_urlsafe(16))
+
+
+def test_a_lone_surrogate_fails_open_not_with_a_500() -> None:
+    checker = HibpRangeChecker(transport=Recorder(""))
+    with pytest.raises(BreachCheckUnavailable):
+        checker.is_breached("abc\ud800def")
+
+
+def test_an_oversized_answer_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    from apps.accounts import breach
+
+    class Huge:
+        def __enter__(self) -> "Huge":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def read(self, size: int) -> bytes:
+            return b"A" * size
+
+    monkeypatch.setattr(breach, "open_url", lambda request, timeout: Huge())
+    with pytest.raises(ValueError, match="too large"):
+        breach._get_text("https://x.test/range/ABCDE", {}, 1.0)
+
+
+@pytest.mark.parametrize(
+    ("url", "checker", "errors"),
+    [
+        ("http://x.test/range/", "apps.accounts.breach.HibpRangeChecker", 1),
+        ("file:///etc/passwd", "apps.accounts.breach.HibpRangeChecker", 1),
+        ("https://x.test/range/", "apps.accounts.breach.HibpRangeChecker", 0),
+        ("http://127.0.0.1:9/", "apps.accounts.tests.fakes.FakeBreachChecker", 0),
+    ],
+)
+def test_the_real_client_needs_an_https_url(url: str, checker: str, errors: int) -> None:
+    from apps.accounts.checks import check_breach_check_url
+
+    with override_settings(BREACH_CHECK_URL=url, BREACH_CHECKER=checker):
+        assert len(check_breach_check_url(None)) == errors

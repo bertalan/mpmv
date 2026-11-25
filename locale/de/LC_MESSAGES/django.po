@@ -13394,7 +13394,7 @@ msgstr "Dieser übergeordnete Knoten existiert nicht."
 
 #: apps/accounts/breach.py
 msgid "This password has appeared in a known data breach. Please choose a different one."
-msgstr "Dieses Passwort ist in einem bekannten Datenleck aufgetaucht. Bitte wähle ein anderes."
+msgstr "Dieses Passwort ist in einem bekannten Datenleck aufgetaucht. Bitte wählen Sie ein anderes."
 
 #: apps/compliance/templates/compliance/includes/destination_notice.html
 msgid ""

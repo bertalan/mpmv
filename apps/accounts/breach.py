@@ -25,6 +25,8 @@ logger = logging.getLogger(__name__)
 
 HIBP_RANGE_URL = "https://api.pwnedpasswords.com/range/"
 PREFIX_LENGTH = 5
+# A real answer is about 40 KB; anything bigger is refused (a hostile or broken endpoint).
+MAX_BODY_BYTES = 1_000_000
 
 # (url, headers, timeout in seconds) -> response body text.
 Transport = Callable[[str, Mapping[str, str], float], str]
@@ -47,7 +49,9 @@ class BreachedPasswordChecker(Protocol):
 def _get_text(url: str, headers: Mapping[str, str], timeout: float) -> str:
     request = urllib.request.Request(url, headers=dict(headers), method="GET")  # noqa: S310 (fixed https URL)
     with open_url(request, timeout=timeout) as response:  # never follows a redirect
-        body: bytes = response.read()
+        body: bytes = response.read(MAX_BODY_BYTES + 1)
+    if len(body) > MAX_BODY_BYTES:
+        raise ValueError("breach API answer too large")
     return body.decode("ascii", errors="replace")
 
 
@@ -61,9 +65,9 @@ class HibpRangeChecker:
         self._base_url = base_url or str(settings.BREACH_CHECK_URL or HIBP_RANGE_URL)
 
     def is_breached(self, password: str) -> bool:
-        digest = hashlib.sha1(password.encode(), usedforsecurity=False).hexdigest().upper()
-        prefix, suffix = digest[:PREFIX_LENGTH], digest[PREFIX_LENGTH:]
         try:
+            digest = hashlib.sha1(password.encode(), usedforsecurity=False).hexdigest().upper()
+            prefix, suffix = digest[:PREFIX_LENGTH], digest[PREFIX_LENGTH:]
             body = self._transport(
                 self._base_url + prefix, {"Add-Padding": "true"}, self.TIMEOUT_SECONDS
             )

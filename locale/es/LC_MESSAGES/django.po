@@ -13245,7 +13245,7 @@ msgstr "Este padre no existe."
 
 #: apps/accounts/breach.py
 msgid "This password has appeared in a known data breach. Please choose a different one."
-msgstr "Esta contraseña ha aparecido en una filtración de datos conocida. Elige otra."
+msgstr "Esta contraseña ha aparecido en una filtración de datos conocida. Elija otra."
 
 #: apps/compliance/templates/compliance/includes/destination_notice.html
 msgid ""
