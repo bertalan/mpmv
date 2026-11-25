@@ -9,7 +9,7 @@ from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
 from apps.vendors.models import VendorClosure
 from apps.vendors.services import add_closure, delete_closure, update_closure
-from apps.vendors.tests.factories import VendorFactory
+from apps.vendors.tests.factories import VendorClosureFactory, VendorFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -146,3 +146,10 @@ def test_validation_messages_are_translated() -> None:
     assert caught.value.message_dict["end_date"] == [
         "La data di fine non può precedere la data di inizio."
     ]
+
+
+def test_factory_row_can_be_updated_through_the_service() -> None:
+    closure = VendorClosureFactory.create()
+    update_closure(closure, notice_days=7, ctx=CTX, today=TODAY)
+    closure.refresh_from_db()
+    assert closure.notice_days == 7
