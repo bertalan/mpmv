@@ -2,6 +2,7 @@
 append-only audit log, the platform operator, the feature flags, the shared image model and its
 licence allow list, the transactional email outbox."""
 
+import functools
 import json
 import posixpath
 import uuid
@@ -12,7 +13,7 @@ from urllib.parse import urlsplit
 from django.conf import settings
 from django.contrib.postgres.constraints import ExclusionConstraint
 from django.contrib.postgres.fields import ArrayField, DateTimeRangeField, RangeOperators
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.files.base import ContentFile
 from django.core.validators import MaxValueValidator, MinValueValidator, URLValidator
 from django.db import models, transaction
@@ -457,16 +458,34 @@ def default_platform_refund_cases() -> list[str]:
     return list(PLATFORM_REFUND_CASES)
 
 
+@functools.cache
+def known_time_zones() -> frozenset[str]:
+    """ARC.27: the IANA time zone names this system knows (read once: it scans the zone data)."""
+    import zoneinfo
+
+    return frozenset(zoneinfo.available_timezones())
+
+
+def configured_time_zone_name() -> str:
+    """ARC.27: the configured zone (`MPMV_BUSINESS_TIME_ZONE`, UTC when unset), refused with a
+    clear error when it is not a known IANA name (the core.E931 check reports it first)."""
+    name = str(settings.BUSINESS_TIME_ZONE)
+    if name not in known_time_zones():
+        raise ImproperlyConfigured(
+            f"MPMV_BUSINESS_TIME_ZONE={name!r} is not a known IANA time zone (core.E931)."
+        )
+    return name
+
+
 def default_business_time_zone() -> str:
-    """ARC.27: a new operator row starts in the configured zone (`MPMV_BUSINESS_TIME_ZONE`)."""
-    return str(settings.BUSINESS_TIME_ZONE)
+    """ARC.27: a new operator row starts in the configured zone (`MPMV_BUSINESS_TIME_ZONE`);
+    an unknown name raises instead of being written (migration 0035 seeds through this)."""
+    return configured_time_zone_name()
 
 
 def validate_time_zone(value: str) -> None:
     """ARC.27: an IANA time zone name that this system knows, such as `Europe/Rome`."""
-    import zoneinfo
-
-    if value not in zoneinfo.available_timezones():
+    if value not in known_time_zones():
         raise ValidationError(_("Enter a time zone name such as Europe/Rome."))
 
 
@@ -533,7 +552,8 @@ class PlatformOperator(Versioned):
         help_text=_(
             "The time zone of the platform's calendar: when a day, a month or a year starts "
             "for order numbers, deadlines and retention. For example Europe/Rome. Change it "
-            "only with your developer: scheduled jobs and order records depend on it."
+            "only with your developer, and only from 1 January: scheduled jobs, order records "
+            "and tax periods depend on it."
         ),
     )
     dac7_authority_country = CountryField(

@@ -434,8 +434,9 @@ REQUEST_FIELDS = (
 
 
 def business_date(at: dt.datetime) -> dt.date:
-    """The date of `at` in business time (`business_tz()`, ARC.27), as invoices see it."""
-    return timezone.localdate(at, business_tz())
+    """The date of `at` in business time, as invoices see it: the zone of the operator version
+    valid at `at` (`business_tz(at)`, ARC.27), so a later zone change leaves past dates alone."""
+    return timezone.localdate(at, business_tz(at))
 
 
 def _public_id(obj: Any) -> str | None:

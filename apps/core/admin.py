@@ -45,6 +45,7 @@ from .models import (
 )
 from .services import (
     NoPlatformOperator,
+    business_zone_refusals,
     check_operator_start,
     configure_platform_operator,
     current_operator,
@@ -162,6 +163,13 @@ class PlatformOperatorForm(forms.ModelForm[PlatformOperator]):
 
     def clean_session_policy(self) -> Any:
         return self.cleaned_data.get("session_policy") or {}
+
+    def clean_business_time_zone(self) -> str:
+        zone: str = self.cleaned_data["business_time_zone"]
+        refusals = business_zone_refusals(zone)  # ARC.27: orders until ORD.41
+        if refusals:
+            raise forms.ValidationError(refusals)
+        return zone
 
     def clean_valid_from(self) -> dt.datetime:
         valid_from: dt.datetime = self.cleaned_data["valid_from"]

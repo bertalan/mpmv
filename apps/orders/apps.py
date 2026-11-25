@@ -46,6 +46,11 @@ class OrdersConfig(AppConfig):
         )
         from django.core import checks
 
-        from .checks import check_trigger_time_zone
+        from apps.core.services import register_business_zone_guard
 
-        checks.register(check_trigger_time_zone, checks.Tags.database)  # ARC.27
+        from .checks import check_trigger_time_zone
+        from .tz import trigger_zone_refusal
+
+        # ARC.27 until ORD.41: fail closed on a zone the order triggers cannot follow.
+        checks.register(check_trigger_time_zone, checks.Tags.database)
+        register_business_zone_guard(trigger_zone_refusal)

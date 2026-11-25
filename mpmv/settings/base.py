@@ -127,6 +127,7 @@ MIDDLEWARE = [
     # With the other header middleware, so responses returned early by an inner middleware
     # (CommonMiddleware's APPEND_SLASH redirect, LIVE's static files) carry it too (SEC.5).
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "apps.core.middleware.BusinessZoneMemoMiddleware",  # ARC.27: one zone lookup per request
     "apps.themes.middleware.ThemeMiddleware",  # the site's theme for the template loader (THM.1)
     # EVT.14: no cookie and no `Vary: Accept-Language` on tiles; outside Session and Locale.
     "apps.core.middleware.TileResponseNeutralMiddleware",

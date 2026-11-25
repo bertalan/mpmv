@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='platformoperator',
             name='business_time_zone',
-            field=models.CharField(default=apps.core.models.default_business_time_zone, help_text="The time zone of the platform's calendar: when a day, a month or a year starts for order numbers, deadlines and retention. For example Europe/Rome. Change it only with your developer: scheduled jobs and order records depend on it.", max_length=64, validators=[apps.core.models.validate_time_zone], verbose_name='business time zone'),
+            field=models.CharField(default=apps.core.models.default_business_time_zone, help_text="The time zone of the platform's calendar: when a day, a month or a year starts for order numbers, deadlines and retention. For example Europe/Rome. Change it only with your developer, and only from 1 January: scheduled jobs, order records and tax periods depend on it.", max_length=64, validators=[apps.core.models.validate_time_zone], verbose_name='business time zone'),
         ),
     ]

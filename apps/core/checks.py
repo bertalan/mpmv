@@ -19,6 +19,7 @@
 - Site flags (ARC.29): `check --deploy` refuses `MPMV_DEMO_MODE` and `MPMV_FORCE_NOINDEX` where
   live data is held (core.E801).
 - Image formats (THM.12): a warning when Pillow cannot encode AVIF (core.W501).
+- Business time zone (ARC.27): `MPMV_BUSINESS_TIME_ZONE` is a known IANA name (core.E931).
 """
 
 import ast
@@ -39,7 +40,7 @@ from django.http import HttpRequest
 from . import encryption, flags
 from .crypto import DecryptionError
 from .http import trusted_proxy_networks
-from .models import TranslationModel
+from .models import TranslationModel, known_time_zones
 
 # Workflow fields of the base model: never translated texts.
 BASE_FIELDS = frozenset(f.name for f in TranslationModel._meta.get_fields())
@@ -553,6 +554,24 @@ def check_email_settings(
             )
         )
     return errors
+
+
+def check_business_time_zone(
+    app_configs: Iterable[AppConfig] | None, **kwargs: Any
+) -> list[checks.CheckMessage]:
+    """ARC.27: the configured business time zone (`MPMV_BUSINESS_TIME_ZONE`) is a known IANA
+    name (core.E931). It seeds the operator and stands in before one exists, so an unknown name
+    would stop every date computation; this check refuses it before `migrate` writes it."""
+    name = str(getattr(settings, "BUSINESS_TIME_ZONE", ""))
+    if name in known_time_zones():
+        return []
+    return [
+        checks.Error(
+            f"MPMV_BUSINESS_TIME_ZONE={name!r} is not a known IANA time zone.",
+            hint="Use a name such as Europe/Rome or UTC (deploy/server/mpmv.env.example).",
+            id="core.E931",
+        )
+    ]
 
 
 def check_privacy_pepper(

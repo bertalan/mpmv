@@ -128,7 +128,8 @@ def _year_and_prefix(now: dt.datetime | None) -> tuple[int, str]:
         raise ImproperlyConfigured(
             f"ORDER_NUMBER_PREFIX is longer than {MAX_PREFIX_LENGTH} characters"
         )
-    return (now or timezone.now()).astimezone(business_tz()).year, prefix
+    moment = now or timezone.now()
+    return moment.astimezone(business_tz(moment)).year, prefix
 
 
 def peek_order_number(*, now: dt.datetime | None = None) -> str:

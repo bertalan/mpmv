@@ -29,6 +29,7 @@ from typing import Any, ParamSpec, TypeVar
 from zoneinfo import ZoneInfo
 
 import croniter
+from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from procrastinate import App, BaseRetryStrategy, RetryDecision
 from procrastinate.contrib.django import app as _proxy_app
@@ -130,6 +131,8 @@ def _operator_zone() -> ZoneInfo:
 
     try:
         return business_tz()
+    except ImproperlyConfigured:
+        raise  # an unknown MPMV_BUSINESS_TIME_ZONE (core.E931): never guess a zone
     except Exception:  # the worker must start: no database yet, or none allowed (unit tests)
         logger.warning("Scheduler: operator time zone unavailable, using the configured zone")
         return configured_tz()
