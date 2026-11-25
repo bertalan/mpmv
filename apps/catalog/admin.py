@@ -23,6 +23,7 @@ from django.db import models
 from django.db.models import QuerySet
 from django.forms.models import BaseInlineFormSet
 from django.http import HttpRequest
+from django.utils.translation import gettext_lazy as _
 from treebeard.forms import TreeNodeChoiceField
 
 from apps.core.audit import audit_context
@@ -90,12 +91,54 @@ def take_price_change(
     return new_prices
 
 
+class ProductTranslationForm(forms.ModelForm[ProductTranslation]):
+    """The human review step of a machine text (CMP.8): the box records who confirmed it, and
+    without it a machine text cannot leave draft."""
+
+    reviewer: Any = None  # the signed-in user, set by the inline's `get_formset`
+    confirm_human_review = forms.BooleanField(
+        required=False,
+        label=_("I have read and checked this text"),
+        help_text=_("Needed to review or publish a text written by a machine."),
+    )
+
+    class Meta:
+        model = ProductTranslation
+        fields = (
+            "language",
+            "status",
+            "origin",
+            "title",
+            "short_description",
+            "description",
+            "material",
+            "colour",
+            "seo_title",
+            "seo_description",
+        )
+
+    def clean(self) -> dict[str, Any]:
+        cleaned = super().clean() or {}
+        if cleaned.get("confirm_human_review") and cleaned.get("origin") == "machine":
+            self.instance.mark_human_reviewed(self.reviewer)
+        return cleaned
+
+
 class ProductTranslationInline(admin.StackedInline[ProductTranslation, Product]):
     model = ProductTranslation
+    form = ProductTranslationForm
     extra = 1
+
+    def get_formset(self, request: HttpRequest, obj: Any = None, **kwargs: Any) -> Any:
+        formset = super().get_formset(request, obj, **kwargs)
+        formset.form = type("ReviewedForm", (formset.form,), {"reviewer": request.user})
+        return formset
+
     fields = (
         "language",
         "status",
+        "origin",
+        "confirm_human_review",
         "title",
         "short_description",
         "description",

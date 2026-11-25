@@ -1320,6 +1320,14 @@ msgstr ""
 msgid "Age in days"
 msgstr "Alter in Tagen"
 
+#: themes/base/templates/components/ai_image_label.html
+msgid "AI-edited image"
+msgstr "Mit KI bearbeitetes Bild"
+
+#: themes/base/templates/components/ai_image_label.html
+msgid "AI-generated image"
+msgstr "KI-generiertes Bild"
+
 #: apps/core/templates/email/core/ops_alert/body.html
 #: apps/core/templates/email/core/ops_alert/body.txt
 msgid "Alert"
@@ -5630,6 +5638,10 @@ msgstr "Namen unterscheiden sich je Sprache"
 msgid "Necessary"
 msgstr "Notwendig"
 
+#: apps/catalog/admin.py
+msgid "Needed to review or publish a text written by a machine."
+msgstr "Erforderlich, um einen maschinell geschriebenen Text zu prüfen oder zu veröffentlichen."
+
 #: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
 msgid "Needed with this product"
 msgstr "Zusätzlich zu diesem Produkt erforderlich"
@@ -8610,6 +8622,14 @@ msgstr ""
 #: apps/manager/fitment_views.py apps/manager/views.py
 msgid "Saved."
 msgstr "Gespeichert."
+
+#: apps/catalog/models.py
+msgid ""
+"Say so when AI made the image or changed what it shows. The product page then shows an 'AI-"
+"generated image' or 'AI-edited image' label next to it."
+msgstr ""
+"Geben Sie das an, wenn KI das Bild erstellt oder seinen Inhalt verändert hat. Die Produktseite "
+"zeigt dann neben dem Bild den Hinweis „KI-generiertes Bild“ oder „Mit KI bearbeitetes Bild“."
 
 #: apps/compliance/forms.py
 msgid "Say whether the content is illegal or only against the platform terms."
@@ -15381,6 +15401,14 @@ msgid ""
 msgstr ""
 "Wer den Artikel geschrieben hat. Der Name erscheint unter dem Titel und verlinkt auf die Seite des"
 " Autors. Wenn Sie das Feld leer lassen, wird kein Autor angezeigt."
+
+#: apps/catalog/models.py
+msgid ""
+"Who wrote the text. A machine text can only be set to reviewed or published after a person has "
+"read and checked it."
+msgstr ""
+"Wer den Text geschrieben hat. Ein maschinell geschriebener Text kann erst als geprüft oder "
+"veröffentlicht gesetzt werden, nachdem eine Person ihn gelesen und kontrolliert hat."
 
 #: apps/orders/templates/orders/_legal_recap.html themes/ride/templates/orders/_legal_recap.html
 msgid "Who you buy from and on which terms"

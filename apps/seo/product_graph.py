@@ -49,6 +49,7 @@ class ImageData:
     credit_text: str = ""
     creator: str = ""
     copyright_notice: str = ""
+    digital_source_type: str = ""  # IPTC URI of an AI image (CMP.8)
 
 
 @dataclass(frozen=True)
@@ -133,6 +134,7 @@ def image_node(image: ImageData) -> dict[str, Any]:
             "creditText": image.credit_text,
             "creator": {"@type": "Person", "name": image.creator} if image.creator else "",
             "copyrightNotice": image.copyright_notice,
+            "digitalSourceType": image.digital_source_type,
         }
     )
 

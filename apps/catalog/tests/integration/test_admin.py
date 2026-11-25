@@ -118,6 +118,7 @@ def test_add_product_with_translations_and_a_variant(staff_client: Client) -> No
         {
             "translations-0-language": primary_language(),
             "translations-0-status": "published",
+            "translations-0-origin": "human",
             "translations-0-title": "Leather bag",
             "translations-0-short_description": "Hand-stitched.",
             "translations-0-description": "A hand-stitched leather bag.",
@@ -126,6 +127,7 @@ def test_add_product_with_translations_and_a_variant(staff_client: Client) -> No
             "translations-0-seo_description": "",
             "translations-1-language": other_language(),
             "translations-1-status": "machine",
+            "translations-1-origin": "human",
             "translations-1-title": "Borsa in pelle",
         }
     )
@@ -315,3 +317,34 @@ def test_variant_changelist_filters_by_vendor(staff_client: Client) -> None:
     )
     assert response.status_code == 200
     assert list(response.context["cl"].result_list) == [mine]
+
+
+def machine_text_form(vendor: Vendor, **extra: str) -> dict[str, Any]:
+    data = product_form(vendor)
+    data.update(management_form("translations", total=1))
+    data.update(management_form("variants", total=0))
+    data.update(
+        {
+            "translations-0-language": other_language(),
+            "translations-0-status": "published",
+            "translations-0-origin": "machine",
+            "translations-0-title": "Borsa in pelle",
+            **{f"translations-0-{name}": value for name, value in extra.items()},
+        }
+    )
+    return data
+
+
+def test_a_machine_text_needs_the_review_box_to_be_published(staff_client: Client) -> None:
+    """CMP.8: unreviewed machine text cannot be published as reviewed."""
+    url = reverse("admin:catalog_product_add")
+    vendor = VendorFactory.create()
+    refused = staff_client.post(url, machine_text_form(vendor))
+    assert refused.status_code == 200
+    assert not Product.objects.exists()
+    accepted = staff_client.post(url, machine_text_form(vendor, confirm_human_review="on"))
+    assert accepted.status_code == 302, accepted.content.decode()
+    text = Product.objects.get().translations.get()
+    assert (text.status, text.origin) == ("published", "machine")
+    assert text.human_reviewed_by is not None
+    assert text.human_reviewed_at is not None

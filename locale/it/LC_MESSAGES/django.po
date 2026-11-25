@@ -1305,6 +1305,14 @@ msgstr ""
 msgid "Age in days"
 msgstr "Età in giorni"
 
+#: themes/base/templates/components/ai_image_label.html
+msgid "AI-edited image"
+msgstr "Immagine modificata con IA"
+
+#: themes/base/templates/components/ai_image_label.html
+msgid "AI-generated image"
+msgstr "Immagine generata con IA"
+
 #: apps/core/templates/email/core/ops_alert/body.html
 #: apps/core/templates/email/core/ops_alert/body.txt
 msgid "Alert"
@@ -5575,6 +5583,10 @@ msgstr "I nomi cambiano per lingua"
 msgid "Necessary"
 msgstr "Necessari"
 
+#: apps/catalog/admin.py
+msgid "Needed to review or publish a text written by a machine."
+msgstr "Serve per rivedere o pubblicare un testo scritto da una macchina."
+
 #: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
 msgid "Needed with this product"
 msgstr "Ti serve insieme a questo prodotto"
@@ -8529,6 +8541,15 @@ msgstr ""
 #: apps/manager/fitment_views.py apps/manager/views.py
 msgid "Saved."
 msgstr "Salvato."
+
+#: apps/catalog/models.py
+msgid ""
+"Say so when AI made the image or changed what it shows. The product page then shows an 'AI-"
+"generated image' or 'AI-edited image' label next to it."
+msgstr ""
+"Indicalo quando l'IA ha creato l'immagine o ne ha cambiato il contenuto. La pagina del prodotto "
+"mostra allora accanto all'immagine l'etichetta «Immagine generata con IA» o «Immagine modificata "
+"con IA»."
 
 #: apps/compliance/forms.py
 msgid "Say whether the content is illegal or only against the platform terms."
@@ -15186,6 +15207,14 @@ msgid ""
 msgstr ""
 "Chi ha scritto l'articolo. Il nome compare sotto il titolo e rimanda alla pagina dell'autore. Se "
 "lo lasci vuoto, non viene mostrato alcun autore."
+
+#: apps/catalog/models.py
+msgid ""
+"Who wrote the text. A machine text can only be set to reviewed or published after a person has "
+"read and checked it."
+msgstr ""
+"Chi ha scritto il testo. Un testo scritto da una macchina può essere impostato come rivisto o "
+"pubblicato solo dopo che una persona lo ha letto e controllato."
 
 #: apps/orders/templates/orders/_legal_recap.html themes/ride/templates/orders/_legal_recap.html
 msgid "Who you buy from and on which terms"

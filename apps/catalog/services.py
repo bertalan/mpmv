@@ -37,7 +37,7 @@ from apps.core import translations
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
 from apps.core.i18n import primary_language
-from apps.core.models import MediaImage
+from apps.core.models import MediaImage, TranslationStatus
 from apps.core.money import CURRENCY
 from apps.core.services import audit_changes, holds_permission, run_mutation, save_audited
 from apps.core.sitemap_version import bump_sitemap_version
@@ -48,7 +48,7 @@ from apps.vendors.scoping import VendorScopedQuerySet, is_platform_staff
 from apps.vendors.seller_name import public_name
 from apps.vendors.services import ensure_vendor_can_write, vendors_in_suggestions
 
-from . import engine, listings, publishing, slugs
+from . import ai_labels, engine, listings, publishing, slugs
 from .models import (
     Attribute,
     AttributeValue,
@@ -529,6 +529,38 @@ def record_translation_facts_change(
         translation_facts_snapshot(translation),
     )
     audit_changes(changes, ctx=ctx, action=PRODUCT_UPDATED)
+    return changes
+
+
+def review_translation(
+    translation: ProductTranslation,
+    *,
+    reviewer: Any,
+    status: str,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """A person confirms a product text and moves it to `reviewed` or `published` (CMP.8).
+
+    This is the human review step: for a machine-origin text it records who read it and when,
+    which is what lets the status leave `machine`. Any other status is refused here.
+    """
+    if status not in (TranslationStatus.REVIEWED, TranslationStatus.PUBLISHED):
+        raise ValidationError({"status": "Choose reviewed or published."})
+    changes = ChangeSet()
+    with transaction.atomic():
+        stored = ProductTranslation.objects.select_related("product__vendor").get(pk=translation.pk)
+        before = {**_translation_snapshot(stored), "status": stored.status, "origin": stored.origin}
+        stored.status = status
+        if stored.origin == ai_labels.ORIGIN_MACHINE:
+            stored.mark_human_reviewed(reviewer)
+        after = {**_translation_snapshot(stored), "status": status, "origin": stored.origin}
+        changes.update(TRANSLATION_MODEL, str(stored.public_id), before, after)
+        if dry_run or changes.is_empty:
+            return changes
+        stored.full_clean(exclude=["source_hash"])
+        stored.save()
+        audit_changes(changes, ctx=ctx, action=PRODUCT_UPDATED)
     return changes
 
 
