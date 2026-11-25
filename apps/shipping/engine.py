@@ -11,9 +11,11 @@ lives here too: one vendor's package in, an outcome out (Rates, IndicativeRates,
 Blocked), net of VAT; the VAT on shipping is the tax engine's (TAX.4).
 """
 
+import calendar
 import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
+from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from enum import IntEnum
 from typing import Final
@@ -935,3 +937,83 @@ def quote_shipping(
             return Rates(pickups)
         return Blocked(blocked, _MESSAGES[blocked])
     return _no_rate(COUNTRY_NOT_COVERED, cfg)
+
+
+# --- Vendor closures (VEN.20, owner decision Q-73) -------------------------------------------
+#
+# Calendar dates only: the caller turns "now" into a date in the business time zone (ARC.27)
+# before it calls in, so nothing here reads a clock or a zone. Periods are inclusive.
+
+
+@dataclass(frozen=True)
+class ClosureRule:
+    """One stored closure range; with `repeats_yearly` it recurs from the year it starts."""
+
+    start: date
+    end: date
+    repeats_yearly: bool
+
+
+@dataclass(frozen=True)
+class ClosedPeriod:
+    """A concrete closed range, first and last day included."""
+
+    start: date
+    end: date
+
+
+def _in_year(year: int, anchor: date) -> date:
+    """`anchor`'s month and day in `year`; 29 February becomes 28 February in other years."""
+    if anchor.month == 2 and anchor.day == 29 and not calendar.isleap(year):
+        return date(year, 2, 28)
+    return date(year, anchor.month, anchor.day)
+
+
+def expand_closures(
+    rules: Sequence[ClosureRule], window_start: date, window_end: date
+) -> tuple[ClosedPeriod, ...]:
+    """The periods of `rules` that touch the window, whole (not cut at its edges), sorted.
+
+    A yearly rule has an instance for every year from its first one; an instance whose end is
+    earlier in the calendar than its start runs over the year end. Overlapping periods are kept
+    apart: `earliest_dispatch_date` merges them.
+    """
+    found: set[ClosedPeriod] = set()
+    for rule in rules:
+        if not rule.repeats_yearly:
+            candidates = [ClosedPeriod(rule.start, rule.end)]
+        else:
+            wraps = (rule.end.month, rule.end.day) < (rule.start.month, rule.start.day)
+            candidates = [
+                ClosedPeriod(_in_year(year, rule.start), _in_year(year + wraps, rule.end))
+                for year in range(max(rule.start.year, window_start.year - 1), window_end.year + 1)
+            ]
+        found.update(c for c in candidates if c.end >= window_start and c.start <= window_end)
+    return tuple(sorted(found, key=lambda c: (c.start, c.end)))
+
+
+def earliest_dispatch_date(ordered_on: date, closed: Sequence[ClosedPeriod]) -> date:
+    """`ordered_on`, or the day after the closure it falls in.
+
+    Overlapping and adjacent periods (next start no later than the day after the current end)
+    count as one closure, so 1-15 and 16-31 August leave on 1 September.
+    """
+    merged: list[ClosedPeriod] = []
+    for period in sorted(closed, key=lambda c: (c.start, c.end)):
+        if merged and period.start <= merged[-1].end + timedelta(days=1):
+            if period.end > merged[-1].end:
+                merged[-1] = ClosedPeriod(merged[-1].start, period.end)
+        else:
+            merged.append(period)
+    for period in merged:
+        if period.start <= ordered_on <= period.end:
+            return period.end + timedelta(days=1)
+    return ordered_on
+
+
+def delivery_window(dispatch_on: date, min_days: int, max_days: int) -> tuple[date, date]:
+    """The earliest and latest delivery date for a method that takes `min_days` to `max_days`
+    counted from the dispatch date."""
+    if min_days < 0 or max_days < min_days:
+        raise ValueError("delivery days must satisfy 0 <= min_days <= max_days")
+    return dispatch_on + timedelta(days=min_days), dispatch_on + timedelta(days=max_days)

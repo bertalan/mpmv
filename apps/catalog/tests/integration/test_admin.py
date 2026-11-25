@@ -118,6 +118,7 @@ def test_add_product_with_translations_and_a_variant(staff_client: Client) -> No
         {
             "translations-0-language": primary_language(),
             "translations-0-status": "published",
+            "translations-0-origin": "human",
             "translations-0-title": "Leather bag",
             "translations-0-short_description": "Hand-stitched.",
             "translations-0-description": "A hand-stitched leather bag.",
@@ -126,6 +127,7 @@ def test_add_product_with_translations_and_a_variant(staff_client: Client) -> No
             "translations-0-seo_description": "",
             "translations-1-language": other_language(),
             "translations-1-status": "machine",
+            "translations-1-origin": "human",
             "translations-1-title": "Borsa in pelle",
         }
     )
@@ -315,3 +317,48 @@ def test_variant_changelist_filters_by_vendor(staff_client: Client) -> None:
     )
     assert response.status_code == 200
     assert list(response.context["cl"].result_list) == [mine]
+
+
+def review_form(text: Any, user: Any, **extra: str) -> Any:
+    from apps.catalog.admin import ProductTranslationForm
+
+    form_class = type("F", (ProductTranslationForm,), {"reviewer": user})
+    return form_class(
+        data={
+            "language": text.language,
+            "status": "published",
+            "title": text.title,
+            "short_description": "",
+            "description": "",
+            "material": "",
+            "colour": "",
+            "seo_title": "",
+            "seo_description": "",
+            **extra,
+        },
+        instance=text,
+    )
+
+
+def test_a_machine_text_needs_the_review_box_to_be_published(superuser: User) -> None:
+    """CMP.8: unreviewed machine text cannot be published as reviewed."""
+    text = ProductTranslationFactory.create(
+        origin="machine", status="machine", language=other_language()
+    )
+    refused = review_form(text, superuser)
+    assert not refused.is_valid()
+    text = ProductTranslation.objects.get(pk=text.pk)
+    accepted = review_form(text, superuser, confirm_human_review="on")
+    assert accepted.is_valid(), accepted.errors
+    accepted.save()
+    text.refresh_from_db()
+    assert (text.status, text.origin) == ("published", "machine")
+    assert text.human_reviewed_by == superuser
+    assert text.human_reviewed_at is not None
+
+
+def test_the_origin_is_read_only_in_the_translation_inline(staff_client: Client) -> None:
+    text = ProductTranslationFactory.create(origin="machine", status="machine")
+    url = reverse("admin:catalog_product_change", args=[text.product_id])
+    html = staff_client.get(url).content.decode()
+    assert 'name="translations-0-origin"' not in html

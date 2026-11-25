@@ -749,6 +749,14 @@ msgstr ""
 "Une question que poserait un nouveau vendeur, par exemple 'Combien ça coûte ?'. Obligatoire : la "
 "question ne peut pas être enregistrée sans elle."
 
+#: apps/vendors/services.py
+msgid "A range that has already ended cannot be saved."
+msgstr "Une période déjà terminée ne peut pas être enregistrée."
+
+#: apps/vendors/services.py
+msgid "A range that has ended stays as history."
+msgstr "Une période terminée reste dans l'historique."
+
 #: apps/manager/amendment_views.py
 msgid "a refund to the customer"
 msgstr "un remboursement au client"
@@ -1062,6 +1070,18 @@ msgstr "Une rétractation a déjà été enregistrée pour cette partie."
 msgid "a withdrawal was already recorded."
 msgstr "une rétractation a déjà été enregistrée."
 
+#: apps/vendors/services.py
+msgid "A yearly range cannot end on 29 February."
+msgstr "Une période annuelle ne peut pas se terminer le 29 février."
+
+#: apps/vendors/services.py
+msgid "A yearly range cannot start on 29 February."
+msgstr "Une période annuelle ne peut pas commencer le 29 février."
+
+#: apps/vendors/services.py
+msgid "A yearly range must last less than one year."
+msgstr "Une période annuelle doit durer moins d'un an."
+
 #: apps/manager/forms.py
 msgid "About the shop"
 msgstr "À propos de la boutique"
@@ -1311,6 +1331,14 @@ msgstr ""
 #: apps/manager/templates/manager/platform/stray_payments.html
 msgid "Age in days"
 msgstr "Âge en jours"
+
+#: themes/base/templates/components/ai_image_label.html
+msgid "AI-edited image"
+msgstr "Image modifiée par IA"
+
+#: themes/base/templates/components/ai_image_label.html
+msgid "AI-generated image"
+msgstr "Image générée par IA"
 
 #: apps/core/templates/email/core/ops_alert/body.html
 #: apps/core/templates/email/core/ops_alert/body.txt
@@ -3910,6 +3938,10 @@ msgstr "Rechercher la commande"
 msgid "Fingerprint %(hash)s."
 msgstr "Empreinte %(hash)s."
 
+#: apps/vendors/models.py
+msgid "First closed day."
+msgstr "Premier jour de fermeture."
+
 #: apps/manager/event_forms.py
 msgid "First day"
 msgstr "Premier jour"
@@ -4433,6 +4465,10 @@ msgstr ""
 "Nombre de jours dont le consommateur dispose pour renvoyer les articles après les avoir reçus. La "
 "loi fixe un minimum de 14 jours pour les ventes aux consommateurs : un nombre inférieur est "
 "refusé. Obligatoire."
+
+#: apps/vendors/models.py
+msgid "How many days before the closure the notice appears (0 to 60)."
+msgstr "Combien de jours avant la fermeture l'avis apparaît (de 0 à 60)."
 
 #: apps/cms/forms_pages.py
 msgid ""
@@ -5067,6 +5103,10 @@ msgstr "Langue : %(language)s. Langue d'origine de l'événement : %(original)s.
 msgid "Languages:"
 msgstr "Langues :"
 
+#: apps/vendors/models.py
+msgid "Last closed day."
+msgstr "Dernier jour de fermeture."
+
 #: apps/manager/event_forms.py
 msgid "Last day"
 msgstr "Dernier jour"
@@ -5625,6 +5665,10 @@ msgstr "Les noms diffèrent selon la langue"
 #: apps/seo/providers.py
 msgid "Necessary"
 msgstr "Nécessaires"
+
+#: apps/catalog/admin.py
+msgid "Needed to review or publish a text written by a machine."
+msgstr "Nécessaire pour relire ou publier un texte écrit par une machine."
 
 #: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
 msgid "Needed with this product"
@@ -8603,6 +8647,14 @@ msgstr ""
 msgid "Saved."
 msgstr "Enregistré."
 
+#: apps/catalog/models.py
+msgid ""
+"Say so when AI made the image or changed what it shows. The product page then shows an 'AI-"
+"generated image' or 'AI-edited image' label next to it."
+msgstr ""
+"Indiquez-le lorsque l'IA a créé l'image ou modifié ce qu'elle montre. La page du produit affiche "
+"alors près de l'image l'étiquette « Image générée par IA » ou « Image modifiée par IA »."
+
 #: apps/compliance/forms.py
 msgid "Say whether the content is illegal or only against the platform terms."
 msgstr "Indiquez si le contenu est illicite ou seulement contraire aux conditions de la plateforme."
@@ -10422,6 +10474,10 @@ msgstr ""
 "L'e-mail ou le mot de passe est incorrect, ou le compte est verrouillé pour un moment. Veuillez "
 "réessayer."
 
+#: apps/vendors/services.py
+msgid "The end date cannot be before the start date."
+msgstr "La date de fin ne peut pas précéder la date de début."
+
 #: apps/manager/event_forms.py
 msgid "The event"
 msgstr "L'événement"
@@ -11353,6 +11409,10 @@ msgstr "Le signalement est en cours d'examen."
 #: apps/manager/termination_views.py
 msgid "The notice is withdrawn and the vendor is told."
 msgstr "Le préavis est retiré et le vendeur en est informé."
+
+#: apps/vendors/services.py
+msgid "The notice lead time is 0 to %(days)s days."
+msgstr "Le délai de l'avis va de 0 à %(days)s jours."
 
 #: apps/compliance/templates/email/compliance/termination_withdrawn/subject.txt
 msgid "The notice of termination of your seller account is withdrawn"
@@ -12710,6 +12770,10 @@ msgstr ""
 "défaut."
 
 #: apps/vendors/models.py
+msgid "The vendor this closure belongs to."
+msgstr "Le vendeur auquel appartient cette fermeture."
+
+#: apps/vendors/models.py
 msgid "The vendor this consent belongs to."
 msgstr "Le vendeur auquel appartient ce consentement."
 
@@ -13523,6 +13587,10 @@ msgstr "Cochez si un logiciel a aidé à trouver le contenu."
 #: apps/compliance/forms.py
 msgid "Tick it if software took the decision."
 msgstr "Cochez si la décision a été prise par un logiciel."
+
+#: apps/vendors/models.py
+msgid "Tick it if the shop closes on the same days every year."
+msgstr "Cochez si la boutique ferme aux mêmes dates chaque année."
 
 #: apps/vendors/models.py
 msgid ""
@@ -15345,6 +15413,14 @@ msgid ""
 msgstr ""
 "Qui a écrit l'article. Le nom apparaît sous le titre et renvoie à la page de l'auteur. Si vous le "
 "laissez vide, aucun auteur n'est affiché."
+
+#: apps/catalog/models.py
+msgid ""
+"Who wrote the text. A machine text can only be set to reviewed or published after a person has "
+"read and checked it."
+msgstr ""
+"Qui a écrit le texte. Un texte écrit par une machine ne peut passer en relu ou publié qu'après "
+"lecture et contrôle par une personne."
 
 #: apps/orders/templates/orders/_legal_recap.html themes/ride/templates/orders/_legal_recap.html
 msgid "Who you buy from and on which terms"

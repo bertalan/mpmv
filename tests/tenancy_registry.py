@@ -180,6 +180,7 @@ from apps.vendors.models import (
     SelfCertification,
     Vendor,
     VendorClaim,
+    VendorClosure,
     VendorFeatureFlag,
     VendorMember,
     VendorTranslation,
@@ -192,6 +193,7 @@ from apps.vendors.tests.factories import (
     SalesTermsVersionFactory,
     SelfCertificationFactory,
     VendorClaimFactory,
+    VendorClosureFactory,
     VendorFeatureFlagFactory,
     VendorMemberFactory,
     VendorTranslationFactory,
@@ -242,6 +244,7 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     VendorFeatureFlag: lambda vendor: VendorFeatureFlagFactory.create(vendor=vendor),
     CrossVendorConsent: lambda vendor: CrossVendorConsentFactory.create(vendor=vendor),
     VendorClaim: lambda vendor: VendorClaimFactory.create(vendor=vendor),
+    VendorClosure: lambda vendor: VendorClosureFactory.create(vendor=vendor),
     Product: lambda vendor: ProductFactory.create(vendor=vendor),
     ProductTranslation: lambda vendor: ProductTranslationFactory.create(
         product=ProductFactory.create(vendor=vendor)
