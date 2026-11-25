@@ -20,6 +20,7 @@ from django.http import (
     HttpResponse,
     HttpResponseBadRequest,
     HttpResponseNotFound,
+    HttpResponseRedirect,
     HttpResponseServerError,
 )
 from django.shortcuts import render
@@ -29,7 +30,7 @@ from django.views.decorators.http import require_GET
 
 from .models import BrandPalette
 from .palettes import ROLES
-from .services import get_registry, palette_stylesheet, resolved_theme, use_theme
+from .services import get_registry, icon_url, palette_stylesheet, resolved_theme, use_theme
 from .styleguide import (
     sample_breadcrumbs,
     sample_forms,
@@ -125,4 +126,15 @@ def palette_css(request: HttpRequest, theme: str, palette: str, digest: str) -> 
     response["Cache-Control"] = (
         "public, max-age=31536000, immutable" if digest == current else "public, max-age=60"
     )
+    return response
+
+
+@require_GET
+def favicon(request: HttpRequest) -> HttpResponse:
+    """`/favicon.ico` (THM.38): a redirect to the active theme's 32 px icon, never a 404.
+
+    Browsers ask for this path whatever the page links. The target is a hashed static file, so
+    the redirect itself is cached for a day only (a site may switch theme)."""
+    response = HttpResponseRedirect(icon_url(resolved_theme(request).slug, "icon-32.png"))
+    response["Cache-Control"] = "public, max-age=86400"
     return response
