@@ -5,8 +5,12 @@ Home page of the `ride` theme (THM.6): when the first block is a hero it carries
 `<h1>` (the page title stays in `<title>`); otherwise the page title is the `<h1>` as in base.
 A slider hero (THM.14) puts its titles in `<h2>`, so the page title is the `<h1>` above it, visible
 to assistive technology only: the slider is the first thing on screen.
+
+THM.24: every block but the hero and the call-to-action band sits in a full-bleed section on an
+alternating light and muted surface (`.home-section`, 38-surfaces.css); featured links render as
+image-led tiles with an overlay title (`tiles`). The hero and the band are full-bleed themselves.
 {% endcomment %}
 {% block content %}
   {% with first=page.body.0 %}{% if first.block_type != "hero" %}<h1>{{ page.title }}</h1>{% elif first.value.is_slider %}<h1 class="visually-hidden">{{ page.title }}</h1>{% endif %}{% endwith %}
-  {% for block in page.body %}{% if forloop.first and block.block_type == "hero" and not block.value.is_slider %}{% include_block block with heading_level=1 %}{% else %}{% include_block block %}{% endif %}{% endfor %}
+  {% for block in page.body %}{% if forloop.first and block.block_type == "hero" and not block.value.is_slider %}{% include_block block with heading_level=1 %}{% elif block.block_type == "hero" or block.block_type == "cta" %}{% include_block block %}{% else %}<div class="home-section full-bleed {% cycle 'surface-light' 'surface-muted' %}">{% include_block block with tiles=True %}</div>{% endif %}{% endfor %}
 {% endblock %}
