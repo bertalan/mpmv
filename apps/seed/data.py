@@ -31,6 +31,16 @@ REOPEN_REASON: Final = "Synthetic demo data seeded again after a reset (ARC.10).
 # --- Platform
 
 OPERATOR_NAME: Final = "Demo Marketplace Operator S.r.l."
+# SEO.18: the generated operator logo, the THM.38 site-icon mark at a size search engines take
+# (Google: at least 112 px, square fits every result layout), in the `ride` primary colour.
+OPERATOR_LOGO_TITLE: Final = "Demo operator logo"
+OPERATOR_LOGO_SIZE: Final = 512
+OPERATOR_LOGO_COLOUR: Final = (0xC4, 0x04, 0x17)
+# SEO.18: the source home's meta description, in the landing's own words (CMS.19, English).
+HOME_SEARCH_DESCRIPTION: Final = (
+    "Open your shop on our marketplace: list your products, and we bring the visitors, the "
+    "checkout and the payments. Apply in a few minutes."
+)
 CONTRACT_NOTE: Final = "Synthetic demo contract (ARC.10)."
 # The platform default commission rule of spec 04's example: 20% on the net goods, payment fee
 # 4% + 2.00 on the gross paid. Seeded only while no default rule is open (VEN.2).
