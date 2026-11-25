@@ -243,3 +243,36 @@ def retry_render(
             return ChangeSet()
         audit_changes(changes, ctx=ctx, action=RETRIED)
     return changes
+
+
+def backfill_group(
+    group: str, *, batch_size: int = CHUNK, dry_run: bool = False
+) -> tuple[int, int]:
+    """Queue the render job of `group` for every image that lacks its renditions, oldest first
+    (the way to give images saved before a preset existed its renditions). Returns (images
+    scanned, jobs queued; with `dry_run`, the images that would get one). Idempotent: an image
+    with all of them is skipped, and a job that already waits is not queued twice (queueing
+    lock). A fixed number of queries per batch, one transaction per batch."""
+    if group not in images.RENDER_GROUPS:
+        raise ValueError(f"unknown render group {group!r}")
+    scanned = queued = after = 0
+    while True:
+        batch = list(MediaImage.objects.filter(pk__gt=after).order_by("pk")[:batch_size])
+        if not batch:
+            return scanned, queued
+        after = batch[-1].pk
+        scanned += len(batch)
+        existing = _existing_specs([image.pk for image in batch])
+        lacking = [i for i in batch if _missing_groups(i, existing[i.pk], (group,))]
+        if dry_run:
+            queued += len(lacking)
+            continue
+        with transaction.atomic():
+            for image in lacking:
+                job = tasks.enqueue(
+                    tasks.render_image,
+                    image_id=image.pk,
+                    group=group,
+                    queueing_lock=f"{JOB}:{image.pk}:{group}",
+                )
+                queued += 1 if job is not None else 0

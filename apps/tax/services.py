@@ -1242,6 +1242,25 @@ def vendor_tax_snapshot(
     )
 
 
+def _stale(customer_vat: VatValidation, at: dt.datetime) -> bool:
+    return at - customer_vat.checked_at > dt.timedelta(seconds=settings.VIES_CACHE_SECONDS)
+
+
+def validated_business(
+    customer_vat: VatValidation | None, *, at: dt.datetime
+) -> engine.B2BValidated | None:
+    """The buyer as a validated business: only a VIES-valid answer no older than
+    `VIES_CACHE_SECONDS` at `at`; invalid, unavailable, stale or absent answers give None (T2,
+    fail closed). The one rule for reverse charge (TAX.5) and business-only sellers (VEN.41)."""
+    if customer_vat is None or customer_vat.result != engine.VAT_VALID:
+        return None
+    if _stale(customer_vat, at):
+        return None
+    return engine.B2BValidated(
+        customer_vat.country, customer_vat.vat_number, customer_vat.checked_at
+    )
+
+
 def build_tax_context(
     vendor: Vendor,
     *,
@@ -1260,22 +1279,17 @@ def build_tax_context(
     territories = tuple(territory_rules())
     vendor_profile = vendor_tax_snapshot(vendor, at, territories)
     operator = current_operator(at)
-    customer: engine.B2BValidated | None = None
+    customer = validated_business(customer_vat, at=at)
     vat_check: engine.VatCheckSnapshot | None = None
     if customer_vat is not None:
-        stale = at - customer_vat.checked_at > dt.timedelta(seconds=settings.VIES_CACHE_SECONDS)
         vat_check = engine.VatCheckSnapshot(
             country=customer_vat.country,
             vat_number=customer_vat.vat_number,
             result=customer_vat.result,
             request_id=customer_vat.request_id,
             checked_at=customer_vat.checked_at,
-            stale=stale and customer_vat.result == engine.VAT_VALID,
+            stale=_stale(customer_vat, at) and customer_vat.result == engine.VAT_VALID,
         )
-        if customer_vat.result == engine.VAT_VALID and not stale:
-            customer = engine.B2BValidated(
-                customer_vat.country, customer_vat.vat_number, customer_vat.checked_at
-            )
     return engine.TaxContext(
         on=at.date(),
         vendor_country=vendor.country,

@@ -43,7 +43,7 @@ from django.test import Client, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from apps.accounts import captcha
+from apps.accounts import breach, captcha
 from apps.core import mail, services
 from apps.core.geocoding import AddressQuery, GeocoderUnavailable
 from apps.core.geocoding import adapters as geo
@@ -171,6 +171,7 @@ OUTBOUND_CALL_SITES = {
     "apps/core/outbound.py": "the no-redirect opener; the host is always the caller's",
     "apps/core/geocoding/adapters.py": "fixed provider URLs; the address only in the query",
     "apps/accounts/captcha.py": "the fixed Turnstile siteverify URL",
+    "apps/accounts/breach.py": "settings.BREACH_CHECK_URL (https check); only a 5-char hash prefix",
     "apps/tax/vies.py": "settings.VIES_API_URL; the VAT number only in the JSON body",
     "apps/core/maps/adapters.py": "the tile URL template from settings; redirects refused",
     "apps/payments/stripe_client.py": "the fixed Stripe API base (lane A, PAY.2)",
@@ -319,6 +320,7 @@ TRANSPORTS: dict[str, Callable[[str], object]] = {
     "geocoder": lambda url: geo.http_get_json(url, {"q": "x"}, {}, 2.0),
     "vies": lambda url: vies.post_json(url, {"vatNumber": "1"}, 2.0),
     "captcha": lambda url: captcha._post_form(url, {"response": "x"}, 2.0),
+    "breach": lambda url: breach._get_text(url, {"Add-Padding": "true"}, 2.0),
 }
 
 

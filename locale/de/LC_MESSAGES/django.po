@@ -13413,6 +13413,10 @@ msgstr "Diese Seite ist in deiner Sprache noch nicht verfügbar."
 msgid "This parent does not exist."
 msgstr "Dieser übergeordnete Knoten existiert nicht."
 
+#: apps/accounts/breach.py
+msgid "This password has appeared in a known data breach. Please choose a different one."
+msgstr "Dieses Passwort ist in einem bekannten Datenleck aufgetaucht. Bitte wählen Sie ein anderes."
+
 #: apps/compliance/templates/compliance/includes/destination_notice.html
 msgid ""
 "This product cannot be shipped to %(country)s: its safety warnings are not yet available in a "
@@ -13425,6 +13429,14 @@ msgstr ""
 #: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
 msgid "This product is no longer available."
 msgstr "Dieses Produkt ist nicht mehr verfügbar."
+
+#: apps/orders/ui/present.py
+msgid ""
+"This seller sells to businesses only. To buy these items, enter in your business details a VAT "
+"number that passes the automatic check."
+msgstr ""
+"Dieser Verkäufer verkauft nur an Unternehmen. Um diese Artikel zu kaufen, gib in deinen "
+"Unternehmensdaten eine USt-IdNr. an, die die automatische Prüfung besteht."
 
 #: apps/accounts/templates/accounts/sessions/list.html
 #: themes/ride/templates/accounts/sessions/list.html
@@ -16066,6 +16078,10 @@ msgstr ""
 #: apps/manager/event_block_forms.py
 msgid "Your own products, up to 12. Required."
 msgstr "Ihre eigenen Produkte, bis zu 12. Pflichtfeld."
+
+#: apps/accounts/breach.py
+msgid "Your password must not appear in a known data breach."
+msgstr "Das Passwort darf in keinem bekannten Datenleck vorkommen."
 
 #: apps/manager/templates/manager/shop/payments.html
 msgid "Your payout account is active. Customers can buy your products online."
