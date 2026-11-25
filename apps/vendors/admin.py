@@ -61,6 +61,7 @@ from .services import (
     add_commission_rule,
     add_no_tin_country,
     approve_claim,
+    audit_vendor_text_changes,
     can_reopen,
     change_status,
     check_contract_start,
@@ -85,6 +86,7 @@ from .services import (
     send_claim_link,
     set_business_only,
     set_cross_vendor_consent,
+    vendor_text_snapshot,
 )
 
 StatusAction = Callable[[admin.ModelAdmin[Vendor], HttpRequest, QuerySet[Vendor]], None]
@@ -864,6 +866,15 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
         else:
             changes = save_vendor(obj, ctx=ctx)
         warn_about_establishment(self, request, obj, changes)
+
+    def save_formset(self, request: HttpRequest, form: Any, formset: Any, change: bool) -> None:
+        if formset.model is not VendorTranslation:
+            super().save_formset(request, form, formset, change)
+            return
+        # VEN.39: the inline writes the rows itself; the texts it changed are audited after it.
+        before = vendor_text_snapshot(form.instance)
+        super().save_formset(request, form, formset, change)
+        audit_vendor_text_changes(form.instance, before, ctx=audit_context(request))
 
     def delete_model(self, request: HttpRequest, obj: Vendor) -> None:
         delete_vendor(obj, ctx=audit_context(request))

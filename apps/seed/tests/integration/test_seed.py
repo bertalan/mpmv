@@ -416,3 +416,15 @@ def test_a_standard_page_can_ask_search_engines_to_skip_it(client: Client) -> No
     with override_settings(FORCE_NOINDEX=False, DEMO_MODE=False):
         assert 'name="robots" content="noindex"' in client.get("/hidden-demo/").content.decode()
         assert 'name="robots"' not in client.get("/shown-page/").content.decode()
+
+
+def test_the_seeded_vendor_texts_are_audited(demo_seed: ChangeSet) -> None:
+    """VEN.39: every seeded vendor text row has its `vendor.profile_changed` entry."""
+    from apps.core.models import AuditLog
+    from apps.vendors.models import VendorTranslation
+
+    keys = {f"{row.vendor.public_id}/{row.language}" for row in VendorTranslation.objects.all()}
+    found = AuditLog.objects.filter(action="vendor.profile_changed")
+    audited = set(found.values_list("target_key", flat=True))
+    assert keys
+    assert keys == audited

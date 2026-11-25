@@ -815,7 +815,10 @@ def _vendor(run: _Run, index: int, spec: data.VendorSeed, contract: VendorContra
             **policies,
         )
 
-    for row in _publish_texts(vendor.translations.all(), text, spec.tagline):
+    texts_before = vendors_services.vendor_text_snapshot(vendor)
+    published = _publish_texts(vendor.translations.all(), text, spec.tagline)
+    vendors_services.audit_vendor_text_changes(vendor, texts_before, ctx=run.ctx)  # VEN.39
+    for row in published:
         run.created("vendors.vendortranslation", f"{spec.slug}:{row.language}")
     return vendor
 
