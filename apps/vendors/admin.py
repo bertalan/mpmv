@@ -32,6 +32,7 @@ from apps.accounts.models import User
 from apps.core.admin import step_up
 from apps.core.audit import AuditContext, audit_context
 from apps.core.changeset import ChangeSet
+from apps.core.models import AuditLog
 from apps.core.tasks import business_tz
 from apps.core.text import ascii_int
 
@@ -56,6 +57,7 @@ from .models import (
 )
 from .services import (
     APPROVAL_DENIED,
+    BUSINESS_ONLY_CHANGED,
     add_commission_rule,
     add_no_tin_country,
     approve_claim,
@@ -81,6 +83,7 @@ from .services import (
     save_vendor,
     save_vendor_flag,
     send_claim_link,
+    set_business_only,
     set_cross_vendor_consent,
 )
 
@@ -163,6 +166,21 @@ class VendorTranslationInline(TranslationHelpMixin, admin.StackedInline[VendorTr
 
 
 REOPEN_TEMPLATE = "admin/vendors/vendor/reopen.html"
+BUSINESS_ONLY_TEMPLATE = "admin/vendors/vendor/business_only.html"
+
+
+class BusinessOnlyForm(forms.Form):
+    # The value staff saw on the page: a double submit or a concurrent change never flips it.
+    value = forms.ChoiceField(choices=(("on", "on"), ("off", "off")), widget=forms.HiddenInput)
+    reason = forms.CharField(
+        label="Reason",
+        max_length=1000,
+        widget=forms.Textarea(attrs={"rows": 4}),
+        help_text=(
+            "Required: what staff checked (VAT number in VIES, that the seller is a business). "
+            "It is kept in the audit log."
+        ),
+    )
 
 
 class ReopenForm(forms.Form):
@@ -388,7 +406,7 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
     search_fields = ("display_name", "legal_name", "slug", "vat_number", "contact_email")
     readonly_fields = (
         "status",
-        "business_only",
+        "business_only_flag",
         "public_id",
         "audit_trail",
         "onboarding",
@@ -409,7 +427,7 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
                     "display_name",
                     "slug",
                     "status",
-                    "business_only",
+                    "business_only_flag",
                     "public_id",
                     "audit_trail",
                 )
@@ -562,6 +580,34 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
             reverse("admin:vendors_vendor_claim_link", args=[obj.pk]),
         )
 
+    @admin.display(description="Business-only seller")
+    def business_only_flag(self, obj: Vendor | None) -> SafeString | str:
+        """The flag, its last change (who, when, why) and the staff action to flip it (VEN.41)."""
+        if obj is None or obj.pk is None:
+            return "-"
+        last = (
+            AuditLog.objects.filter(
+                action=BUSINESS_ONLY_CHANGED,
+                target_model="vendors.vendor",
+                target_key=str(obj.public_id),
+            )
+            .order_by("-created_at", "-id")
+            .first()
+        )
+        if last is None:
+            history = "No change recorded."
+        else:
+            reason = (last.after or {}).get("reason", "")
+            stamp = f"{last.created_at:%Y-%m-%d %H:%M} UTC"
+            history = f"Last change {stamp} by {last.actor_label}: {reason}"
+        return format_html(
+            '<strong>{}</strong> <span class="help">{}</span> <a class="button" href="{}">{}</a>',
+            "On" if obj.business_only else "Off",
+            history,
+            reverse("admin:vendors_vendor_business_only", args=[obj.pk]),
+            "Unmark as business-only" if obj.business_only else "Mark as business-only",
+        )
+
     @admin.display(description="Reopen")
     def reopen(self, obj: Vendor | None) -> SafeString | str:
         """A closed vendor is reopened on its own page, with a reason (VEN.21)."""
@@ -622,8 +668,17 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
             # Sending restarts a claim, also after a reject: a fresh second factor (CORE.4).
             return step_up(lambda req: self.claim_link_view(req, object_id))(request)
 
+        def business_only(request: HttpRequest, object_id: str) -> HttpResponse:
+            # Changes what buyers can do at checkout: a fresh second factor (CORE.4).
+            return step_up(lambda req: self.business_only_view(req, object_id))(request)
+
         prefix = f"{self.opts.app_label}_{self.opts.model_name}"
         urls = [
+            path(
+                "<path:object_id>/business-only/",
+                self.admin_site.admin_view(business_only),
+                name=f"{prefix}_business_only",
+            ),
             path(
                 "<path:object_id>/reopen/",
                 self.admin_site.admin_view(reopen),
@@ -713,6 +768,61 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
             "change_url": change_url,
         }
         return TemplateResponse(request, REOPEN_TEMPLATE, context)
+
+    def business_only_view(self, request: HttpRequest, object_id: str) -> HttpResponse:
+        """Staff set or clear the business-only flag (`set_business_only`), with a reason."""
+        obj = self.get_object(request, unquote(object_id))
+        if obj is None:
+            raise Http404("No such vendor.")
+        actor = cast(User, request.user)
+        if not self.has_change_permission(request, obj) or not can_reopen(actor):
+            raise PermissionDenied  # the service checks it too
+        change_url = reverse("admin:vendors_vendor_change", args=[obj.pk])
+        form = BusinessOnlyForm(
+            request.POST or None, initial={"value": "off" if obj.business_only else "on"}
+        )
+        new_value = not obj.business_only
+        if request.method == "POST" and form.is_valid():
+            new_value = form.cleaned_data["value"] == "on"
+            if obj.business_only == new_value:
+                self.message_user(
+                    request,
+                    f"{obj} is already marked as a business-only seller."
+                    if new_value
+                    else f"{obj} is already not marked as a business-only seller.",
+                    messages.INFO,
+                )
+                return redirect(change_url)
+            try:
+                set_business_only(
+                    obj,
+                    new_value,
+                    actor=actor,
+                    reason=form.cleaned_data["reason"],
+                    ctx=audit_context(request),
+                )
+            except engine.ReasonRequired as exc:
+                form.add_error("reason", str(exc))
+            else:
+                self.message_user(
+                    request,
+                    f"{obj} is now marked as a business-only seller."
+                    if new_value
+                    else f"{obj} is no longer marked as a business-only seller.",
+                    messages.SUCCESS,
+                )
+                return redirect(change_url)
+
+        context = {
+            **self.admin_site.each_context(request),
+            "opts": self.opts,
+            "original": obj,
+            "title": f"{'Mark' if new_value else 'Unmark'} {obj} as business-only",
+            "form": form,
+            "new_value": new_value,
+            "change_url": change_url,
+        }
+        return TemplateResponse(request, BUSINESS_ONLY_TEMPLATE, context)
 
     @admin.display(description="Audit trail")
     def audit_trail(self, obj: Vendor) -> SafeString | str:
