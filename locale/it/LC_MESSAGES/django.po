@@ -742,6 +742,14 @@ msgstr ""
 "Una domanda che farebbe un nuovo venditore, per esempio 'Quanto costa?'. Obbligatoria: senza non "
 "si può salvare la domanda."
 
+#: apps/vendors/services.py
+msgid "A range that has already ended cannot be saved."
+msgstr "Un intervallo già concluso non può essere salvato."
+
+#: apps/vendors/services.py
+msgid "A range that has ended stays as history."
+msgstr "Un intervallo concluso resta nello storico."
+
 #: apps/manager/amendment_views.py
 msgid "a refund to the customer"
 msgstr "un rimborso al cliente"
@@ -1055,6 +1063,18 @@ msgstr "Per quella parte è già stato registrato un recesso."
 #: apps/compliance/templates/compliance/withdrawal_choose.html
 msgid "a withdrawal was already recorded."
 msgstr "è già stato registrato un recesso."
+
+#: apps/vendors/services.py
+msgid "A yearly range cannot end on 29 February."
+msgstr "Un intervallo annuale non può terminare il 29 febbraio."
+
+#: apps/vendors/services.py
+msgid "A yearly range cannot start on 29 February."
+msgstr "Un intervallo annuale non può iniziare il 29 febbraio."
+
+#: apps/vendors/services.py
+msgid "A yearly range must last less than one year."
+msgstr "Un intervallo annuale deve durare meno di un anno."
 
 #: apps/manager/forms.py
 msgid "About the shop"
@@ -3877,6 +3897,10 @@ msgstr "Cerca l'ordine"
 msgid "Fingerprint %(hash)s."
 msgstr "Impronta %(hash)s."
 
+#: apps/vendors/models.py
+msgid "First closed day."
+msgstr "Primo giorno di chiusura."
+
 #: apps/manager/event_forms.py
 msgid "First day"
 msgstr "Primo giorno"
@@ -4396,6 +4420,10 @@ msgstr ""
 "Quanti giorni ha il consumatore per restituire la merce dopo averla ricevuta. La legge fissa un "
 "minimo di 14 giorni per le vendite ai consumatori, quindi un numero inferiore viene rifiutato. "
 "Obbligatorio."
+
+#: apps/vendors/models.py
+msgid "How many days before the closure the notice appears (0 to 60)."
+msgstr "Quanti giorni prima della chiusura compare l'avviso (da 0 a 60)."
 
 #: apps/cms/forms_pages.py
 msgid ""
@@ -5024,6 +5052,10 @@ msgstr "Lingua: %(language)s. Lingua originale dell’evento: %(original)s."
 #: themes/ride/templates/compliance/contact_points.html
 msgid "Languages:"
 msgstr "Lingue:"
+
+#: apps/vendors/models.py
+msgid "Last closed day."
+msgstr "Ultimo giorno di chiusura."
 
 #: apps/manager/event_forms.py
 msgid "Last day"
@@ -10366,6 +10398,10 @@ msgid ""
 "The email or the password is not correct, or the account is locked for a while. Please try again."
 msgstr "L’email o la password non sono corrette, oppure l’account è bloccato per un po’. Riprova."
 
+#: apps/vendors/services.py
+msgid "The end date cannot be before the start date."
+msgstr "La data di fine non può precedere la data di inizio."
+
 #: apps/manager/event_forms.py
 msgid "The event"
 msgstr "L'evento"
@@ -11282,6 +11318,10 @@ msgstr "La segnalazione è in revisione."
 #: apps/manager/termination_views.py
 msgid "The notice is withdrawn and the vendor is told."
 msgstr "Il preavviso è ritirato e il venditore ne viene informato."
+
+#: apps/vendors/services.py
+msgid "The notice lead time is 0 to %(days)s days."
+msgstr "L'anticipo dell'avviso va da 0 a %(days)s giorni."
 
 #: apps/compliance/templates/email/compliance/termination_withdrawn/subject.txt
 msgid "The notice of termination of your seller account is withdrawn"
@@ -12622,6 +12662,10 @@ msgstr ""
 "predefiniti."
 
 #: apps/vendors/models.py
+msgid "The vendor this closure belongs to."
+msgstr "Il venditore a cui appartiene questa chiusura."
+
+#: apps/vendors/models.py
 msgid "The vendor this consent belongs to."
 msgstr "Il venditore a cui appartiene questo consenso."
 
@@ -13424,6 +13468,10 @@ msgstr "Spunta se un software ha aiutato a trovare il contenuto."
 #: apps/compliance/forms.py
 msgid "Tick it if software took the decision."
 msgstr "Spunta se la decisione è stata presa da un software."
+
+#: apps/vendors/models.py
+msgid "Tick it if the shop closes on the same days every year."
+msgstr "Spunti se il negozio chiude negli stessi giorni ogni anno."
 
 #: apps/vendors/models.py
 msgid ""
