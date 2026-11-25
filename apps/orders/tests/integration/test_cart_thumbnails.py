@@ -36,6 +36,7 @@ from apps.orders.tests.integration.test_checkout_views import (
     with_cart,
 )
 from apps.orders.ui import present
+from tests.i18n import other_language
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("english_interface", "tax_setup")]
 __all__ = ["tax_setup"]
@@ -117,7 +118,8 @@ def test_a_line_shows_the_variant_image_the_product_image_or_nothing(
     assert len(imgs(html, "redhelmet")) == 1
     assert not imgs(html, "helmetshared")  # the variant's own gallery wins
     assert len(imgs(html, "gloves")) == 1
-    assert 'width="96" height="96"' in imgs(html, "gloves")[0]
+    assert "width=" in imgs(html, "gloves")[0]  # the size is set: no layout shift
+    assert "height=" in imgs(html, "gloves")[0]
     # the line without an image shows no `<img>` of the product (a placeholder box in base)
     assert html.count("cart-line__name") == 3
     assert len([tag for tag in re.findall(r"<img[^>]*>", html) if ".png" in tag]) == 2
@@ -129,7 +131,7 @@ def test_a_variant_without_images_shows_the_product_cover() -> None:
     blue = VariantFactory.create(product=product, sku="HEL-BLUE")
     picture(product, "helmetshared", is_cover=True)
     found = thumbnails([(product.pk, blue.pk)])
-    assert "helmetshared" in found[(product.pk, blue.pk)].url
+    assert "helmetshared" in found[(product.pk, blue.pk)].image.file.name
 
 
 def test_a_variant_cover_is_the_line_image_even_when_another_is_first() -> None:
@@ -141,7 +143,7 @@ def test_a_variant_cover_is_the_line_image_even_when_another_is_first() -> None:
     red.cover_image = chosen
     red.save()
     found = thumbnails([(product.pk, red.pk)])
-    assert "second" in found[(product.pk, red.pk)].url
+    assert "second" in found[(product.pk, red.pk)].image.file.name
 
 
 def test_a_language_with_a_dedicated_image_shows_only_it() -> None:
@@ -151,22 +153,23 @@ def test_a_language_with_a_dedicated_image_shows_only_it() -> None:
     picture(product, "german", language="de", is_cover=True)
     picture(product, "french", language="fr", is_cover=True)
     key = (product.pk, None)
-    assert "german" in thumbnails([key], "de")[key].url
-    assert "neutral" in thumbnails([key], "en")[key].url
-    assert "neutral" in thumbnails([key], "it")[key].url
+    assert "german" in thumbnails([key], "de")[key].image.file.name
+    assert "neutral" in thumbnails([key], "en")[key].image.file.name
+    assert "neutral" in thumbnails([key], "it")[key].image.file.name
 
 
 def test_the_cart_page_follows_the_page_language(client: Client, settings: Any) -> None:
+    german = other_language()
     cart = with_cart(client)
     product = product_for(vendor(), "Box")
     put_line(cart, product)
     picture(product, "neutral", is_cover=True)
-    picture(product, "german", language="de", is_cover=True)
-    with translation.override("de"):
-        views = present.package_views  # the view model reads the active language
-        assert views is not None
-        found = thumbnails([(product.pk, None)], translation.get_language() or "en")
-    assert "german" in found[(product.pk, None)].url
+    picture(product, "dedicated", language=german, is_cover=True)
+    with translation.override(german):
+        url = reverse("orders:cart")
+    html = client.get(url).content.decode()
+    assert len(imgs(html, "dedicated")) == 1
+    assert not imgs(html, "neutral")  # a language with its own image shows only those
 
 
 def test_a_product_with_images_only_in_another_language_shows_none() -> None:
@@ -224,6 +227,10 @@ def test_the_line_data_carries_the_thumbnail_and_no_price_changes(
     assert strip.sub("", before).count("Helmet") == strip.sub("", after).count("Helmet")
 
 
+def image_queries(captured: Any) -> int:
+    return len([q for q in captured if "productimage" in q["sql"] or "rendition" in q["sql"]])
+
+
 def test_the_cart_page_queries_do_not_grow_per_line(client: Client, settings: Any) -> None:
     cart = with_cart(client)
     owner = vendor()
@@ -231,22 +238,25 @@ def test_the_cart_page_queries_do_not_grow_per_line(client: Client, settings: An
     picture(first, "pic0", is_cover=True)
     put_line(cart, first)
     client.get(reverse("orders:cart"))  # warm caches (content types, flags)
-    with CaptureQueriesContext(connection) as small:
+    with CaptureQueriesContext(connection) as one:
         client.get(reverse("orders:cart"))
-    for index in range(1, 6):
+    for index in range(1, 8):
         extra = product_for(owner, f"Lamp {index}")
         picture(extra, f"pic{index}", is_cover=True)
         picture(extra, f"alt{index}", language="de")
         put_line(cart, extra)
-    with CaptureQueriesContext(connection) as large:
+    with CaptureQueriesContext(connection) as eight:
         html = client.get(reverse("orders:cart")).content.decode()
-    assert len([tag for tag in re.findall(r"<img[^>]*>", html) if "pic" in tag]) == 6
-    image_queries = [q for q in large.captured_queries if "catalog_productimage" in q["sql"]]
-    assert len(image_queries) <= 3  # the images and their texts: one prefetch for all lines
-    renditions = [q for q in large.captured_queries if "rendition" in q["sql"]]
-    assert len(renditions) <= 1
-    # five more lines add the queries the lines themselves cost (texts, stock), never one per image
-    assert len(large) - len(small) < 5 * 4
+    assert len([tag for tag in re.findall(r"<img[^>]*>", html) if "pic" in tag]) == 8
+    # The images cost the same queries for 1 and for 8 lines: one prefetch for all of them.
+    assert image_queries(eight.captured_queries) == image_queries(one.captured_queries) > 0
+    # And the same cart without images costs exactly that much less (the lines' own texts and
+    # stock queries are not the images').
+    ProductImage.objects.all().delete()
+    with CaptureQueriesContext(connection) as bare:
+        client.get(reverse("orders:cart"))
+    added = image_queries(eight.captured_queries) - image_queries(bare.captured_queries)
+    assert len(eight) - len(bare) == added
 
 
 def test_the_thumbnail_helper_runs_a_fixed_number_of_queries() -> None:

@@ -622,12 +622,10 @@ def fitment(product: Product, language: str) -> FitmentSummary | None:
 
 @dataclass(frozen=True)
 class LineThumbnail:
-    """The small picture of a cart or checkout line (ORD.40): an existing rendition, or the
-    original file where the renditions are not made yet, with its size."""
+    """The small picture of a cart or checkout line (ORD.40): the image, rendered by the page
+    with `{% responsive_image image "thumb" %}` from its existing renditions (renditions loaded)."""
 
-    url: str
-    width: int | None
-    height: int | None
+    image: MediaImage
     alt: str  # the image's own alt text in the shown language, "" when it has none
 
 
@@ -671,9 +669,6 @@ def line_thumbnails(
     core_images.prefetch_renditions(row.image for row in chosen.values())
     out: dict[tuple[int, int | None], LineThumbnail] = {}
     for key, row in chosen.items():
-        url, width, height = core_images.rendition_or_original(row.image, core_images.THUMB_SPEC)
         text = translations.resolve(row.translations.all(), language).translation
-        out[key] = LineThumbnail(
-            url=url, width=width, height=height, alt=text.alt_text if text is not None else ""
-        )
+        out[key] = LineThumbnail(image=row.image, alt=text.alt_text if text is not None else "")
     return out

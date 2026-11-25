@@ -21,6 +21,7 @@ from django.utils.translation import gettext as _
 
 from apps.cart.models import Cart, CartLine
 from apps.catalog import product_pages, slugs
+from apps.core.models import MediaImage
 from apps.core.money import CURRENCY, round_line
 from apps.orders import engine
 from apps.orders.services import CheckoutPreview
@@ -83,7 +84,7 @@ class LineView:
     total: str
     variant: str = ""
     problem: str = ""
-    image_url: str = ""  # the thumbnail (ORD.40); empty when the product has no image
+    image: MediaImage | None = None  # the thumbnail (ORD.40); none when the product has no image
     image_alt: str = ""
 
 
@@ -262,7 +263,7 @@ def package_views(
                     quantity=line.quantity,
                     total=money(total),
                     problem=" ".join(by_product.get(line.product_id, [])),
-                    image_url=thumbnail.url if thumbnail is not None else "",
+                    image=thumbnail.image if thumbnail is not None else None,
                     image_alt=thumbnail_alt(line.title, thumbnail.alt) if thumbnail else "",
                 )
             )

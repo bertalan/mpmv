@@ -40,6 +40,9 @@ class Preset:
     op: Literal["width", "fill", "height"] = "width"
     ratio: tuple[int, int] | None = None  # for "fill": width to height
     fallback: str = "jpeg"  # the <img> format; PNG where transparency matters (logos)
+    # For an image saved before this preset existed (until the backfill ran): the renditions of
+    # this other preset at this slot's `sizes`, before the original file. Never builds one.
+    fallback_preset: str | None = None
 
 
 PRESETS: dict[str, Preset] = {
@@ -56,7 +59,7 @@ PRESETS: dict[str, Preset] = {
     # Product cards and tiles in a grid.
     "card": Preset((320, 480, 640), "(min-width: 64rem) 25vw, (min-width: 40rem) 50vw, 100vw"),
     # Cart and checkout line thumbnails (ORD.40): shown 96 px square, so 192 covers 2x screens.
-    "thumb": Preset((96, 192), "96px"),
+    "thumb": Preset((96, 192), "96px", fallback_preset="card"),
     # Logos in a strip: 3rem high, so 96 px covers 2x screens.
     "logo": Preset((96,), "6rem", op="height", fallback="png"),
 }
@@ -119,7 +122,8 @@ def all_specs() -> list[str]:
 RENDER_GROUPS: dict[str, tuple[str, ...]] = {
     "hero": ("hero",),
     "content": ("content", "article", "gallery"),
-    "card": ("card", "avatar", "thumb"),
+    "card": ("card", "avatar"),
+    "thumb": ("thumb",),
     "logo": ("logo",),
     "extras": (),
 }
@@ -146,9 +150,6 @@ def render_all(image: Any) -> None:
     """Make every rendition the pages can use for `image`: all groups, one after the other."""
     for group in RENDER_GROUPS:
         render_group(image, group)
-
-
-THUMB_SPEC = "format-jpeg|width-192"  # the thumb preset's JPEG rendition at 2x
 
 
 def rendition_or_original(image: Any, spec: str) -> tuple[str, int | None, int | None]:
@@ -217,6 +218,11 @@ def render_picture(image: Any, name: str, **attrs: Any) -> SafeString:
         img_attrs["loading"] = "lazy"
         img_attrs["decoding"] = "async"
     img_attrs.update({key: value for key, value in attrs.items() if value not in (None, "")})
+    other = PRESETS[name].fallback_preset
+    if not renditions and other is not None:
+        return render_picture(
+            image, other, **{"sizes": PRESETS[name].sizes, **attrs, "alt": img_attrs["alt"]}
+        )
     if not renditions:
         # The fallback has no srcset: the browser takes the one original, which can be large, for
         # every such image (24 cards = 24 originals). It is rare: `core.render_image` is queued on

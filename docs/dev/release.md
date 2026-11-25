@@ -178,6 +178,18 @@ deploying a release that contains it:
 2. Deploy; `migrate` applies the same reslug and writes the audit entries.
 3. Rerunning changes nothing. Reverse is a no-op: the old slugs stay in SlugHistory.
 
+### Cart line thumbnails: backfill the `thumb` renditions (ORD.40)
+
+The cart and checkout lines show a small picture (render group `thumb`, AVIF/WebP/JPEG at 96 and
+192 px). New images get it from the `core.render_image` job; images saved earlier need one run:
+
+1. `manage.py backfill_renditions --dry-run` (default group `thumb`) counts the images without it.
+2. `manage.py backfill_renditions` queues one job per such image, in batches (`--batch-size`).
+   Safe to rerun; images that have them are skipped and a waiting job is not queued twice.
+3. Until the jobs ran, the line uses the card renditions of that image (never the original file,
+   and a request never builds one). The rendition monitor (Images > Image renditions) lists the
+   images still missing `thumb` and shows when the backfill is done.
+
 ### v0.1.4 on STAGE (EVT.5, I18N.11, CAT.5, CORE.17)
 
 Changes since v0.1.3: product slugs without the language suffix (above), the language switch,
