@@ -108,6 +108,7 @@ def clear_caches() -> None:
     palette_asset.cache_clear()
     registered_surfaces.cache_clear()
     palette_violations.cache_clear()
+    _icon_path.cache_clear()
     from .appearance import clear_cache  # lazy: appearance imports this module
 
     clear_cache()
@@ -341,8 +342,14 @@ def icon_url(slug: str, name: str) -> str:
     through the static storage, so a hashed name is served with a long cache. The files are
     looked up in the theme sources, so this needs no build.
     """
+    return static(_icon_path(slug, name))
+
+
+@functools.lru_cache(maxsize=64)
+def _icon_path(slug: str, name: str) -> str:
+    """The static path behind `icon_url`, looked up on disk once per theme and file."""
     for owner in (slug, "base"):
         path = f"themes/{owner}/{SITE_ICON_DIR}/{name}"
         if (themes_dir() / owner / "static" / path).is_file():
-            return static(path)
-    return static(f"themes/base/{SITE_ICON_DIR}/{name}")
+            return path
+    return f"themes/base/{SITE_ICON_DIR}/{name}"

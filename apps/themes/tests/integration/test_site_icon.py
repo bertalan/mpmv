@@ -7,8 +7,8 @@ import pytest
 from django.test import Client
 from pytest_django.fixtures import Settings as SettingsWrapper
 
-from apps.themes.services import clear_caches
-from apps.themes.tests.factories import SiteFactory
+from apps.themes.services import clear_caches, icon_url
+from apps.themes.tests.factories import SiteFactory, ThemeSettingsFactory
 
 pytestmark = pytest.mark.django_db
 ICON = re.compile(r'<link rel="(icon|apple-touch-icon)" href="([^"]+)"')
@@ -47,9 +47,24 @@ def test_favicon_ico_redirects_to_the_active_themes_icon(
     assert response.status_code == 302
     assert f"themes/{theme}/site-icon/icon-32" in response["Location"]
     assert "max-age=" in response["Cache-Control"]
+    # The redirect leads to a file that exists (no static server in the test stack).
+    relative = response["Location"].removeprefix(settings.STATIC_URL)
+    assert (Path(settings.MPMV_THEMES_DIR) / theme / "static" / relative).is_file()
+
+
+def test_favicon_ico_follows_the_sites_own_theme_not_the_default(
+    client: Client, settings: SettingsWrapper
+) -> None:
+    """Review of #1104: the site's `ThemeSettings` choice wins over `MPMV_THEME_DEFAULT`."""
+    settings.MPMV_THEME_DEFAULT = "base"
+    settings.ALLOWED_HOSTS = [".example.test"]
+    clear_caches()
+    site = SiteFactory.create()
+    ThemeSettingsFactory.create(site=site, theme="ride")
+    response = client.get("/favicon.ico", HTTP_HOST=site.hostname)
+    assert response.status_code == 302
+    assert "themes/ride/site-icon/icon-32" in response["Location"]
 
 
 def test_a_theme_without_icons_inherits_the_base_icon(settings: SettingsWrapper) -> None:
-    from apps.themes.services import icon_url
-
     assert "themes/base/site-icon/icon.svg" in icon_url("no-such-theme", "icon.svg")
