@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **492** in **22** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **3706 h** (P1 2706 h · P2 900 h · P3 100 h)
+- Micro-tasks: **493** in **22** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **3708 h** (P1 2706 h · P2 902 h · P3 100 h)
 - P1 critical path (schedule lower bound with full parallelism): **197 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → CAT.1 → ORD.1 → ORD.2 → ORD.4 → PAY.1 → PAY.2 → PAY.3 → PAY.4 → PAY.7 → ORD.20 → ORD.21 → ORD.22 → ORD.23
 
 ## By macro area
@@ -20,7 +20,7 @@
 | VEN | Vendors, commissions, ledger | 43 | 301 | 42 | 0 | 343 |
 | TAX | Tax engine | 22 | 98 | 37 | 0 | 135 |
 | SHP | Shipping and quotes | 16 | 102 | 30 | 0 | 132 |
-| ORD | Cart, orders, returns | 39 | 254 | 82 | 5 | 341 |
+| ORD | Cart, orders, returns | 40 | 254 | 84 | 5 | 343 |
 | PAY | Payments (Stripe Connect) | 7 | 46 | 4 | 16 | 66 |
 | PRM | Coupons and cart recovery | 16 | 0 | 143 | 10 | 153 |
 | ING | Supplier import and pipelines | 14 | 92 | 36 | 0 | 128 |
@@ -36,7 +36,7 @@
 | SEC | Security | 13 | 82 | 0 | 0 | 82 |
 | OPS | Operations | 16 | 25 | 48 | 8 | 81 |
 | MIG | Migration and cutover | 22 | 141 | 29 | 0 | 170 |
-| **Total** | | **492** | **2706** | **900** | **100** | **3706** |
+| **Total** | | **493** | **2706** | **902** | **100** | **3708** |
 
 ## By phase
 
@@ -399,7 +399,7 @@
 | MIG.20 | Refunds migration (owner decision 2026-11-11, relayed by lane-a, #86): refund child orders and marketplace refund requests are stored inside the historical order (refunded amount, date, reason); there is no separate refund model for legacy data; no new ledger entry and no tax recalculation | P1 | 4 | MIG.4 | A migrated order shows its refunded amount, date and reason; the MIG.5 parity report reconciles order total minus refunds against the legacy figures; a refund amount that does not parse as `Decimal` is rejected with a report; the migration writes no ledger entry for a refund (MIG.8 covers balances); no refund model or table exists for legacy data |
 | MIG.22 | Domains, mail and TLS at cutover (owner decision 2026-11-16, §13.4): DNS inventory exported from the registrar into private storage, a dedicated mail host record and the MX moved to it before the switch when mail is self-managed on the legacy server (a dedicated mail service is a recommended follow-up, and a precondition for shutting the legacy server down), SPF, DKIM and DMARC for the transactional provider (ARC.16), TTL 300 s from T−7, production certificates issued before the switch (ACME DNS-01), legacy site on an internal hostname behind basic auth and `noindex`, Stripe webhook URLs and domain verification updated, staged HSTS | P1 | 6 | MIG.9 | Runbook checklist: the inventory file is in private storage; a mail test send and receive passes after the MX change, before the switch; the TTL check shows 300 s on the switched records; certificates are valid before the switch; the legacy host answers 401 over valid HTTPS without credentials (HSTS `includeSubDomains` applies to it) and carries `noindex`; rollback by DNS was rehearsed in a dress rehearsal |
 
-### F6 — After go-live (P2) (150 tasks, 1014 h)
+### F6 — After go-live (P2) (151 tasks, 1016 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -453,6 +453,7 @@
 | ORD.36 | Orders API 4/6, amendment proposals: minor amendments apply at once and substantial ones go to the customer for acceptance (D-47, ORD.20 to ORD.24), through the amendment services | P2 | 4 | ORD.33, ORD.21 | A substantial amendment through the API waits for the customer exactly as from the Manager; no route changes a paid order without that path |
 | ORD.37 | Orders API 5/6, external orders, record-only (MQ-57; needs human review: tax, DAC7): `POST /orders/external` with `channel="external"`, a channel label and the vendor's external reference (idempotent on it); stock, customer history, shipping and documents are updated; no commission, payment, payout or ledger entry; excluded from DAC7 platform sales and the platform statements; prices and VAT are stored as sent, checked for consistent line totals and rates valid in the vendor's country, and never turned into platform tax lines | P2 | 6 | ORD.33, CMP.1 | An external order adds no ledger row and no DAC7 amount; the same external reference twice creates one order; an inconsistent total is rejected with the line named |
 | ORD.38 | Orders API 6/6, operator commands and docs: management commands over the same services for the platform operator (no entitlement needed); the API reference and an integration guide in the developer docs; help files for the Manager API key screen listing the new scopes | P2 | 3 | ORD.34, ORD.35, ORD.36, ORD.37 | Every route has a documented example; a command and the matching API call produce the same audit action |
+| ORD.40 | Cart line thumbnails (owner decision 2026-11-25, follow-up of THM.27): the cart and checkout line data (`apps/orders/ui/present.py`) carry `image_url` and `image_alt` for each line, taken from the cover of the gallery the current language shows (spec 03 §3.2: the variant's gallery if it has images, else the product's; a language with dedicated images shows only those, every other language the neutral ones), as a small Wagtail rendition (THM.12 formats, width and height set); a line whose product has no image carries none and shows no `<img>`. Presentation only: no price, tax, stock or order-snapshot change, and the confirmation and order documents are unchanged | P2 | 2 | THM.27 | Cart and checkout lines show the thumbnail in the ride and base themes with the product name as alt text, or `alt=""` when the name is already in the line; an integration test covers a line with a variant image, one with only a product image, one whose language has a dedicated image, and one with none; the cart page query count does not grow per line (one prefetch); the THM.10 cart baselines show the thumbnails; axe `wcag22aa` stays clean |
 | PAY.5 | `PaymentProvider` interface (owner decision D-09, 2026-11-11; PAY.1 is its only implementation; the payments layer stays provider-neutral, owner decision 2026-11-16: Stripe is the only provider at launch, but the interface must allow adding business payment methods later, e.g. bank transfer, without changes to orders) and the dev page `docs/dev/payment-providers.md` "how to add a payment method": what a provider must support (split at source or a deferred collection of the platform fee, refunds with the balance-transaction cost for PAY.4, payout reconciliation for PAY.3, signed idempotent webhooks for PAY.2), the contract tests a new provider must pass, and the review steps (D-08 PSD2 check, CMP.5 terms); spec and docs only for now, the code lands with PAY.1 | P2 | 4 | PAY.1 | The dev page exists and lists the four capabilities, the contract-test checklist and the review steps; the interface in PAY.1 matches it and the Stripe provider is the only registered one; a provider missing a capability is refused at registration (test, when built) |
 | PRM.1 | New app `promotions`: `Promotion` (versioned, issuer is funder with a check constraint, no separate funder field), `Coupon`, `Redemption`, scope, limits, activation modes, audited services with `dry_run`; no order or tax import | P2 | 10 | CAT.1, VEN.2, ORD.2 | A promotion with redemptions cannot be edited in place; a vendor promotion cannot scope another vendor's product; a platform promotion needs a budget cap; migrations and import contract green |
 | PRM.2 | Pure `apply_promotions` engine: types percent, fixed, free shipping, gift; one discount per line; fixed-amount sharing with remainder to the largest line; caps and vendor-net clamp; minimum payable total; stacking rules; per-line `ROUND_HALF_UP`; gift rule T-7 (in-kind discount on a paid order only, gift value at most the paid goods) | P2 | 12 | PRM.1, TAX.4 | CPN-VENDOR, CPN-GIFT-T7, CPN-FIXED-SPLIT, CPN-MULTI, CPN-MINPAY, CPN-STACK green; a random-cart property test never exceeds the eligible total or makes a negative vendor net |
