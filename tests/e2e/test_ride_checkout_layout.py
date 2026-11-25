@@ -3,6 +3,7 @@ shipping options are tiles over native radios, and the sign-in is a centred card
 show-password toggle inside the field. Axe (WCAG 2.2 AA) and the CSP stay quiet at 375 and
 1280 px. Visual baselines: THM.10 (`checkout`, `sign-in`)."""
 
+import re
 import secrets
 from typing import Any
 
@@ -142,3 +143,51 @@ def test_a_long_toggle_text_and_the_error_state_never_overlap_the_input(
     assert toggle["y"] >= control["y"] - 1
     assert toggle["y"] + toggle["height"] <= control["y"] + control["height"] + 1
     assert field["width"] >= 100, "the input keeps room to type"
+
+
+def _luminance(rgb: str) -> float:
+    channels = [int(float(c)) for c in re.findall(r"[\d.]+", rgb)[:3]]
+    linear = [
+        c / 255 / 12.92 if c / 255 <= 0.03928 else ((c / 255 + 0.055) / 1.055) ** 2.4
+        for c in channels
+    ]
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+
+def test_the_password_row_shows_a_focus_ring_by_keyboard(
+    page: Page, live_server: LiveServer
+) -> None:
+    page.set_viewport_size({"width": 1280, "height": 900})
+    page.goto(f"{live_server.url}/account/login/")
+    page.locator("#id_username").focus()
+    page.keyboard.press("Tab")
+    expect(page.locator("#id_password")).to_be_focused()
+    ring = page.locator(".signin-control").evaluate(
+        "el => { const s = getComputedStyle(el);"
+        " return [s.outlineStyle, s.outlineWidth, s.outlineColor,"
+        " getComputedStyle(el.closest('.card')).backgroundColor]; }"
+    )
+    style, width, colour, card = ring
+    assert style == "solid"
+    assert float(width.removesuffix("px")) >= 2
+    lighter, darker = sorted((_luminance(colour), _luminance(card)), reverse=True)
+    assert (lighter + 0.05) / (darker + 0.05) >= 3, "the ring contrasts with the card"
+
+
+def test_a_failed_sign_in_names_the_error_and_ties_it_to_the_fields(
+    page: Page, live_server: LiveServer
+) -> None:
+    page.set_viewport_size({"width": 375, "height": 900})
+    page.goto(f"{live_server.url}/account/login/")
+    page.locator("#id_username").fill("nobody@example.com")
+    page.locator("#id_password").fill(secrets.token_urlsafe(12))
+    page.locator("#id_password").press("Enter")
+    alert = page.locator("#login-error")
+    expect(alert).to_be_visible()
+    expect(alert).to_have_attribute("role", "alert")
+    expect(alert).to_contain_text(translated("Error"))
+    password = page.locator("#id_password")
+    expect(password).to_have_attribute("aria-invalid", "true")
+    expect(password).to_have_attribute("aria-describedby", "login-error")
+    border = page.locator(".signin-control").evaluate("el => getComputedStyle(el).borderTopColor")
+    assert border != "rgb(0, 0, 0)"
