@@ -9,9 +9,14 @@
   {% include "components/step_indicator.html" with steps=steps current=current_step only %}
   <form method="post" action="{% url 'orders:review' %}">
     {% csrf_token %}
-    {% include "orders/_review_body.html" %}
-    {# Outside #review-body: Turnstile renders a widget once, so a swap must never replace it. #}
-    {% captcha_widget %}
+    <div class="checkout-layout row g-4 align-items-start">
+      <div class="col-lg-8">
+        {% include "orders/_review_body.html" %}
+        {# Outside #review-body: Turnstile renders a widget once, so a swap must never replace it. #}
+        {% captcha_widget %}
+      </div>
+      {% include "orders/_review_summary.html" %}
+    </div>
     {% include "orders/_review_actions.html" %}
   </form>
 </article>

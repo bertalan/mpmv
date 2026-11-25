@@ -17,7 +17,6 @@ and the actions stay outside it.
   {% for package in packages %}{% include "orders/_package.html" with package=package mode="review" %}{% endfor %}
   {% include "orders/_legal_recap.html" %}
   <noscript><p><button type="submit" class="btn btn-outline-secondary" formaction="{% url 'orders:shipping' %}" formnovalidate>{% translate "Update shipping" %}</button></p></noscript>
-  {% if order %}{% include "components/order_summary.html" with id="order-summary" title=_("Order total") lines=order.lines total=order.total note=order.note only %}{% endif %}
   {% if ordering_closed %}{% include "components/alert.html" with level="info" message=_("Ordering is not open yet. Your cart is kept.") only %}{% endif %}
 </div>
-{% if partial %}{% include "orders/_review_actions.html" with oob=True %}{% endif %}
+{% if partial %}{% include "orders/_review_summary.html" with oob=True %}{% include "orders/_review_actions.html" with oob=True %}{% endif %}
