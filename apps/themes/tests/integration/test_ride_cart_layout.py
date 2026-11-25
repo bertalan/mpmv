@@ -61,6 +61,10 @@ def test_the_cart_is_a_row_with_the_packages_left_and_the_summary_right() -> Non
     assert re.search(r'<aside class="cart-summary[^"]*\bcol-lg-4\b', html)
 
 
+def test_the_summary_landmark_has_a_name() -> None:
+    assert re.search(r'<aside class="cart-summary[^"]*" aria-label="Order summary">', cart())
+
+
 def test_the_summary_holds_the_totals_and_the_continue_link_outside_the_form() -> None:
     html = cart()
     aside = html[html.index('<aside class="cart-summary') :]

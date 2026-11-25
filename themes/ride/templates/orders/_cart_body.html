@@ -12,7 +12,7 @@
         <p><button type="submit" class="btn btn-outline-secondary">{% translate "Update cart" %}</button></p>
       </form>
     </div>
-    <aside class="cart-summary col-lg-4">
+    <aside class="cart-summary col-lg-4" aria-label="{% translate "Order summary" %}">
       {% if order %}
         {% include "components/order_summary.html" with id="order-summary" title=_("Order total") lines=order.lines total=order.total note=order.note only %}
       {% else %}
