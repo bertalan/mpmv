@@ -38,6 +38,7 @@ from django.utils import translation
 from apps.catalog import engine as catalog_engine
 from apps.catalog import services as catalog
 from apps.catalog import slugs
+from apps.catalog.ai_labels import iptc_source_type
 from apps.catalog.models import VariantOption
 from apps.catalog.product_pages import GalleryImage, ProductPage, page_return_policy
 from apps.core import translations
@@ -107,6 +108,7 @@ def _image(gallery_image: GalleryImage, site: str) -> pg.ImageData:
         credit_text=credit.text if credit is not None else str(image.credit_text or ""),
         creator=author,
         copyright_notice=f"\u00a9 {author}" if author else "",
+        digital_source_type=iptc_source_type(gallery_image.ai_origin),
     )
 
 

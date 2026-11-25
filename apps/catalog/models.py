@@ -49,7 +49,7 @@ from apps.core.translations import Resolved
 from apps.vendors.models import Vendor
 from apps.vendors.scoping import VendorScopedManager
 
-from . import engine
+from . import ai_labels, engine
 from .attributes import (
     Attribute,
     AttributeKind,
@@ -837,6 +837,32 @@ class ProductTranslation(TranslationModel):
     slug = models.SlugField(max_length=80, blank=True, editable=False)
     seo_title = seo_title_field()
     seo_description = seo_description_field()
+    origin = models.CharField(
+        max_length=16,
+        default=ai_labels.ORIGIN_HUMAN,
+        choices=[
+            (ai_labels.ORIGIN_HUMAN, _("Written by a person")),
+            (ai_labels.ORIGIN_MACHINE, _("Written by a machine")),
+        ],
+        help_text=_(
+            "Who wrote the text. A machine text can only be set to reviewed or published "
+            "after a person has read and checked it."
+        ),
+    )
+    human_reviewed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        editable=False,
+        help_text="When a person last confirmed a machine text (CMP.8).",
+    )
+    human_reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        editable=False,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
 
     class Meta(TranslationModel.Meta):
         ordering = ["product", "language"]
@@ -857,6 +883,17 @@ class ProductTranslation(TranslationModel):
         ]
         constraints = [
             *TranslationModel.Meta.constraints,
+            models.CheckConstraint(
+                condition=models.Q(origin__in=ai_labels.TEXT_ORIGINS),
+                name="catalog_producttranslation_origin_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(origin=ai_labels.ORIGIN_HUMAN)
+                | models.Q(status=TranslationStatus.MACHINE)
+                | models.Q(human_reviewed_at__isnull=False),
+                name="catalog_producttranslation_machine_text_reviewed",
+                violation_error_message="A machine text needs a person's review first.",
+            ),
             models.UniqueConstraint(
                 fields=["product", "language"], name="catalog_producttranslation_unique"
             ),
@@ -870,6 +907,66 @@ class ProductTranslation(TranslationModel):
 
     def __str__(self) -> str:
         return f"{self.product} [{self.language}]"
+
+    def _review_is_missing(self) -> bool:
+        """True when this save would take a machine text out of draft without a new human review
+        (CMP.8). A text already reviewed or published stays so while a person edits it; one sent
+        back to draft (the source changed) needs a review dated after the one it had."""
+        if self.origin != ai_labels.ORIGIN_MACHINE or self.status == TranslationStatus.MACHINE:
+            return False
+        previous = (
+            type(self)._default_manager.filter(pk=self.pk).values("status", "human_reviewed_at")
+            if self.pk
+            else None
+        )
+        stored = previous.first() if previous is not None else None
+        if stored is not None and stored["status"] != TranslationStatus.MACHINE:
+            return False
+        reviewed = self.human_reviewed_at
+        return not ai_labels.may_leave_draft(
+            self.origin,
+            reviewed_by_person=reviewed is not None
+            and (stored is None or reviewed != stored["human_reviewed_at"]),
+        )
+
+    def clean(self) -> None:
+        super().clean()
+        if self._review_is_missing():
+            raise ValidationError(
+                {
+                    "status": _(
+                        "A machine text cannot be reviewed or published until a person has "
+                        "read and checked it."
+                    )
+                }
+            )
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if (
+            self.origin == ai_labels.ORIGIN_MACHINE
+            and self.status != TranslationStatus.MACHINE
+            and self.human_reviewed_at is None
+        ):
+            raise ValidationError("A machine text cannot be reviewed or published unreviewed.")
+        if self._review_is_missing():
+            raise ValidationError("A machine text cannot be reviewed or published unreviewed.")
+        super().save(*args, **kwargs)
+
+    def mark_stale_translations(self) -> int:
+        """As the base rule, and a machine text sent back to draft also loses its review (CMP.8),
+        so even a plain `update(status=...)` cannot publish it without a new one (DB check)."""
+        count = super().mark_stale_translations()
+        if count:
+            self.family().filter(
+                origin=ai_labels.ORIGIN_MACHINE, status=TranslationStatus.MACHINE
+            ).update(human_reviewed_at=None, human_reviewed_by=None)
+        return count
+
+    def mark_human_reviewed(self, reviewer: Any) -> None:
+        """Record that `reviewer` read and checked this text (CMP.8); the caller then sets the
+        status and saves."""
+        self.human_reviewed_at = timezone.now()
+        self.human_reviewed_by = reviewer if getattr(reviewer, "pk", None) else None
 
 
 class SlugHistory(BaseModel):
@@ -1575,10 +1672,28 @@ class ProductImage(BaseModel):
         db_index=True,
         help_text="SHA-256 of the uploaded file: the same file is stored once per vendor.",
     )
+    ai_origin = models.CharField(
+        "AI origin",
+        max_length=16,
+        default=ai_labels.AI_NONE,
+        choices=[
+            (ai_labels.AI_NONE, _("Not made with AI")),
+            (ai_labels.AI_GENERATED, _("Generated by AI")),
+            (ai_labels.AI_EDITED, _("Edited with AI")),
+        ],
+        help_text=_(
+            "Say so when AI made the image or changed what it shows. The product page then "
+            "shows an 'AI-generated image' or 'AI-edited image' label next to it."
+        ),
+    )
 
     class Meta:
         ordering = ["product", "variant", "position", "id"]
         constraints = [
+            models.CheckConstraint(
+                condition=models.Q(ai_origin__in=ai_labels.AI_ORIGINS),
+                name="catalog_productimage_ai_origin_valid",
+            ),
             models.UniqueConstraint(
                 fields=["product", "variant", "language"],
                 condition=models.Q(is_cover=True),

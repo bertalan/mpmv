@@ -344,6 +344,7 @@ def test_the_admin_regenerates_the_slug_on_a_title_change(
         "translations-0-product": str(product.pk),
         "translations-0-language": primary_language(),
         "translations-0-status": translation.status,
+        "translations-0-origin": translation.origin,
         "translations-0-title": "Leather Travel Bag",
         "variants-TOTAL_FORMS": "0",
         "variants-INITIAL_FORMS": "0",

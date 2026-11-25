@@ -1312,6 +1312,14 @@ msgstr ""
 msgid "Age in days"
 msgstr "Âge en jours"
 
+#: themes/base/templates/components/ai_image_label.html
+msgid "AI-edited image"
+msgstr "Image modifiée par IA"
+
+#: themes/base/templates/components/ai_image_label.html
+msgid "AI-generated image"
+msgstr "Image générée par IA"
+
 #: apps/core/templates/email/core/ops_alert/body.html
 #: apps/core/templates/email/core/ops_alert/body.txt
 msgid "Alert"
@@ -5626,6 +5634,10 @@ msgstr "Les noms diffèrent selon la langue"
 msgid "Necessary"
 msgstr "Nécessaires"
 
+#: apps/catalog/admin.py
+msgid "Needed to review or publish a text written by a machine."
+msgstr "Nécessaire pour relire ou publier un texte écrit par une machine."
+
 #: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
 msgid "Needed with this product"
 msgstr "Nécessaire avec ce produit"
@@ -8602,6 +8614,14 @@ msgstr ""
 #: apps/manager/fitment_views.py apps/manager/views.py
 msgid "Saved."
 msgstr "Enregistré."
+
+#: apps/catalog/models.py
+msgid ""
+"Say so when AI made the image or changed what it shows. The product page then shows an 'AI-"
+"generated image' or 'AI-edited image' label next to it."
+msgstr ""
+"Indiquez-le lorsque l'IA a créé l'image ou modifié ce qu'elle montre. La page du produit affiche "
+"alors près de l'image l'étiquette « Image générée par IA » ou « Image modifiée par IA »."
 
 #: apps/compliance/forms.py
 msgid "Say whether the content is illegal or only against the platform terms."
@@ -15345,6 +15365,14 @@ msgid ""
 msgstr ""
 "Qui a écrit l'article. Le nom apparaît sous le titre et renvoie à la page de l'auteur. Si vous le "
 "laissez vide, aucun auteur n'est affiché."
+
+#: apps/catalog/models.py
+msgid ""
+"Who wrote the text. A machine text can only be set to reviewed or published after a person has "
+"read and checked it."
+msgstr ""
+"Qui a écrit le texte. Un texte écrit par une machine ne peut passer en relu ou publié qu'après "
+"lecture et contrôle par une personne."
 
 #: apps/orders/templates/orders/_legal_recap.html themes/ride/templates/orders/_legal_recap.html
 msgid "Who you buy from and on which terms"
