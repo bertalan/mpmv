@@ -2517,6 +2517,56 @@ def save_storefront_profile(
     return changes
 
 
+def vendor_text_snapshot(vendor: Vendor) -> dict[str, dict[str, str]]:
+    """The vendor's texts now, by language: the status and every `PROFILE_FIELDS` text. Take it
+    before a door writes `VendorTranslation` rows, then pass it to `audit_vendor_text_changes`."""
+    return {
+        row.language: {"status": row.status, **_profile_texts(row)}
+        for row in VendorTranslation.objects.filter(vendor=vendor)
+    }
+
+
+def audit_vendor_text_changes(
+    vendor: Vendor, before: Mapping[str, Mapping[str, str]], *, ctx: AuditContext
+) -> ChangeSet:
+    """VEN.39: one `vendor.profile_changed` entry per language whose texts differ from `before`
+    (a `vendor_text_snapshot`), holding the status and only the changed fields, before and after.
+
+    The one audit for every door that writes vendor texts outside `save_storefront_profile` and
+    `revert_profile_change` (which audit themselves): the admin inline, the catalog import and
+    the seed. A row that was created, changed or deleted counts; a change of status alone does
+    not (no text changed). Call it in the same transaction as the write."""
+    now = vendor_text_snapshot(vendor)
+    changes = ChangeSet()
+    for language in sorted(set(before) | set(now)):
+        old, new = before.get(language), now.get(language)
+        old_texts = {name: (old or {}).get(name, "") for name in PROFILE_FIELDS}
+        new_texts = {name: (new or {}).get(name, "") for name in PROFILE_FIELDS}
+        changed = [name for name in PROFILE_FIELDS if old_texts[name] != new_texts[name]]
+        if not changed:
+            continue
+        identity = {"vendor": str(vendor.public_id), "language": language}
+        key = f"{vendor.public_id}/{language}"
+        old_snapshot = {
+            **identity,
+            "status": None if old is None else old["status"],
+            **{n: old_texts[n] for n in changed},
+        }
+        new_snapshot = {
+            **identity,
+            "status": None if new is None else new["status"],
+            **{n: new_texts[n] for n in changed},
+        }
+        if old is None:
+            changes.create(PROFILE_LABEL, key, new_snapshot)
+        elif new is None:
+            changes.delete(PROFILE_LABEL, key, old_snapshot)
+        else:
+            changes.update(PROFILE_LABEL, key, old_snapshot, new_snapshot)
+    audit_changes(changes, ctx=ctx, action=PROFILE_CHANGED)
+    return changes
+
+
 def _audit_stale_translations(
     vendor: Vendor, language: str, siblings: Mapping[str, str], *, ctx: AuditContext
 ) -> None:

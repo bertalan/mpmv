@@ -276,6 +276,7 @@ class CatalogLoader:
             legacy_wp_user_id=int(row["user_id"]),
         )
         self._merge("vendors.vendor", vendor_services.save_vendor(vendor, ctx=self.ctx))
+        written = False
         for language, texts in sorted(
             (row.get("translations") or {}).items(), key=lambda kv: kv[0] != self.source
         ):
@@ -291,6 +292,11 @@ class CatalogLoader:
                     for name in VendorTranslation.translated_fields
                     if name in texts
                 },
+            )
+            written = True
+        if written:  # VEN.39: the loaded texts are audited like any other vendor text
+            self.report.changes.changes.extend(
+                vendor_services.audit_vendor_text_changes(vendor, {}, ctx=self.ctx).changes
             )
         return vendor
 
