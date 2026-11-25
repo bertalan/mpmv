@@ -20,7 +20,8 @@ from django.utils.translation import get_language, gettext_lazy
 from django.utils.translation import gettext as _
 
 from apps.cart.models import Cart, CartLine
-from apps.catalog import slugs
+from apps.catalog import product_pages, slugs
+from apps.core.models import MediaImage
 from apps.core.money import CURRENCY, round_line
 from apps.orders import engine
 from apps.orders.services import CheckoutPreview
@@ -87,6 +88,8 @@ class LineView:
     total: str
     variant: str = ""
     problem: str = ""
+    image: MediaImage | None = None  # the thumbnail (ORD.40); none when the product has no image
+    image_alt: str = ""
 
 
 @dataclass
@@ -111,6 +114,15 @@ class PackageView:
     summary_lines: list[dict[str, str]] = field(default_factory=list)
     total: str = ""
     note: str = ""
+
+
+def thumbnail_alt(name: str, alt: str) -> str:
+    """The alt text of a line thumbnail: the image's own text when it says more than the line's
+    name beside it, else empty (the picture is then decorative, WCAG 1.1.1)."""
+    shown, wanted = name.casefold().strip(), alt.casefold().strip()
+    if not wanted or wanted in shown or shown in wanted:
+        return ""
+    return alt
 
 
 def _delivery(min_days: int | None, max_days: int | None) -> str:
@@ -200,6 +212,9 @@ def package_views(
     }
     language = get_language() or "en"
     default_language = "en"
+    thumbnails = product_pages.line_thumbnails(
+        [(product, variant) for product, variant in lines], language
+    )
     out: list[PackageView] = []
     for index, package in enumerate(preview.packages, start=1):
         vendor = vendors.get(package.vendor_id)
@@ -243,6 +258,7 @@ def package_views(
                 tax_rate=line.tax_rate,
                 line_tax=line.tax,
             )
+            thumbnail = thumbnails.get((line.product_id, line.variant_id))
             view.lines.append(
                 LineView(
                     id=str(cart_line.public_id) if cart_line is not None else "",
@@ -251,6 +267,8 @@ def package_views(
                     quantity=line.quantity,
                     total=money(total),
                     problem=" ".join(by_product.get(line.product_id, [])),
+                    image=thumbnail.image if thumbnail is not None else None,
+                    image_alt=thumbnail_alt(line.title, thumbnail.alt) if thumbnail else "",
                 )
             )
         net_view = tax_prices.business_net_view(request)
