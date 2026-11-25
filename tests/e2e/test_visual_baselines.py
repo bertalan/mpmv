@@ -39,6 +39,7 @@ from apps.tax import engine as tax
 from apps.tax.tests.factories import TaxRateFactory
 from apps.vendors.tests.factories import CommissionRuleFactory
 from tests.e2e.palette import PALETTE_LINK, PALETTES, assert_palette_applied, choose_palette
+from tests.e2e.test_checkout import fill_delivery
 from tests.e2e.test_ride_home import seed_ride_home
 from tests.e2e.visual import WIDTHS, assert_matches_baseline, require_visual_mode
 from tests.i18n import translated
@@ -169,6 +170,35 @@ def test_ride_storefront_matches_its_visual_baseline(
     page.wait_for_function("() => [...document.images].every((img) => img.complete)", timeout=5000)
     for width in STOREFRONT_WIDTHS:
         assert_matches_baseline(page, theme="ride", name="storefront", width=width)
+
+
+def test_ride_checkout_and_sign_in_match_their_visual_baselines(
+    page: Page,
+    live_server: LiveServer,
+    settings: SettingsWrapper,
+    paths: dict,  # type: ignore[type-arg]
+) -> None:
+    """THM.27 2/2: the `ride` review step and the sign-in, 375 and 1280 px, baselines
+    `ride/checkout-<width>.png` and `ride/sign-in-<width>.png`."""
+    require_visual_mode()
+    settings.MPMV_THEME_DEFAULT = "ride"
+    page.emulate_media(reduced_motion="reduce")
+    page.clock.set_fixed_time(utc(2026, 11, 18, 10))
+    page.set_viewport_size({"width": 1280, "height": 900})
+    page.goto(f"{live_server.url}/product/blue-vase/")
+    page.get_by_role("button", name=translated("Add to cart")).click()
+    expect(page.locator("#add-to-cart-result")).to_contain_text(translated("Added to your cart."))
+    page.goto(f"{live_server.url}/checkout/")
+    fill_delivery(page)
+    page.locator("#id_city").press("Enter")
+    expect(page.get_by_role("heading", level=1)).to_have_text(translated("Review and pay"))
+    page.wait_for_load_state("load")
+    for width in STOREFRONT_WIDTHS:
+        assert_matches_baseline(page, theme="ride", name="checkout", width=width)
+    page.goto(f"{live_server.url}/account/login/")
+    page.wait_for_load_state("load")
+    for width in STOREFRONT_WIDTHS:
+        assert_matches_baseline(page, theme="ride", name="sign-in", width=width)
 
 
 PALETTE_PAGES = ("home", "product")
