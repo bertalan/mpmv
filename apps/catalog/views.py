@@ -300,8 +300,11 @@ def product_detail(request: HttpRequest, segment: str, slug: str) -> HttpRespons
     fitment = product_pages.fitment(page.product, language)
     context: dict[str, Any] = {
         "page_data": page,
-        "meta_description": core_text.meta_description(
-            page.seo_description, page.short_description
+        # SEO.17: page language only; a page showing the source text has no description.
+        "meta_description": (
+            ""
+            if page.is_fallback
+            else core_text.meta_description(page.seo_description, page.short_description)
         ),
         "currency": CURRENCY,
         "language_urls": dict(page.paths),

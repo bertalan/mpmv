@@ -125,3 +125,28 @@ def test_a_product_uses_its_seo_description_then_its_short_description() -> None
     assert descriptions(product_path(product)) == ["Search text."]
     product.translations.update(seo_description="")
     assert descriptions(product_path(product)) == ["Short."]
+
+
+def test_a_product_shown_in_another_language_has_no_description() -> None:
+    """Review of #1101: the page falls back to the source text; its description must not."""
+    from tests.i18n import product_url
+
+    product = stock()
+    product.translations.update(short_description="Only in the source language.")
+    response = Client().get(product_url(other_language(), "mug"), follow=True)
+    assert response.status_code == 200
+    assert META.findall(response.content.decode()) == []
+
+
+def test_a_hostile_vendor_tagline_is_inert_in_the_description() -> None:
+    """Review of #1101: the text is escaped once, in the attribute; no element is added."""
+    vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
+    hostile = '"><script>alert(1)</script><img src=x onerror=alert(2)>'
+    VendorTranslationFactory.create(vendor=vendor, status=PUBLISHED, tagline=hostile)
+    stock(vendor=vendor)
+    html = Client().get(vendor_url(primary_language(), vendor.slug)).content.decode()
+    [found] = META.findall(html)
+    assert "<" not in found
+    assert '"' not in found
+    assert "<script>alert(1)" not in html
+    assert "onerror=alert(2)>" not in html
