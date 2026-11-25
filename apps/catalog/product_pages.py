@@ -618,3 +618,57 @@ def fitment(product: Product, language: str) -> FitmentSummary | None:
         if summary is not None and (summary.universal or summary.groups):
             return summary
     return None
+
+
+@dataclass(frozen=True)
+class LineThumbnail:
+    """The small picture of a cart or checkout line (ORD.40): the image, rendered by the page
+    with `{% responsive_image image "thumb" %}` from its existing renditions (renditions loaded)."""
+
+    image: MediaImage
+    alt: str  # the image's own alt text in the shown language, "" when it has none
+
+
+def line_thumbnails(
+    pairs: Sequence[tuple[int, int | None]], language: str
+) -> dict[tuple[int, int | None], LineThumbnail]:
+    """The thumbnail of each (product id, variant id) of a cart, for the gallery `language` shows
+    (spec 03 §3.2, D-18): the variant's own gallery cover when it has images in that language,
+    else the product's cover. A pair without any image is left out. A fixed number of queries
+    (images with their files, variants' covers, alt texts, renditions) whatever the line count.
+    """
+    if not pairs:
+        return {}
+    rows = list(
+        ProductImage.objects.filter(product_id__in={product for product, _v in pairs})
+        .select_related("image")
+        .prefetch_related("translations")
+    )
+    by_product: dict[int, list[ProductImage]] = {}
+    for row in rows:
+        by_product.setdefault(row.product_id, []).append(row)
+    variant_ids = {variant for _p, variant in pairs if variant is not None}
+    covers = dict(
+        Variant.objects.filter(pk__in=variant_ids).values_list("pk", "cover_image_id")
+        if variant_ids
+        else []
+    )
+    row_by_pk = {row.pk: row for row in rows}
+    chosen: dict[tuple[int, int | None], ProductImage] = {}
+    for product_id, variant_id in pairs:
+        own_rows = by_product.get(product_id, [])
+        shared = [row for row in own_rows if row.variant_id is None]
+        own = [row for row in own_rows if variant_id is not None and row.variant_id == variant_id]
+        cover_pk = covers.get(variant_id) if variant_id is not None else None
+        cover = row_by_pk.get(cover_pk) if cover_pk is not None else None
+        shown = engine.variant_gallery(own, shared, cover, language) or engine.gallery_selection(
+            shared, language
+        )
+        if shown:
+            chosen[(product_id, variant_id)] = shown[0]
+    core_images.prefetch_renditions(row.image for row in chosen.values())
+    out: dict[tuple[int, int | None], LineThumbnail] = {}
+    for key, row in chosen.items():
+        text = translations.resolve(row.translations.all(), language).translation
+        out[key] = LineThumbnail(image=row.image, alt=text.alt_text if text is not None else "")
+    return out

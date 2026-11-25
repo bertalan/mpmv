@@ -377,7 +377,14 @@ AUTH_PASSWORD_VALIDATORS = [
     },
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+    # CORE.28: a password found in a breach is refused when set (fails open if the service is down).
+    {"NAME": "apps.accounts.breach.BreachedPasswordValidator"},
 ]
+
+# Breached-password check (CORE.28): Have I Been Pwned range API, k-anonymity (5 hash characters).
+BREACH_CHECK_ENABLED = env_bool("MPMV_BREACH_CHECK_ENABLED", default=True)
+BREACH_CHECKER = "apps.accounts.breach.HibpRangeChecker"
+BREACH_CHECK_URL = env_str("MPMV_BREACH_CHECK_URL", "https://api.pwnedpasswords.com/range/")
 
 # Site languages (spec 09, D-18, I18N.15): MPMV_LANGUAGES, an ordered list of codes; the first is
 # the primary (source) language without URL prefix. Default: en,it (DE/FR/ES wait for the

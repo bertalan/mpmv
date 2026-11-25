@@ -6793,12 +6793,13 @@ msgstr "Referencia del pedido"
 
 #: themes/base/templates/components/order_summary.html
 #: themes/ride/templates/components/order_summary.html themes/ride/templates/orders/_cart_body.html
+#: themes/ride/templates/orders/_review_summary.html
 msgid "Order summary"
 msgstr "Resumen del pedido"
 
 #: apps/orders/templates/orders/_cart_body.html apps/orders/templates/orders/_review_body.html
 #: apps/orders/templates/orders/confirmation.html themes/ride/templates/orders/_cart_body.html
-#: themes/ride/templates/orders/_review_body.html themes/ride/templates/orders/confirmation.html
+#: themes/ride/templates/orders/_review_summary.html themes/ride/templates/orders/confirmation.html
 msgid "Order total"
 msgstr "Total del pedido"
 
@@ -13287,6 +13288,10 @@ msgstr "Esta página todavía no está disponible en tu idioma."
 msgid "This parent does not exist."
 msgstr "Este padre no existe."
 
+#: apps/accounts/breach.py
+msgid "This password has appeared in a known data breach. Please choose a different one."
+msgstr "Esta contraseña ha aparecido en una filtración de datos conocida. Elija otra."
+
 #: apps/compliance/templates/compliance/includes/destination_notice.html
 msgid ""
 "This product cannot be shipped to %(country)s: its safety warnings are not yet available in a "
@@ -13299,6 +13304,14 @@ msgstr ""
 #: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
 msgid "This product is no longer available."
 msgstr "Este producto ya no está disponible."
+
+#: apps/orders/ui/present.py
+msgid ""
+"This seller sells to businesses only. To buy these items, enter in your business details a VAT "
+"number that passes the automatic check."
+msgstr ""
+"Este vendedor vende solo a empresas. Para comprar estos artículos, introduce en tus datos de "
+"empresa un número de IVA que supere la comprobación automática."
 
 #: apps/accounts/templates/accounts/sessions/list.html
 #: themes/ride/templates/accounts/sessions/list.html
@@ -15890,6 +15903,10 @@ msgstr ""
 #: apps/manager/event_block_forms.py
 msgid "Your own products, up to 12. Required."
 msgstr "Sus propios productos, hasta 12. Obligatorio."
+
+#: apps/accounts/breach.py
+msgid "Your password must not appear in a known data breach."
+msgstr "La contraseña no debe aparecer en ninguna filtración de datos conocida."
 
 #: apps/manager/templates/manager/shop/payments.html
 msgid "Your payout account is active. Customers can buy your products online."

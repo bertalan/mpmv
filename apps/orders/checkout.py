@@ -231,6 +231,8 @@ def build_checkout(
     summaries: list[engine.PackageSummary] = []
     ready: list[PlaceVendor] = []
     customer_ctx: tax_engine.TaxContext | None = None
+    # VEN.41: the same rule as reverse charge (TAX.5) says whether the buyer is a business.
+    verified_business = tax_services.validated_business(customer_vat, at=now) is not None
     for package in cart_packages:
         vendor = package.lines[0].item.product.vendor
         summary, place, ctx = _package(
@@ -252,6 +254,12 @@ def build_checkout(
                 summary,
                 _block(engine.CHECKOUT_OFF, "This vendor cannot take orders right now.", vendor.pk),
             )
+            place = None
+        refused = engine.business_only_block(
+            vendor.pk, business_only=vendor.business_only, verified_business=verified_business
+        )
+        if refused is not None:
+            summary = _blocked(summary, refused)
             place = None
         summaries.append(summary)
         blocks.extend(summary.blocks)

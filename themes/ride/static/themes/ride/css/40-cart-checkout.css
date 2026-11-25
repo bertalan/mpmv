@@ -13,6 +13,14 @@
     max-inline-size: 75rem;
   }
 
+  /* Line thumbnail (ORD.40): a square crop whatever the photo's shape. */
+  .cart-line__thumb {
+    inline-size: 6rem;
+    block-size: 6rem; /* the picture's height attribute is its real ratio, not this box */
+    aspect-ratio: 1;
+    object-fit: cover;
+  }
+
   .cart-summary .btn-lg {
     inline-size: 100%;
   }
@@ -26,6 +34,47 @@
     .cart-summary {
       position: sticky;
       inset-block-start: 1rem;
+    }
+  }
+
+  /* Review step (THM.27 2/2): packages left, summary right (sticky from 64rem by the `.cart-summary` rule above), the pay
+     actions full width below. */
+  .checkout:has(.checkout-layout) {
+    max-inline-size: 75rem;
+  }
+
+  /* Shipping options: a tile per option over the native radio (kept, so arrows, focus and the
+     checked state are the browser's). The whole tile is the click target through the label. */
+  .shipping-tile.form-check {
+    position: relative;
+    margin-block-end: 0.5rem;
+    padding-block: 0.75rem;
+    padding-inline: 3rem 0.75rem;
+    border: 1px solid var(--color-border-control);
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
+  }
+
+  .shipping-tile .shipping-tile__label::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
+
+  .shipping-tile:has(input:checked) {
+    border-color: var(--color-accent);
+    box-shadow: inset 0 0 0 2px var(--color-accent);
+    background: var(--color-accent-tint);
+  }
+
+  .shipping-tile:has(input:focus-visible) {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .shipping-tile {
+      transition: border-color 0.15s ease, background-color 0.15s ease;
     }
   }
 

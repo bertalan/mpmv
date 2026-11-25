@@ -22,3 +22,29 @@ class FakeCaptchaVerifier:
     @classmethod
     def reset(cls) -> None:
         cls.calls.clear()
+
+
+class FakeBreachChecker:
+    """CORE.28: a `BreachedPasswordChecker` with no network.
+
+    Tests put passwords in `breached` (generated per test, never a real leaked one) or set `down`.
+    `reset()` runs before every test (root conftest).
+    """
+
+    breached: ClassVar[set[str]] = set()
+    down: ClassVar[bool] = False
+    calls: ClassVar[list[str]] = []
+
+    def is_breached(self, password: str) -> bool:
+        from apps.accounts.breach import BreachCheckUnavailable
+
+        type(self).calls.append(password)
+        if type(self).down:
+            raise BreachCheckUnavailable("fake provider down")
+        return password in type(self).breached
+
+    @classmethod
+    def reset(cls) -> None:
+        cls.breached.clear()
+        cls.calls.clear()
+        cls.down = False
