@@ -106,6 +106,8 @@
 		uri strip_prefix /media
 		root * /srv/media
 		header X-Content-Type-Options nosniff
+		# 24 hours, not longer (OPS.17): an image deleted and re-uploaded under the same file name
+		# gets the same paths, so a long cache would keep showing the old picture.
 		header Cache-Control "public, max-age=86400"
 		# Sanitised SVG logos keep their inline styles (THM.12). The two matchers are exclusive on
 		# purpose: the adapter runs a header with a matcher before one without, so an unmatched CSP
