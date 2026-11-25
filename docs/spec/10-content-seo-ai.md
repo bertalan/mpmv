@@ -170,8 +170,11 @@ everywhere:
   verified reviews only; listings and taxonomy pages as `CollectionPage` with an `ItemList`.
 - Blog: `BlogPosting` with `author` pointing to a `Person` node (`ProfilePage` on the author
   page, CMS.3), `publisher` pointing to the operator `Organization`; events as `Event` (spec 15).
-- Language: `inLanguage` on every node, the text in the page language only, never a fallback in
-  another language; no node for content that is not published in that language.
+- Language: `inLanguage` on every node whose schema.org type has it (the `CreativeWork` nodes
+  such as `WebPage`, `WebSite`, `BlogPosting`, `FAQPage`, and `Event`), never on a type that
+  lacks it (`ItemList`, `Organization`, `Product`, SEO.16); the text in the page language only,
+  never a fallback in another language; no node for content that is not published in that
+  language.
 
 **Widgets feed the graph (owner, 2026-11-09).** Every block or widget that shows a list of
 things on a page adds to the page's `@graph`, instead of being invisible to it: the product grid
@@ -181,9 +184,10 @@ template widget implements `graph_nodes(context) -> list[dict]` and returns one 
 a `name` (the block heading in the page language), `numberOfItems` and ordered `ListItem`s
 (`position`, `item` = the `@id` of the product, event, post or vendor page, plus `name`, `url`
 and `image`). Full `Product` nodes appear only on the product's own page; a list item references
-it and never repeats offers, so a page with three widgets and twenty products stays small. The
-page node links the lists through `hasPart` (`mainEntity` on listing pages, where the first list
-is the page's main content). The same product in two widgets is one `@id`, listed in each.
+it and never repeats offers, so a page with three widgets and twenty products stays small. On
+listing pages the page node points at the first list through `mainEntity` (it is the page's main
+content); other lists stay in the same `@graph`, found by their `@id`, and are not linked through
+`hasPart`, which only takes a `CreativeWork` (SEO.16, from the schema.org validator, 2026-11-25). The same product in two widgets is one `@id`, listed in each.
 Hidden, unpublished or other-language items never appear.
 
 **Every page type has a graph (owner, 2026-11-09).** The table below is the coverage SEO.7 must
@@ -192,7 +196,7 @@ graph.
 
 | Page | Page node | Main content |
 |---|---|---|
-| Home | `WebPage` | `hasPart` lists from its blocks |
+| Home | `WebPage` | named `ItemList`s from its blocks, in the same `@graph` |
 | Product | `ItemPage` | `Product` or `ProductGroup` with offers |
 | Category, term, brand listing | `CollectionPage` | `ItemList` of product `@id`s (`mainEntity`) |
 | Vendor storefront | `ProfilePage` | vendor `Organization` + `ItemList` of its products |
@@ -452,6 +456,8 @@ with design tokens, template overrides, CSP-safe components and WCAG 2.2 AA rule
 | SEO.13 | Product node attributes from the catalogue data (follow-up of the SEO.1 review, 2026-11-16): `width`, `height`, `depth` and `weight` as `QuantitativeValue` with the UN/CEFACT `unitCode` (CAT.22), `material`, `color`, `countryOfOrigin`, a `manufacturer` that points to the CAT.20 `Brand` node (producer role per SEO.10), and per-variant `gtin`, `mpn` and `image` (CAT.23; takes over that clause of SEO.12); a field that is empty is omitted, never emitted blank | P2 | 4 | SEO.1, CAT.22, CAT.23, CAT.20, SEO.10 | A product with dimensions, weight and origin shows them as `QuantitativeValue` and an ISO country; each variant carries its own identifiers and image; an empty field is absent; the page graph stays under 30 KB |
 | SEO.14 | Vendor return policy in the structured data (follow-up of the SEO.1 review; the data is VEN.40; the link and country fallback are SEO.11, in review on PR #561): `merchantReturnDays` from the vendor window instead of the 14-day floor, `returnFees` (free return or customer-paid shipping; without an approved policy `returnFees` is `FreeReturn`, because the shop then pays the return shipping, VEN.40, owner decision Q-105, 2026-11-18), `returnMethod` and `merchantReturnLink`; a vendor that has set nothing keeps the floor | P1 | 3 | SEO.1, VEN.40 | A vendor with a 30-day window and free returns shows both in the JSON-LD; a vendor with no approved policy shows 14 days and `FreeReturn`, and the product page says the shop pays the return shipping; the stated values equal the ones on the product page |
 | SEO.15 | Seller name is never a person (follow-up of the SEO.1 review): the `seller` and vendor `Organization` name is the public shop or trading name of the vendor, never the bare legal name of a natural person (sole trader, individual from VEN.12); a sole trader's shop name is emitted even when it contains their personal name (owner decision 2026-11-18), the bare personal name never is; if the only name available is a natural person's legal name the seller node is omitted rather than emitted; the vendor onboarding form asks for a shop name; the rule is one engine function used by SEO.1 and SEO.7 | P1 | 3 | SEO.1, SEO.7, VEN.12 | A sole trader with a shop name emits the shop name; a sole trader whose only name equals the legal name emits no seller and no error; the schema check rejects a seller equal to a natural person's legal name |
+| SEO.16 | Structured data passes the schema.org validator (external audit of STAGE, 2026-11-25): the page node no longer links `ItemList`s through `hasPart` (its range is `CreativeWork`; listing pages keep `mainEntity`); `inLanguage` is dropped from `ItemList` nodes, the block widgets included, and kept on the types that define it; the CI schema check gains a property-domain rule (a property used on a type that does not define it, or a value of a type outside its range, fails) for the types the graph emits; a Django system check warns when the platform operator has no logo, since the operator `Organization` then has none (Google needs it for the logo in results) | P1 | 3 | SEO.7 | The graphs of the home, a listing, a product and a vendor storefront have no `hasPart` pointing at an `ItemList` and no `ItemList` with `inLanguage`; the property-domain rule fails on a fixture with either; a listing still has its list as `mainEntity`; the system check warns with no operator logo and is silent with one |
+| SEO.17 | A meta description on every public page (external audit of STAGE, 2026-11-25: the home, listings without an editorial text and vendor storefronts had none): one resolver with a fallback chain per page type, in the page language only: search description, then the page summary; a vendor storefront uses the vendor's short description; a listing without an editorial text uses its taxonomy term or brand description; a blog author page uses the author bio; trimmed to about 160 characters on a word boundary, plain text, no fallback in another language; a page with nothing to say emits no tag, never a placeholder | P2 | 3 | SEO.7 | A sweep over the registered public page types finds a description on each one that has a source text; a storefront shows its vendor's short description; a listing with no editorial text shows the term description; a 400-character source ends on a whole word within 160 characters; a page with no source text has no empty tag |
 | AI.1 | MCP server: auth, read tools (catalog, orders, quotes, simulations, reports) | P2 | 12 | CORE.7 | Tools usable from Claude Code with scopes |
 | AI.2 | Mutating MCP tools with dry-run, confirmation and audit | P2 | 10 | AI.1 | Every mutation has a diff and an audit entry |
 | AI.3 | Read-only public catalog API for agents | P3 | 6 | CAT.9 | Search by taxonomy term via API |
