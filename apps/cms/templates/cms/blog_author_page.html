@@ -7,7 +7,7 @@ language's), profile links, then their live articles here, newest first, twelve 
 `page` is the blog index; the page graph (SEO.7) holds the ProfilePage of the author's Person.
 {% endcomment %}
 {% block title %}{{ author.name }} · {{ page.title }} · {{ site_name }}{% endblock %}
-{% block description %}{% endblock %}
+{% block description %}{% if meta_description %}<meta name="description" content="{{ meta_description }}">{% endif %}{% endblock %}
 {% block page_content %}
   <section class="author-profile">
     <h1>{{ author.name }}</h1>

@@ -78,6 +78,7 @@ class ProductPage:
     vendor: Vendor
     title: str
     short_description: str
+    seo_description: str  # SEO.17: the search engines' text, before the short description
     description: str  # sanitised HTML
     requested: str  # the page language
     shown: str  # the language of the texts shown
@@ -284,6 +285,7 @@ def _build(product: Product, language: str) -> ProductPage | None:
         vendor=product.vendor,
         title=text.title,
         short_description=text.short_description,
+        seo_description=text.seo_description,
         description=services._clean_rich_text(text.description).strip(),
         requested=language,
         shown=resolved.language,

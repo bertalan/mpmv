@@ -28,6 +28,7 @@ from wagtail import hooks
 from wagtail.rich_text import RichText
 from wagtail.views import serve
 
+from apps.core import text as core_text
 from apps.core import translations
 from apps.core.i18n import hreflang_alternates
 from apps.core.money import CURRENCY
@@ -188,12 +189,24 @@ def _listing(
     }
     labels.update({(listings.VENDOR, option.value): option.label for option in vendors})
     brand = anchor.scope.brand
+    brand_profile = services.brand_profile(brand, language) if brand else None
     editorial = (
         _editorial(request, anchor.scope, language) if listings.shows_editorial(params) else None
     )
 
     context: dict[str, Any] = {
         "editorial": editorial,
+        # SEO.17: the editorial text, else the listing's own texts in the page language.
+        "meta_description": core_text.meta_description(
+            editorial.description if editorial else "",
+            *services.listing_description_texts(anchor.scope, language),
+            brand_profile.description if brand_profile else "",
+            *(
+                (vendor_profile.tagline, vendor_profile.description)
+                if vendor_profile and not vendor_profile.is_fallback
+                else ()
+            ),
+        ),
         "editorial_faq": editorial.faq if editorial else (),
         "anchor": anchor,
         "location": location,
@@ -206,7 +219,7 @@ def _listing(
         "vendor_options": vendors,
         "store_categories": store_categories,
         "vendor_profile": vendor_profile,
-        "brand_profile": services.brand_profile(brand, language) if brand else None,
+        "brand_profile": brand_profile,
         # SEO.7: the layout prints the page's one graph from these.
         "graph_object": anchor,
         "policy_items": [
@@ -287,6 +300,9 @@ def product_detail(request: HttpRequest, segment: str, slug: str) -> HttpRespons
     fitment = product_pages.fitment(page.product, language)
     context: dict[str, Any] = {
         "page_data": page,
+        "meta_description": core_text.meta_description(
+            page.seo_description, page.short_description
+        ),
         "currency": CURRENCY,
         "language_urls": dict(page.paths),
         "alternates": alternates,

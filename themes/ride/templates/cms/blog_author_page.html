@@ -7,7 +7,7 @@ banner (the only h1; the trail is Home, the blog, the author). `page` is the blo
 page graph (SEO.7) holds the ProfilePage. The image presets "article" and "avatar" come from CAT.29 (#671).
 {% endcomment %}
 {% block title %}{{ author.name }} · {{ page.title }} · {{ site_name }}{% endblock %}
-{% block description %}{% endblock %}
+{% block description %}{% if meta_description %}<meta name="description" content="{{ meta_description }}">{% endif %}{% endblock %}
 {% block content %}
   {% page_trail page current=author.name as trail %}
   {% include "components/page_banner.html" with title=author.name items=trail text=author_job_title only %}
