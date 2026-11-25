@@ -7,6 +7,28 @@
     max-inline-size: 60rem;
   }
 
+  /* Cart page (THM.27): packages left, summary right; stacked on a phone. The page is wider than
+     the other checkout pages so the packages keep room for the thumbnail and the stepper. */
+  .checkout:has(.cart-layout) {
+    max-inline-size: 75rem;
+  }
+
+  .cart-summary .btn-lg {
+    inline-size: 100%;
+  }
+
+  .cart-summary .order-summary {
+    margin-block-end: 1rem;
+  }
+
+  /* Sticky only where the columns sit side by side; on a phone the summary follows the packages. */
+  @media (min-width: 64rem) {
+    .cart-summary {
+      position: sticky;
+      inset-block-start: 1rem;
+    }
+  }
+
   .checkout h1,
   .checkout h2,
   .checkout h3 {

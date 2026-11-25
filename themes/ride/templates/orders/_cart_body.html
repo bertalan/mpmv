@@ -4,20 +4,26 @@
   {% url "home" as home_url %}{% include "components/empty_state.html" with title=_("Your cart is empty") text=_("Find something you like.") url=home_url action=_("Start shopping") only %}
 {% else %}
   {% for message in cart_messages %}{% include "components/alert.html" with level="warning" message=message only %}{% endfor %}
-  <form method="post" action="{% url 'orders:cart' %}" hx-post="{% url 'orders:cart' %}" hx-trigger="change, submit" hx-target="#cart-body" hx-swap="outerHTML">
-    {% csrf_token %}
-    {% for package in packages %}{% include "orders/_package.html" with package=package mode="cart" %}{% endfor %}
-    <p><button type="submit" class="btn btn-outline-secondary">{% translate "Update cart" %}</button></p>
-  </form>
-  {% if order %}
-    {% include "components/order_summary.html" with id="order-summary" title=_("Order total") lines=order.lines total=order.total note=order.note only %}
-  {% else %}
-    <p class="form-text">{% translate "Indicative price. Final amount at checkout." %} {% translate "Shipping is worked out at checkout, from your delivery address." %}</p>
-  {% endif %}
-  {% if can_continue %}
-    <p><a class="btn btn-primary btn-lg" href="{% url 'orders:checkout' %}">{% translate "Continue to checkout" %}</a></p>
-  {% else %}
-    <p class="form-text">{% translate "Solve the points above to go on." %}</p>
-  {% endif %}
+  <div class="cart-layout row g-4 align-items-start">
+    <div class="col-lg-8">
+      <form method="post" action="{% url 'orders:cart' %}" hx-post="{% url 'orders:cart' %}" hx-trigger="change, submit" hx-target="#cart-body" hx-swap="outerHTML">
+        {% csrf_token %}
+        {% for package in packages %}{% include "orders/_package.html" with package=package mode="cart" %}{% endfor %}
+        <p><button type="submit" class="btn btn-outline-secondary">{% translate "Update cart" %}</button></p>
+      </form>
+    </div>
+    <aside class="cart-summary col-lg-4">
+      {% if order %}
+        {% include "components/order_summary.html" with id="order-summary" title=_("Order total") lines=order.lines total=order.total note=order.note only %}
+      {% else %}
+        <p class="form-text">{% translate "Indicative price. Final amount at checkout." %} {% translate "Shipping is worked out at checkout, from your delivery address." %}</p>
+      {% endif %}
+      {% if can_continue %}
+        <p><a class="btn btn-primary btn-lg" href="{% url 'orders:checkout' %}">{% translate "Continue to checkout" %}</a></p>
+      {% else %}
+        <p class="form-text">{% translate "Solve the points above to go on." %}</p>
+      {% endif %}
+    </aside>
+  </div>
 {% endif %}
 </div>{% endwith %}
