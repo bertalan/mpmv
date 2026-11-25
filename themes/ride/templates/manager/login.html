@@ -1,14 +1,19 @@
 {% extends "layouts/account.html" %}
-{% load i18n static captcha %}
+{% load i18n static captcha manager_tags %}
 {% comment %}
-The Manager login on Bootstrap classes (THM.16 2/2); same fields, ids, errors and captcha as base.
+The Manager login on Bootstrap classes (THM.16 2/2); same fields, ids, errors and captcha as base. THM.27 2/2: a centred card on an image stage; the
+show-password toggle sits inside the password field.
 {% endcomment %}
 {% block title %}{% translate "Sign in" %} · {{ site_name }}{% endblock %}
 {% block description %}{% robots_meta "noindex" %}{% endblock %}
 {% block head %}{% captcha_script %}
 <link rel="stylesheet" href="{% static 'accounts/password-toggle.css' %}">
 <script type="module" src="{% static 'accounts/password-toggle.js' %}"></script>{% endblock %}
-{% block account_content %}
+{% block content %}
+<div class="signin-stage">
+<div class="signin-card account-page card mx-auto">
+<div class="card-body p-3 p-md-4">
+  {% manager_entry as manager_link %}{% if manager_link %}<p class="fw-semibold"><a href="{{ manager_link.url }}">{{ manager_link.label }}</a></p>{% endif %}
   <h1>{% translate "Sign in" %}</h1>
   {% if form.errors %}
     <div class="alert alert-danger" id="login-error" role="alert">
@@ -16,18 +21,23 @@ The Manager login on Bootstrap classes (THM.16 2/2); same fields, ids, errors an
       <p class="mb-0">{% translate "The email or the password is not correct, or the account is locked for a while. Please try again." %}</p>
     </div>
   {% endif %}
-  <form method="post" action="{{ request.get_full_path }}" class="col-md-8 col-lg-6 p-0">
+  <form method="post" action="{{ request.get_full_path }}" class="p-0">
     {% csrf_token %}
     <div class="mb-3">
       <label class="form-label" for="id_username">{% translate "Email" %}</label>
       <input class="form-control{% if form.errors %} is-invalid{% endif %}" type="email" name="username" id="id_username" autocomplete="username" required value="{{ form.username.value|default:'' }}" autofocus{% if form.errors %} aria-invalid="true" aria-describedby="login-error"{% endif %}>
     </div>
-    <div class="mb-3">
+    <div class="signin-field mb-3">
       <label class="form-label" for="id_password">{% translate "Password" %}</label>
-      <input class="form-control{% if form.errors %} is-invalid{% endif %}" type="password" name="password" id="id_password" autocomplete="current-password" data-password-toggle="{% translate 'Show password' %}" required{% if form.errors %} aria-invalid="true" aria-describedby="login-error"{% endif %}>
+      <div class="signin-control">
+        <input class="form-control{% if form.errors %} is-invalid{% endif %}" type="password" name="password" id="id_password" autocomplete="current-password" data-password-toggle="{% translate 'Show password' %}" required{% if form.errors %} aria-invalid="true" aria-describedby="login-error"{% endif %}>
+      </div>
     </div>
     {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
     {% captcha_widget %}
     <button type="submit" class="btn btn-primary">{% translate "Sign in" %}</button>
   </form>
+</div>
+</div>
+</div>
 {% endblock %}
