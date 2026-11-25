@@ -1,0 +1,52 @@
+{% extends "admin/base_site.html" %}
+{% load admin_urls %}
+{% comment %}VEN.41: staff set or clear the business-only flag, saying why.{% endcomment %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Home</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+  &rsaquo; <a href="{% url opts|admin_urlname:'changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+  &rsaquo; <a href="{{ change_url }}">{{ original }}</a>
+  &rsaquo; Business-only seller
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  <p>
+    {% if new_value %}
+      Mark {{ original }} as a <strong>business-only seller</strong> only after checking its VAT
+      number (VIES for EU numbers) and that it is a business. Its products will then be sold only
+      to buyers with a verified VAT number, shown without VAT, and without the consumer right of
+      withdrawal. Contact data stay mandatory.
+    {% else %}
+      Remove the <strong>business-only seller</strong> mark from {{ original }}. Its products go
+      back to the normal consumer rules.
+    {% endif %}
+    A vendor's own request never changes the flag: only this staff action does.
+  </p>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <p class="errornote">The flag could not be changed.</p>
+      {{ form.non_field_errors }}
+    {% endif %}
+    <fieldset class="module aligned">
+      <div class="form-row{% if form.reason.errors %} errors{% endif %}">
+        {{ form.reason.errors }}
+        <div class="flex-container">
+          <label for="{{ form.reason.id_for_label }}" class="required">{{ form.reason.label }}:</label>
+          {{ form.reason }}
+        </div>
+        <div class="help" id="{{ form.reason.id_for_label }}_helptext">{{ form.reason.help_text }}</div>
+      </div>
+    </fieldset>
+    <div class="submit-row">
+      <input type="submit" value="{% if new_value %}Mark as business-only{% else %}Unmark as business-only{% endif %}" class="default">
+      <a href="{{ change_url }}" class="closelink">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
