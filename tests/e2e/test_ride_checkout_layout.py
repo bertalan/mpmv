@@ -7,6 +7,8 @@ import secrets
 from typing import Any
 
 import pytest
+from django.conf import settings as django_settings
+from django.utils import translation
 from playwright.sync_api import Page, expect
 from pytest_django.live_server_helper import LiveServer
 
@@ -90,17 +92,53 @@ def test_the_sign_in_is_a_centred_card_with_the_toggle_inside_the_field(
     card = page.locator(".signin-card").bounding_box()
     assert card is not None
     assert abs((card["x"] + card["width"] / 2) - width / 2) < 2, "centred"
-    field = page.locator("#id_password").bounding_box()
+    control = page.locator(".signin-control").bounding_box()
     toggle = page.locator(".password-toggle").bounding_box()
-    assert field is not None
+    assert control is not None
     assert toggle is not None
-    assert field["x"] <= toggle["x"]
-    assert toggle["x"] + toggle["width"] <= field["x"] + field["width"] + 1
-    assert field["y"] - 1 <= toggle["y"]
-    assert toggle["y"] + toggle["height"] <= field["y"] + field["height"] + 1
+    assert control["x"] <= toggle["x"]
+    assert toggle["x"] + toggle["width"] <= control["x"] + control["width"] + 1
+    assert control["y"] - 1 <= toggle["y"]
+    assert toggle["y"] + toggle["height"] <= control["y"] + control["height"] + 1
     page.locator("#id_username").focus()
     page.keyboard.press("Tab")
     page.keyboard.press("Tab")
     expect(page.locator(".password-toggle")).to_be_focused()
     page.keyboard.press("Space")
     expect(page.locator("#id_password")).to_have_attribute("type", "text")
+
+
+def _longest_show_password() -> str:
+    """The longest catalog translation of the toggle's text, whatever the languages are."""
+    texts = []
+    for code, _name in django_settings.LANGUAGES:
+        with translation.override(code):
+            texts.append(str(translation.gettext("Show password")))
+    return max(texts, key=len)
+
+
+@pytest.mark.parametrize("width", [375, 1280])
+def test_a_long_toggle_text_and_the_error_state_never_overlap_the_input(
+    page: Page,
+    live_server: LiveServer,
+    width: int,
+) -> None:
+    page.set_viewport_size({"width": width, "height": 900})
+    page.goto(f"{live_server.url}/account/login/")
+    page.wait_for_load_state("load")
+    page.evaluate(
+        "(text) => { const b = document.querySelector('.password-toggle'); b.textContent = text;"
+        " document.querySelector('#id_password').classList.add('is-invalid'); }",
+        _longest_show_password(),
+    )
+    control = page.locator(".signin-control").bounding_box()
+    field = page.locator("#id_password").bounding_box()
+    toggle = page.locator(".password-toggle").bounding_box()
+    assert control is not None
+    assert field is not None
+    assert toggle is not None
+    assert field["x"] + field["width"] <= toggle["x"] + 1, "the toggle sits beside the input"
+    assert toggle["x"] + toggle["width"] <= control["x"] + control["width"] + 1
+    assert toggle["y"] >= control["y"] - 1
+    assert toggle["y"] + toggle["height"] <= control["y"] + control["height"] + 1
+    assert field["width"] >= 100, "the input keeps room to type"

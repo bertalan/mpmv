@@ -9,6 +9,9 @@ import pytest
 from django.template.loader import render_to_string
 from django.test import RequestFactory
 
+from apps.accounts.tests.factories import UserFactory
+from apps.manager.spaces import Space
+from apps.manager.templatetags import manager_tags
 from apps.themes.services import use_theme
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("english_interface")]
@@ -105,3 +108,15 @@ def test_the_sign_in_is_a_centred_card_on_an_image_stage() -> None:
     assert "signin-stage" in html
     assert "data-password-toggle=" in html
     assert re.search(r'class="[^"]*\bsignin-field\b', html)
+
+
+def test_the_sign_in_keeps_the_manager_entry_of_the_account_layout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(manager_tags, "may_enter", lambda space, user: space is Space.PLATFORM)
+    request = RequestFactory().get("/")
+    request.user = UserFactory.create(superuser=True)
+    with use_theme("ride"):
+        html = render_to_string("manager/login.html", {"form": None, "next": ""}, request=request)
+    assert re.search(r'<p class="fw-semibold"><a href="[^"]+">Manager</a></p>', html)
+    assert "signin-control" in html

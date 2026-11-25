@@ -29,16 +29,10 @@
     }
   }
 
-  /* Review step (THM.27 2/2): packages left, summary right, the pay actions full width below. */
+  /* Review step (THM.27 2/2): packages left, summary right (sticky from 64rem by the `.cart-summary` rule above), the pay
+     actions full width below. */
   .checkout:has(.checkout-layout) {
     max-inline-size: 75rem;
-  }
-
-  @media (min-width: 64rem) {
-    .checkout-layout .cart-summary {
-      position: sticky;
-      inset-block-start: 1rem;
-    }
   }
 
   /* Shipping options: a tile per option over the native radio (kept, so arrows, focus and the

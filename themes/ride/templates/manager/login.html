@@ -1,5 +1,5 @@
 {% extends "layouts/account.html" %}
-{% load i18n static captcha %}
+{% load i18n static captcha manager_tags %}
 {% comment %}
 The Manager login on Bootstrap classes (THM.16 2/2); same fields, ids, errors and captcha as base. THM.27 2/2: a centred card on an image stage; the
 show-password toggle sits inside the password field.
@@ -13,6 +13,7 @@ show-password toggle sits inside the password field.
 <div class="signin-stage">
 <div class="signin-card account-page card mx-auto">
 <div class="card-body p-3 p-md-4">
+  {% manager_entry as manager_link %}{% if manager_link %}<p class="fw-semibold"><a href="{{ manager_link.url }}">{{ manager_link.label }}</a></p>{% endif %}
   <h1>{% translate "Sign in" %}</h1>
   {% if form.errors %}
     <div class="alert alert-danger" id="login-error" role="alert">
@@ -28,7 +29,9 @@ show-password toggle sits inside the password field.
     </div>
     <div class="signin-field mb-3">
       <label class="form-label" for="id_password">{% translate "Password" %}</label>
-      <input class="form-control{% if form.errors %} is-invalid{% endif %}" type="password" name="password" id="id_password" autocomplete="current-password" data-password-toggle="{% translate 'Show password' %}" required{% if form.errors %} aria-invalid="true" aria-describedby="login-error"{% endif %}>
+      <div class="signin-control">
+        <input class="form-control{% if form.errors %} is-invalid{% endif %}" type="password" name="password" id="id_password" autocomplete="current-password" data-password-toggle="{% translate 'Show password' %}" required{% if form.errors %} aria-invalid="true" aria-describedby="login-error"{% endif %}>
+      </div>
     </div>
     {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
     {% captcha_widget %}

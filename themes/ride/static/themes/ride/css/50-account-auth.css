@@ -65,25 +65,43 @@
     margin: 0;
   }
 
-  /* The show-password toggle is a link-styled button inside the field's right edge. The shared
-     toggle sheet (unlayered) gives it a 2.75rem box and a 0.5rem block margin, so the field is
-     3.75rem tall and the toggle fits inside it. */
-  .signin-field {
-    position: relative;
+  /* The show-password toggle is a link-styled button inside the field: the border belongs to a
+     flex row that holds the input and the toggle side by side, so a longer translation or the
+     invalid-state icon of the input never runs under the toggle (the toggle wraps instead). The
+     shared toggle sheet (unlayered) gives the toggle a 2.75rem box and a 0.5rem block margin. */
+  .signin-control {
+    display: flex;
+    align-items: center;
+    border: 1px solid var(--color-border-control);
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
   }
 
-  .signin-field .form-control {
-    min-block-size: 3.75rem;
-    padding-inline-end: 8.5rem;
+  .signin-control:has(.is-invalid) {
+    border-color: var(--color-danger);
   }
 
-  .signin-field .password-toggle {
-    position: absolute;
-    inset-inline-end: 0;
-    inset-block-end: 0;
+  .signin-control:has(.form-control:focus-visible) {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .signin-control .form-control {
+    flex: 1 1 auto;
+    min-inline-size: 0;
+    border: 0;
+    outline: none;
+    box-shadow: none;
+    background-color: transparent;
+  }
+
+  .signin-control .password-toggle {
+    flex: 0 1 auto;
+    max-inline-size: 50%;
     border: 0;
     background: none;
     color: var(--color-accent);
     text-decoration: underline;
+    text-align: end;
   }
 }
