@@ -622,3 +622,19 @@ def test_a_malformed_legacy_phone_is_left_empty_and_the_products_are_held_back(
     assert "vendor 7: malformed phone left empty" in report.problems
     assert Product.objects.get(sku="P-1").status == ProductStatus.DRAFT
     assert report.held_back == ["product 'P-1': vendor_phone"]
+
+
+def test_loaded_vendor_texts_get_one_audit_entry_per_language() -> None:
+    """VEN.39: the import is a door for vendor texts, so it audits them like any other."""
+    load()
+    vendor = Vendor.objects.get(legacy_wp_user_id=7)
+    found = AuditLog.objects.filter(
+        action="vendor.profile_changed", target_key__startswith=str(vendor.public_id)
+    )
+    assert sorted(entry.target_key.split("/")[1] for entry in found) == sorted(
+        [primary_language(), other_language()]
+    )
+    italian = found.get(target_key__endswith=f"/{other_language()}")
+    after = italian.after or {}
+    assert after["description"] == "<p>Chi siamo</p>"
+    assert "tagline" not in after
