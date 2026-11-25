@@ -265,3 +265,18 @@ def test_the_permission_name_matches_the_platform_staff_rule() -> None:
     # failure (no skip) if #185's constant ever disappears.
     scoping = importlib.import_module("apps.vendors.scoping")
     assert scoping.PLATFORM_STAFF_PERMISSION == services.UNLOCK_PERMISSION
+
+
+def test_a_breached_new_password_is_refused_and_the_service_down_lets_it_through() -> None:
+    from apps.accounts.tests.fakes import FakeBreachChecker
+
+    user = UserFactory.create()
+    password = secrets.token_urlsafe(20)
+    FakeBreachChecker.breached.add(password)
+    with pytest.raises(ValidationError) as caught:
+        services.complete_password_reset(user, password, ctx=CTX)
+    assert caught.value.error_list[0].code == "password_breached"
+    FakeBreachChecker.down = True
+    services.complete_password_reset(user, password, ctx=CTX)
+    user.refresh_from_db()
+    assert user.check_password(password)

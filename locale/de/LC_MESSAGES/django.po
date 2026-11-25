@@ -13392,6 +13392,10 @@ msgstr "Diese Seite ist in deiner Sprache noch nicht verfügbar."
 msgid "This parent does not exist."
 msgstr "Dieser übergeordnete Knoten existiert nicht."
 
+#: apps/accounts/breach.py
+msgid "This password has appeared in a known data breach. Please choose a different one."
+msgstr "Dieses Passwort ist in einem bekannten Datenleck aufgetaucht. Bitte wähle ein anderes."
+
 #: apps/compliance/templates/compliance/includes/destination_notice.html
 msgid ""
 "This product cannot be shipped to %(country)s: its safety warnings are not yet available in a "
@@ -16037,6 +16041,10 @@ msgstr ""
 #: apps/manager/event_block_forms.py
 msgid "Your own products, up to 12. Required."
 msgstr "Ihre eigenen Produkte, bis zu 12. Pflichtfeld."
+
+#: apps/accounts/breach.py
+msgid "Your password must not appear in a known data breach."
+msgstr "Das Passwort darf in keinem bekannten Datenleck vorkommen."
 
 #: apps/manager/templates/manager/shop/payments.html
 msgid "Your payout account is active. Customers can buy your products online."
