@@ -33,3 +33,15 @@ def test_no_operator_yet_is_not_this_checks_business() -> None:
 
 def test_without_a_database_the_check_is_silent() -> None:
     assert [m.id for m in check_operator_logo(None, databases=None)] == []
+
+
+def test_overlapping_operators_do_not_crash_the_check(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Review of #1100: `check` and `migrate` must not crash on an overlap. The database's
+    exclusion constraint already refuses one, so the lookup error is simulated."""
+    from apps.core import services
+
+    def overlap(*args: Any) -> None:
+        raise services.OverlappingPlatformOperators("two rows")
+
+    monkeypatch.setattr(services, "current_operator", overlap)
+    assert ids() == []

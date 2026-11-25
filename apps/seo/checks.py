@@ -55,11 +55,17 @@ def check_operator_logo(
         return []
     from django.db import DatabaseError
 
-    from apps.core.services import NoPlatformOperator, current_operator
+    from apps.core.services import (
+        NoPlatformOperator,
+        OverlappingPlatformOperators,
+        current_operator,
+    )
 
     try:
         operator = current_operator()
     except (NoPlatformOperator, DatabaseError):  # a fresh install or no tables yet
+        return []
+    except OverlappingPlatformOperators:  # the exclusion constraint refuses it; never crash
         return []
     if operator.logo_id is not None:
         return []
