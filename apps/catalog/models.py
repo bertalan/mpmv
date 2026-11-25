@@ -942,9 +942,25 @@ class ProductTranslation(TranslationModel):
             )
 
     def save(self, *args: Any, **kwargs: Any) -> None:
+        if (
+            self.origin == ai_labels.ORIGIN_MACHINE
+            and self.status != TranslationStatus.MACHINE
+            and self.human_reviewed_at is None
+        ):
+            raise ValidationError("A machine text cannot be reviewed or published unreviewed.")
         if self._review_is_missing():
             raise ValidationError("A machine text cannot be reviewed or published unreviewed.")
         super().save(*args, **kwargs)
+
+    def mark_stale_translations(self) -> int:
+        """As the base rule, and a machine text sent back to draft also loses its review (CMP.8),
+        so even a plain `update(status=...)` cannot publish it without a new one (DB check)."""
+        count = super().mark_stale_translations()
+        if count:
+            self.family().filter(
+                origin=ai_labels.ORIGIN_MACHINE, status=TranslationStatus.MACHINE
+            ).update(human_reviewed_at=None, human_reviewed_by=None)
+        return count
 
     def mark_human_reviewed(self, reviewer: Any) -> None:
         """Record that `reviewer` read and checked this text (CMP.8); the caller then sets the

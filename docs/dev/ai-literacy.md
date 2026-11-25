@@ -22,6 +22,8 @@ are not legal wording yet.
 | Text that changed at the source | Goes back to draft, and needs a new confirmation. | `TranslationModel.mark_stale_translations` |
 | Product image made or changed by AI | Set "AI origin" to generated or edited. The product page shows "AI-generated image" or "AI-edited image" next to the image and in the zoom view, and the product data (JSON-LD `ImageObject`) carries the IPTC digital source type. | `ProductImage.ai_origin`, `media.set_ai_origin` |
 
+Editing a machine text that is already reviewed or published needs no new confirmation: whoever edits it answers for it, as its reviewer.
+
 Text reviewed by a person under their editorial responsibility needs no label on the page.
 Images do: a realistic AI image can look like a real photo (deep fake rule, article 50(4)).
 

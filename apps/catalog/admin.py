@@ -107,7 +107,6 @@ class ProductTranslationForm(forms.ModelForm[ProductTranslation]):
         fields = (
             "language",
             "status",
-            "origin",
             "title",
             "short_description",
             "description",
@@ -119,7 +118,7 @@ class ProductTranslationForm(forms.ModelForm[ProductTranslation]):
 
     def clean(self) -> dict[str, Any]:
         cleaned = super().clean() or {}
-        if cleaned.get("confirm_human_review") and cleaned.get("origin") == "machine":
+        if cleaned.get("confirm_human_review") and self.instance.origin == "machine":
             self.instance.mark_human_reviewed(self.reviewer)
         return cleaned
 
@@ -128,6 +127,11 @@ class ProductTranslationInline(admin.StackedInline[ProductTranslation, Product])
     model = ProductTranslation
     form = ProductTranslationForm
     extra = 1
+
+    def get_readonly_fields(self, request: HttpRequest, obj: Any = None) -> tuple[str, ...]:
+        # Not a field to change by hand once machine: it would skip the review (CMP.8). New
+        # rows are human; a pipeline (ING.5) creates machine ones.
+        return (*super().get_readonly_fields(request, obj), "origin")
 
     def get_formset(self, request: HttpRequest, obj: Any = None, **kwargs: Any) -> Any:
         formset = super().get_formset(request, obj, **kwargs)

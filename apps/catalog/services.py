@@ -293,6 +293,7 @@ def set_variant_price(
 
 PRODUCT_CREATED = "catalog.product.created"
 PRODUCT_UPDATED = "catalog.product.updated"
+TRANSLATION_REVIEWED = "catalog.product_translation.reviewed"
 PRODUCT_DELETED = "catalog.product.deleted"
 PRODUCT_STATUS_CHANGED = "catalog.product.status_changed"
 PRODUCT_RELATIONS_CHANGED = "catalog.product.relations_changed"
@@ -532,35 +533,64 @@ def record_translation_facts_change(
     return changes
 
 
+def _review_snapshot(text: ProductTranslation) -> dict[str, Any]:
+    reviewer = text.human_reviewed_by
+    return {
+        **_translation_snapshot(text),
+        "status": text.status,
+        "origin": text.origin,
+        "human_reviewed_by": str(reviewer.public_id) if reviewer is not None else None,
+        "human_reviewed_at": text.human_reviewed_at.isoformat() if text.human_reviewed_at else None,
+    }
+
+
 def review_translation(
     translation: ProductTranslation,
     *,
-    reviewer: Any,
     status: str,
     ctx: AuditContext,
     dry_run: bool = False,
 ) -> ChangeSet:
-    """A person confirms a product text and moves it to `reviewed` or `published` (CMP.8).
+    """The signed-in actor of `ctx` confirms a product text and moves it to `reviewed` or
+    `published` (CMP.8).
 
-    This is the human review step: for a machine-origin text it records who read it and when,
-    which is what lets the status leave `machine`. Any other status is refused here.
+    This is the human review step: for a machine-origin text it records the actor as the
+    reviewer, which is what lets the status leave `machine`, so a pipeline (no actor) cannot
+    review one. The actor must be platform staff with the catalog write right or a vendor member
+    allowed to manage products. Any other status is refused here.
     """
+    require_catalog_editor(ctx)
     if status not in (TranslationStatus.REVIEWED, TranslationStatus.PUBLISHED):
         raise ValidationError({"status": "Choose reviewed or published."})
+    user = (
+        get_user_model().objects.filter(pk=ctx.actor_id).first()
+        if ctx.actor_id is not None
+        else None
+    )
     changes = ChangeSet()
     with transaction.atomic():
-        stored = ProductTranslation.objects.select_related("product__vendor").get(pk=translation.pk)
-        before = {**_translation_snapshot(stored), "status": stored.status, "origin": stored.origin}
+        stored = ProductTranslation.objects.select_related(
+            "product__vendor", "human_reviewed_by"
+        ).get(pk=translation.pk)
+        if user is None:
+            # A pipeline may move a human text along, but never confirm a machine one.
+            if stored.origin == ai_labels.ORIGIN_MACHINE:
+                raise PermissionDenied("A machine text is reviewed by a signed-in person.")
+        elif not (
+            is_platform_staff(user)
+            or vendors_services.has_vendor_permission(user, stored.product.vendor, "products")
+        ):
+            raise PermissionDenied("You cannot review this product's texts.")
+        before = _review_snapshot(stored)
         stored.status = status
         if stored.origin == ai_labels.ORIGIN_MACHINE:
-            stored.mark_human_reviewed(reviewer)
-        after = {**_translation_snapshot(stored), "status": status, "origin": stored.origin}
-        changes.update(TRANSLATION_MODEL, str(stored.public_id), before, after)
+            stored.mark_human_reviewed(user)
+        changes.update(TRANSLATION_MODEL, str(stored.public_id), before, _review_snapshot(stored))
         if dry_run or changes.is_empty:
             return changes
         stored.full_clean(exclude=["source_hash"])
         stored.save()
-        audit_changes(changes, ctx=ctx, action=PRODUCT_UPDATED)
+        audit_changes(changes, ctx=ctx, action=TRANSLATION_REVIEWED)
     return changes
 
 

@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 from django.apps import apps as django_apps
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
 from django.test import Client
@@ -23,7 +23,7 @@ from apps.accounts.tests.factories import UserFactory
 from apps.catalog import ai_labels, media, services
 from apps.catalog.models import ProductImage, ProductTranslation
 from apps.catalog.tests.factories import ProductFactory, ProductTranslationFactory
-from apps.core.audit import AuditContext
+from apps.core.audit import AuditContext, user_context
 from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.core.tests.factories import ImageLicenceFactory
@@ -184,34 +184,74 @@ def test_a_new_machine_row_cannot_start_as_published() -> None:
         )
 
 
+def staff() -> Any:
+    return UserFactory.create(password=secrets.token_urlsafe(12), is_staff=True, is_superuser=True)
+
+
+def staff_ctx(user: Any) -> AuditContext:
+    return user_context(user, None)
+
+
 def test_the_review_step_records_who_and_publishes_with_an_audit_entry() -> None:
     text = machine_text()
-    reviewer = UserFactory.create(password=secrets.token_urlsafe(12))
-    services.review_translation(text, reviewer=reviewer, status="published", ctx=CTX)
+    reviewer = staff()
+    services.review_translation(text, status="published", ctx=staff_ctx(reviewer))
     text.refresh_from_db()
     assert text.status == "published"
     assert text.human_reviewed_by == reviewer
     assert text.human_reviewed_at is not None
-    assert AuditLog.objects.filter(target_key=str(text.public_id)).exists()
+    entry = AuditLog.objects.get(action=services.TRANSLATION_REVIEWED)
+    assert entry.target_key == str(text.public_id)
+    assert str(reviewer.public_id) in str(entry.after)
+
+
+def test_a_non_editor_and_a_pipeline_cannot_review_a_machine_text() -> None:
+    text = machine_text()
+    outsider = UserFactory.create(password=secrets.token_urlsafe(12))
+    for ctx in (staff_ctx(outsider), CTX):
+        with pytest.raises(PermissionDenied):
+            services.review_translation(text, status="published", ctx=ctx)
+    text.refresh_from_db()
+    assert text.status == "machine"
 
 
 def test_a_dry_run_review_changes_nothing() -> None:
     text = machine_text()
-    services.review_translation(text, reviewer=None, status="reviewed", ctx=CTX, dry_run=True)
+    services.review_translation(text, status="reviewed", ctx=staff_ctx(staff()), dry_run=True)
     text.refresh_from_db()
     assert text.status == "machine"
 
 
 def test_a_stale_machine_text_needs_a_new_review() -> None:
-    text = machine_text()
-    services.review_translation(text, reviewer=None, status="published", ctx=CTX)
+    source = ProductTranslationFactory.create(
+        language=primary_language(), status="published", title="Mug"
+    )
+    text = ProductTranslationFactory.create(
+        product=source.product,
+        origin=ai_labels.ORIGIN_MACHINE,
+        status="machine",
+        language=other_language(),
+    )
+    ctx = staff_ctx(staff())
+    services.review_translation(text, status="published", ctx=ctx)
+    source.title = "Cup"
+    source.save()  # the source changed: the translation goes back to draft
     text.refresh_from_db()
-    ProductTranslation.objects.filter(pk=text.pk).update(status="machine")  # the source changed
-    text.refresh_from_db()
+    assert text.status == "machine"
+    assert text.human_reviewed_at is None
+    with pytest.raises(IntegrityError), transaction.atomic():
+        ProductTranslation.objects.filter(pk=text.pk).update(status="published")
     text.status = "published"
     with pytest.raises(ValidationError):
         text.save()
-    services.review_translation(text, reviewer=None, status="published", ctx=CTX)
+    services.review_translation(text, status="published", ctx=ctx)
+
+
+def test_a_reviewed_text_cannot_be_flipped_to_machine_by_save() -> None:
+    text = ProductTranslationFactory.create(status="published", language=other_language())
+    text.origin = ai_labels.ORIGIN_MACHINE
+    with pytest.raises(ValidationError):
+        text.save()
 
 
 def test_human_text_is_never_blocked() -> None:
@@ -221,4 +261,4 @@ def test_human_text_is_never_blocked() -> None:
 
 def test_review_refuses_a_status_that_is_not_a_review() -> None:
     with pytest.raises(ValidationError):
-        services.review_translation(machine_text(), reviewer=None, status="machine", ctx=CTX)
+        services.review_translation(machine_text(), status="machine", ctx=staff_ctx(staff()))
