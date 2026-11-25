@@ -13,12 +13,10 @@ def entries() -> list[ge.ListEntry]:
 
 
 def test_item_list_has_ordered_list_items_that_reference_page_ids() -> None:
-    node = ge.item_list_node(
-        list_id=f"{SITE}/x/#items", name="Things", language="en", entries=entries()
-    )
+    node = ge.item_list_node(list_id=f"{SITE}/x/#items", name="Things", entries=entries())
     assert node["@type"] == "ItemList"
     assert node["@id"] == f"{SITE}/x/#items"
-    assert node["inLanguage"] == "en"
+    assert "inLanguage" not in node  # SEO.16: not an ItemList property
     assert node["numberOfItems"] == 2
     first, second = node["itemListElement"]
     assert (first["@type"], first["position"]) == ("ListItem", 1)
@@ -35,13 +33,11 @@ def test_item_list_has_ordered_list_items_that_reference_page_ids() -> None:
 
 
 def test_an_empty_list_gives_no_node() -> None:
-    assert ge.item_list_node(list_id="x", name="n", language="en", entries=[]) == {}
+    assert ge.item_list_node(list_id="x", name="n", entries=[]) == {}
 
 
 def test_a_page_listed_twice_stays_once() -> None:
-    node = ge.item_list_node(
-        list_id="x", name="n", language="en", entries=[*entries(), entries()[0]]
-    )
+    node = ge.item_list_node(list_id="x", name="n", entries=[*entries(), entries()[0]])
     assert node["numberOfItems"] == 2
 
 

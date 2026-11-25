@@ -74,9 +74,7 @@ def product_entries(ctx: PageContext, cards: Iterable[Any]) -> list[ge.ListEntry
 
 
 def _items(ctx: PageContext, url: str, name: str, entries: Iterable[ge.ListEntry]) -> Node:
-    return ge.item_list_node(
-        list_id=f"{url}#items", name=name, language=ctx.language, entries=entries
-    )
+    return ge.item_list_node(list_id=f"{url}#items", name=name, entries=entries)
 
 
 def cms_page_nodes(
@@ -92,7 +90,8 @@ def cms_page_nodes(
 ) -> list[Node]:
     """The `WebPage`, its breadcrumb (none on the home page), the page's FAQ, the named lists of
     its widgets and `extra` nodes. `items` is the page's own main `ItemList` (a collection
-    page's `mainEntity`)."""
+    page's `mainEntity`). Only the FAQ is a `hasPart`: the lists are not `CreativeWork`s, so they
+    sit in the graph by their `@id` (SEO.16)."""
     from apps.cms.blocks import page_graph_nodes
     from apps.cms.engine import faq_questions
 
@@ -107,11 +106,9 @@ def cms_page_nodes(
     body = getattr(page, "body", None)
     widgets: list[Node] = []
     for number, widget in enumerate(page_graph_nodes(body, ctx.context) if body else [], 1):
-        widgets.append({**widget, "@id": f"{url}#list-{number}", "inLanguage": language})
-    parts = [str(node["@id"]) for node in (faq, *widgets) if node]
-    if items and main_entity_id:
-        parts.append(str(items["@id"]))
-    elif items:
+        widgets.append({**widget, "@id": f"{url}#list-{number}"})
+    parts = [str(faq["@id"])] if faq else []
+    if items and not main_entity_id:
         main_entity_id = str(items["@id"])
     web = ge.webpage_node(
         kind=kind,
@@ -336,7 +333,6 @@ def _product(ctx: PageContext) -> list[Node]:
         description=str(page.short_description or ""),
         breadcrumb_id=f"{url}#breadcrumb",
         main_entity_id=str(entity["@id"]),
-        has_part_ids=[str(node["@id"]) for node in widgets],
     )
     return [web, *nodes, *widgets]
 
@@ -355,7 +351,6 @@ def _product_widget_lists(ctx: PageContext, url: str) -> list[Node]:
         ge.item_list_node(
             list_id=f"{url}#{key.replace('_', '-')}",
             name=name,
-            language=ctx.language,
             entries=product_entries(ctx, ctx.context.get(key) or ()),
         )
         for key, name in widgets
@@ -401,8 +396,7 @@ def _listing(ctx: PageContext) -> list[Node]:
             node_id=f"{url}#organization", name=public_name, url=url
         )
         nodes.append(organization)
-        if main_entity:
-            parts.append(main_entity)
+        # The product list stays in the graph by its `@id`: `hasPart` takes a `CreativeWork`.
         main_entity = str(organization["@id"])
     web = ge.webpage_node(
         kind=kind,

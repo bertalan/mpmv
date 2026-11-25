@@ -1,5 +1,5 @@
 """SEO.7 2/2: the featured links block and the strip feed the page graph as named `ItemList`s of
-the pages their cards lead to (pages, terms, vendors, products), linked from the page by `hasPart`.
+the pages their cards lead to (pages, terms, vendors, products), not linked by `hasPart` (SEO.16).
 """
 
 import json
@@ -88,7 +88,8 @@ def test_the_rendered_page_links_each_list_once_with_a_distinct_id(seeded: SeedR
     assert len(lists) == 2
     assert len({n["@id"] for n in lists}) == 2
     [page] = [n for n in graph if n["@type"] == "WebPage"]
-    assert all({"@id": n["@id"]} in page["hasPart"] for n in lists)
+    assert "hasPart" not in page  # SEO.16: lists are not a CreativeWork
+    assert all("inLanguage" not in n for n in lists)
 
 
 def test_a_retired_product_card_leaves_the_list(seeded: SeedReport) -> None:
