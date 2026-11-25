@@ -48,7 +48,6 @@ class CoreConfig(AppConfig):
             check_admin_network_settings,
             check_audit_policy,
             check_avif_support,
-            check_business_time_zone,
             check_client_ip_settings,
             check_email_settings,
             check_encrypted_data,
@@ -89,7 +88,6 @@ class CoreConfig(AppConfig):
         checks.register(check_avif_support)
         checks.register(check_image_upload_limits)
         checks.register(check_live_site_flags, checks.Tags.security, deploy=True)
-        checks.register(check_business_time_zone, checks.Tags.database)  # ARC.27
 
         # Pillow's decompression-bomb threshold is process-wide: set once here, to the upload
         # still-image decode cap (SEC.2), so every Pillow use of the process (uploads,

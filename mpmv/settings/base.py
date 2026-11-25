@@ -506,8 +506,8 @@ WAGTAIL_ENABLE_UPDATE_CHECK = False
 USE_TZ = True
 TIME_ZONE = "UTC"
 # ARC.27 (D-31): the bootstrap business time zone, from the environment (owner 2026-11-25: not
-# in the code; UTC when unset). It seeds the operator's `business_time_zone` and is the zone
-# cron schedules run in; code reads `business_tz()`. STAGE and LIVE set it (Europe/Rome).
+# in the code; UTC when unset). It seeds the operator's `business_time_zone` and stands in before
+# an operator exists; code and cron schedules read `business_tz()`. STAGE and LIVE set it.
 BUSINESS_TIME_ZONE = env_str("MPMV_BUSINESS_TIME_ZONE", "") or "UTC"
 # Public holidays (ISO dates) the GPSR article 22 deadlines skip (CMP.3). Empty: working days are
 # Monday to Friday, the earliest deadline (owner decision 2026-11-09).

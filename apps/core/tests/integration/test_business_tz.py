@@ -9,7 +9,6 @@ import pytest
 from django.core.exceptions import ValidationError
 
 from apps.core.audit import AuditContext
-from apps.core.checks import check_business_time_zone
 from apps.core.services import business_tz, configure_platform_operator, current_operator
 from apps.core.tests.factories import PlatformOperatorFactory, utc
 from apps.orders.services import peek_order_number
@@ -71,11 +70,26 @@ def test_the_order_year_turns_at_midnight_in_the_business_zone(rome: None) -> No
     assert peek_order_number(now=NEW_YEAR_EVE).startswith("2030-")
 
 
-def test_the_scheduler_check_warns_when_the_zones_differ(rome: None) -> None:
-    assert check_business_time_zone(None, databases=["default"]) == []
-    operator_in("UTC", start=dt.datetime.now(dt.UTC) - dt.timedelta(seconds=1))
-    assert [m.id for m in check_business_time_zone(None, databases=["default"])] == ["core.W920"]
-    assert check_business_time_zone(None, databases=None) == []
+@pytest.mark.django_db(transaction=True)
+def test_the_scheduler_reads_the_operator_zone_once_from_its_own_thread(rome: None) -> None:
+    """ARC.27: the schedules follow the operator, not the setting; the lookup works from
+    Procrastinate's async loop (a thread of its own) and is kept until the worker restarts."""
+    import asyncio
+
+    from apps.core import tasks
+
+    operator_in("Asia/Tokyo", start=dt.datetime.now(dt.UTC) - dt.timedelta(seconds=1))
+    tasks.forget_scheduler_zone()
+    try:
+
+        async def from_the_loop() -> ZoneInfo:
+            return tasks.scheduler_tz()
+
+        assert asyncio.run(from_the_loop()) == ZoneInfo("Asia/Tokyo")
+        operator_in("UTC", start=dt.datetime.now(dt.UTC))
+        assert tasks.scheduler_tz() == ZoneInfo("Asia/Tokyo")  # kept until a restart
+    finally:
+        tasks.forget_scheduler_zone()
 
 
 def test_orders_warn_when_the_zone_leaves_the_trigger_zone(rome: None) -> None:

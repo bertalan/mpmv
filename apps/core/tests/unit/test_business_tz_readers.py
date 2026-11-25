@@ -1,7 +1,7 @@
 """ARC.27 (D-31): `business_tz()` next to `current_operator()` is the only reader of the business
 time zone. The setting `BUSINESS_TIME_ZONE` (from `MPMV_BUSINESS_TIME_ZONE`, UTC when unset) stays a
-bootstrap value: only the operator field's default, the helper's fallback, the scheduler
-(Procrastinate's async loop cannot query the database) and its check may read it."""
+bootstrap value: only the operator field's default and the helper's fallback may read it; the
+job scheduler reads `business_tz()` too, once per worker process."""
 
 from pathlib import Path
 
@@ -9,8 +9,6 @@ ROOT = Path(__file__).resolve().parents[4]
 ALLOWED = {
     "apps/core/models.py",  # default_business_time_zone(): a new operator row starts there
     "apps/core/services.py",  # business_tz(): the fallback before an operator exists
-    "apps/core/tasks.py",  # cron schedules, read in the scheduler's async loop
-    "apps/core/checks.py",  # core.W920: the scheduler and the operator disagree
 }
 
 

@@ -6,8 +6,8 @@ moving to another queue later means changing this file only. Application code:
 - declares a job with `@task("<app>.<job>")` in `apps/<app>/tasks.py`; the worker imports
   every `tasks` module of the installed apps;
 - runs it on a cron schedule with `@periodic("<cron>")`, read as wall-clock time in
-  `settings.BUSINESS_TIME_ZONE` (Europe/Rome, the bootstrap value of the operator's business time
-  zone: core.W920 warns when they differ), with cron's daylight saving time rules (see
+  the operator's business time zone (ARC.27, `scheduler_tz()`, read once per worker process),
+  with cron's daylight saving time rules (see
   `_BusinessTimeCron`); the job receives `timestamp`, the Unix time of the tick;
 - prevents overlaps with `@locked()`: at most one run at a time and one job waiting;
 - queues it with `enqueue(job, **kwargs)`, inside the caller's database transaction.
@@ -17,6 +17,7 @@ Job arguments must be JSON-serializable. Failed jobs are retried with exponentia
 """
 
 import asyncio
+import concurrent.futures
 import contextlib
 import datetime as dt
 import functools
@@ -28,7 +29,6 @@ from typing import Any, ParamSpec, TypeVar
 from zoneinfo import ZoneInfo
 
 import croniter
-from django.conf import settings
 from django.db import transaction
 from procrastinate import App, BaseRetryStrategy, RetryDecision
 from procrastinate.contrib.django import app as _proxy_app
@@ -108,11 +108,39 @@ class _BackoffStrategy(BaseRetryStrategy):
 # --- Business-time schedules ----------------------------------------------------------------
 
 
+_scheduler_zone: ZoneInfo | None = None
+
+
 def scheduler_tz() -> ZoneInfo:
-    """The zone cron schedules are read in: the bootstrap setting, because the scheduler runs in
-    Procrastinate's async loop, where no database query may run (ARC.27; core.W920 warns when
-    the operator's business time zone differs). Business code uses `services.business_tz()`."""
-    return ZoneInfo(settings.BUSINESS_TIME_ZONE)
+    """The zone cron schedules are read in: the operator's business time zone (ARC.27), read
+    once per process and kept, so a change reaches the schedules when the worker restarts (every
+    deploy does). The scheduler asks from Procrastinate's async loop, where Django refuses a
+    database query, so the one lookup runs in a short-lived thread of its own."""
+    global _scheduler_zone
+    if _scheduler_zone is None:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            _scheduler_zone = pool.submit(_operator_zone).result()
+    return _scheduler_zone
+
+
+def _operator_zone() -> ZoneInfo:
+    from django.db import connections
+
+    from .services import business_tz, configured_tz
+
+    try:
+        return business_tz()
+    except Exception:  # the worker must start: no database yet, or none allowed (unit tests)
+        logger.warning("Scheduler: operator time zone unavailable, using the configured zone")
+        return configured_tz()
+    finally:
+        connections.close_all()  # this thread's own connection, never reused
+
+
+def forget_scheduler_zone() -> None:
+    """Drop the kept zone (tests, and a worker that reloads its configuration)."""
+    global _scheduler_zone
+    _scheduler_zone = None
 
 
 class _BusinessTimeCron:

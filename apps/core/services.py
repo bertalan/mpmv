@@ -180,8 +180,14 @@ def business_tz() -> ZoneInfo:
     try:
         name = current_operator().business_time_zone
     except (NoPlatformOperator, OverlappingPlatformOperators, DatabaseError):
-        name = settings.BUSINESS_TIME_ZONE
+        return configured_tz()
     return ZoneInfo(name)
+
+
+def configured_tz() -> ZoneInfo:
+    """The configured zone (`MPMV_BUSINESS_TIME_ZONE`, UTC when unset): `business_tz()`'s
+    fallback before an operator exists or when the database cannot be asked."""
+    return ZoneInfo(settings.BUSINESS_TIME_ZONE)
 
 
 def latest_operator() -> PlatformOperator | None:
