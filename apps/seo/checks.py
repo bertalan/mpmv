@@ -2,6 +2,7 @@
 
 - seo.E001: `MPMV_CONSENT_PROVIDER` names no registered provider, or its class cannot be loaded.
 - seo.W001: the provider needs a script origin that `SECURE_CSP` does not allow.
+- seo.W002: the platform operator has no logo (SEO.16), so its `Organization` node has none.
 """
 
 from collections.abc import Iterable
@@ -43,3 +44,29 @@ def check_consent_provider(
             )
         ]
     return []
+
+
+def check_operator_logo(
+    app_configs: Iterable[AppConfig] | None, databases: Iterable[str] | None = None, **kwargs: Any
+) -> list[checks.CheckMessage]:
+    """SEO.16, a database check (it runs with `migrate` and `check --database`): Google wants a
+    logo on the site's `Organization`; without one the rich result has no logo."""
+    if not databases:
+        return []
+    from django.db import DatabaseError
+
+    from apps.core.services import NoPlatformOperator, current_operator
+
+    try:
+        operator = current_operator()
+    except (NoPlatformOperator, DatabaseError):  # a fresh install or no tables yet
+        return []
+    if operator.logo_id is not None:
+        return []
+    return [
+        checks.Warning(
+            "The platform operator has no logo, so search engines get none for the site.",
+            hint="Pick one in the admin: Platform operator > Logo (from 'Logos and icons').",
+            id="seo.W002",
+        )
+    ]

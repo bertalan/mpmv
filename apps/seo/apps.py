@@ -1,5 +1,5 @@
 from django.apps import AppConfig
-from django.core.checks import register
+from django.core.checks import Tags, register
 
 
 class SeoConfig(AppConfig):
@@ -17,7 +17,7 @@ class SeoConfig(AppConfig):
         from apps.cms.services import register_golive_check
         from apps.core import indexing
 
-        from .checks import check_consent_provider
+        from .checks import check_consent_provider, check_operator_logo
         from .page_builders import register_all
         from .services import golive_indexing_messages, site_allows_indexing
 
@@ -25,4 +25,5 @@ class SeoConfig(AppConfig):
         indexing.register_site_policy(site_allows_indexing)
         register_golive_check(golive_indexing_messages)
         register(check_consent_provider)  # SEO.9
+        register(check_operator_logo, Tags.database)  # SEO.16
         register_all()  # SEO.7: the page graph builders
