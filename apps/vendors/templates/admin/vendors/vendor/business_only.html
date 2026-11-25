@@ -33,6 +33,7 @@
       <p class="errornote">The flag could not be changed.</p>
       {{ form.non_field_errors }}
     {% endif %}
+    {{ form.value }}
     <fieldset class="module aligned">
       <div class="form-row{% if form.reason.errors %} errors{% endif %}">
         {{ form.reason.errors }}

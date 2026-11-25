@@ -170,6 +170,8 @@ BUSINESS_ONLY_TEMPLATE = "admin/vendors/vendor/business_only.html"
 
 
 class BusinessOnlyForm(forms.Form):
+    # The value staff saw on the page: a double submit or a concurrent change never flips it.
+    value = forms.ChoiceField(choices=(("on", "on"), ("off", "off")), widget=forms.HiddenInput)
     reason = forms.CharField(
         label="Reason",
         max_length=1000,
@@ -776,10 +778,21 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
         if not self.has_change_permission(request, obj) or not can_reopen(actor):
             raise PermissionDenied  # the service checks it too
         change_url = reverse("admin:vendors_vendor_change", args=[obj.pk])
+        form = BusinessOnlyForm(
+            request.POST or None, initial={"value": "off" if obj.business_only else "on"}
+        )
         new_value = not obj.business_only
-
-        form = BusinessOnlyForm(request.POST or None)
         if request.method == "POST" and form.is_valid():
+            new_value = form.cleaned_data["value"] == "on"
+            if obj.business_only == new_value:
+                self.message_user(
+                    request,
+                    f"{obj} is already marked as a business-only seller."
+                    if new_value
+                    else f"{obj} is already not marked as a business-only seller.",
+                    messages.INFO,
+                )
+                return redirect(change_url)
             try:
                 set_business_only(
                     obj,
