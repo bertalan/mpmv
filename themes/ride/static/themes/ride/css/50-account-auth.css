@@ -87,7 +87,8 @@
   }
 
   .signin-control .form-control {
-    flex: 1 1 auto;
+    flex: 1 1 8rem;
+    inline-size: auto;
     min-inline-size: 0;
     border: 0;
     outline: none;
@@ -96,8 +97,8 @@
   }
 
   .signin-control .password-toggle {
-    flex: 0 1 auto;
-    max-inline-size: 50%;
+    flex: 0 1 max-content;
+    max-inline-size: 60%;
     border: 0;
     background: none;
     color: var(--color-accent);
