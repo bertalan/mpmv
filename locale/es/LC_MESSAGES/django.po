@@ -6750,7 +6750,7 @@ msgid "Order reference"
 msgstr "Referencia del pedido"
 
 #: themes/base/templates/components/order_summary.html
-#: themes/ride/templates/components/order_summary.html
+#: themes/ride/templates/components/order_summary.html themes/ride/templates/orders/_cart_body.html
 msgid "Order summary"
 msgstr "Resumen del pedido"
 
