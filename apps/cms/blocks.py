@@ -630,6 +630,8 @@ class Card:
     label: str
     href: str
     text: str
+    image: Any = None
+    image_alt: str = ""
 
 
 @dataclass(frozen=True)
@@ -639,6 +641,8 @@ class _Target:
     name: str
     href: str
     text: str = ""
+    image: Any = None
+    image_alt: str = ""
 
 
 class _CardValue(blocks.StructValue):  # type: ignore[misc]
@@ -653,7 +657,12 @@ class _CardValue(blocks.StructValue):  # type: ignore[misc]
         target = None if chosen is None else targets.get((self.target_kind, chosen.pk))
         if target is None:
             return None
-        return Card(self.get("label") or target.name, target.href, self.get("text") or target.text)
+        label = self.get("label") or target.name
+        text = self.get("text") or target.text
+        own = self.get("image")
+        if own:  # the editor's picture is decoration next to the title: no alt text
+            return Card(label, target.href, text, own, "")
+        return Card(label, target.href, text, target.image, target.image_alt)
 
 
 class PageCardValue(_CardValue):
@@ -683,12 +692,28 @@ def _page_targets(pages: list[Page], language: str, request: Any) -> dict[int, _
         )
     }
     targets: dict[int, _Target] = {}
+    shown_pages = {
+        page.pk: translated.get(page.translation_key) or (page if page.live else None)
+        for page in pages
+    }
+    posts = _post_images({s.pk for s in shown_pages.values() if s is not None})
     for page in pages:
-        shown: Page | None = translated.get(page.translation_key) or (page if page.live else None)
+        shown = shown_pages[page.pk]
         url = shown.get_url(request) if shown is not None else None
         if shown is not None and url:
-            targets[page.pk] = _Target(shown.title, url)
+            post = posts.get(shown.pk)
+            image = post.image if post is not None else None
+            alt = post.image_alt_text if post is not None else ""
+            targets[page.pk] = _Target(shown.title, url, "", image, alt)
     return targets
+
+
+def _post_images(page_pks: set[int]) -> dict[int, Any]:
+    """The blog posts among `page_pks` that have a main image: one query."""
+    from .models import BlogPostPage  # models import this module
+
+    posts = BlogPostPage.objects.filter(pk__in=page_pks, image__isnull=False)
+    return {post.pk: post for post in posts.select_related("image")}
 
 
 def _published_by_owner(rows: Iterable[Any], owner: str) -> dict[int, dict[str, Any]]:
@@ -842,6 +867,17 @@ def _card_label() -> blocks.CharBlock:
     )
 
 
+def _card_image() -> ImageChooserBlock:
+    return ImageChooserBlock(
+        required=False,
+        help_text=_(
+            "A picture for the card: the home page shows it behind the title and the blog "
+            "strip above it. If you leave it empty, a card to a blog post uses that post's "
+            "main image, and any other card shows the theme's own artwork."
+        ),
+    )
+
+
 def _card_text() -> blocks.TextBlock:
     return blocks.TextBlock(
         required=False,
@@ -863,6 +899,7 @@ class PageCardBlock(blocks.StructBlock):  # type: ignore[misc]
     )
     label = _card_label()
     text = _card_text()
+    image = _card_image()
 
     class Meta:
         icon = "doc-empty"
@@ -880,6 +917,7 @@ class TermCardBlock(blocks.StructBlock):  # type: ignore[misc]
     )
     label = _card_label()
     text = _card_text()
+    image = _card_image()
 
     class Meta:
         icon = "tag"
@@ -897,6 +935,7 @@ class VendorCardBlock(blocks.StructBlock):  # type: ignore[misc]
     )
     label = _card_label()
     text = _card_text()
+    image = _card_image()
 
     class Meta:
         icon = "group"
@@ -915,6 +954,7 @@ class ProductCardBlock(blocks.StructBlock):  # type: ignore[misc]
     )
     label = _card_label()
     text = _card_text()
+    image = _card_image()
 
     class Meta:
         icon = "pick"
@@ -1131,6 +1171,8 @@ class StripBlock(blocks.StructBlock):  # type: ignore[misc]
                         "text": card.text,
                         "meta": "",
                         "url": card.href,
+                        "image": card.image,
+                        "image_alt": card.image_alt,
                         "quote": False,
                     }
                 )

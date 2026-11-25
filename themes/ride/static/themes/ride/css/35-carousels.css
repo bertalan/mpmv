@@ -152,6 +152,7 @@
     block-size: auto;
     margin-block-end: var(--space-s);
     border-radius: var(--radius-card);
+    aspect-ratio: 3 / 2;
     object-fit: cover;
   }
 
