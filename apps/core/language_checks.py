@@ -26,6 +26,8 @@ from django.core import checks
 
 from mpmv.settings.languages import KNOWN_LANGUAGES
 
+from .migration_safety import migrations_pending
+
 # Languages in the default set whose interface catalogs are delivered by I18N.7.
 CATALOG_PENDING = frozenset({"de", "fr", "es"})
 # The language the msgids are written in: it needs no catalog.
@@ -142,7 +144,7 @@ def check_language_state(
     language is accepted. Runs only when the database is checked, and stays silent while the
     table does not exist yet (before the first migration).
     """
-    if not databases:
+    if not databases or migrations_pending("core"):  # CORE.27
         return []
     from django.db.utils import DatabaseError
 

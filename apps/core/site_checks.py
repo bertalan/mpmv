@@ -16,6 +16,8 @@ from django.core import checks
 from django.db import connection
 from wagtail.models import Site
 
+from .migration_safety import migrations_pending
+
 PLACEHOLDER_HOSTNAME = "localhost"  # what the installer (cms migration 0002) creates
 
 
@@ -58,6 +60,8 @@ def check_site_hostname(
         out.append(checks.Warning(problem + ".", hint=hint, id="core.W921"))
     if Site._meta.db_table not in connection.introspection.table_names():
         return out  # `migrate` runs the database checks before it creates the table
+    if migrations_pending("wagtailcore"):
+        return out  # CORE.27: the Site table may lack columns a pending migration adds
     from .site_root import base_url_parts
 
     root = base_url_parts()

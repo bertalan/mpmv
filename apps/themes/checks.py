@@ -17,7 +17,8 @@ from typing import Any
 from django.apps import AppConfig
 from django.core import checks
 from django.db import DatabaseError, connections, transaction
-from django.db.migrations.executor import MigrationExecutor
+
+from apps.core.migration_safety import migrations_pending
 
 from .engine import MISSING_BASE
 from .foundation import foundation_problems
@@ -71,9 +72,7 @@ def check_themes(
 
 def _migrations_pending(alias: str) -> bool:
     """True while any `themes` migration is unapplied on this database."""
-    executor = MigrationExecutor(connections[alias])
-    leaves = executor.loader.graph.leaf_nodes("themes")
-    return any(m.app_label == "themes" for m, _backwards in executor.migration_plan(leaves))
+    return migrations_pending("themes", database=alias)
 
 
 def check_site_themes(
