@@ -37,7 +37,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
-from wagtail.models import Locale
+from wagtail.models import Collection, Locale
 
 from apps.accounts.models import User
 from apps.catalog import engine as catalog_engine
@@ -71,6 +71,7 @@ from apps.core.changeset import ChangeSet
 from apps.core.i18n import configured_languages, primary_language
 from apps.core.models import ImageLicence, MediaImage, PlatformOperator, TranslationModel
 from apps.core.services import (
+    OPERATOR_COPIED_FIELDS,
     NoPlatformOperator,
     configure_platform_operator,
     current_operator,
@@ -109,7 +110,7 @@ from apps.vendors.models import (
 )
 
 from . import data, demo_home, demo_pages
-from .images import placeholder_webp
+from .images import logo_png, placeholder_webp
 
 PUBLISHED = translations.PUBLISHED
 # The seed texts are written in English (some also in Italian, a few in more languages). English
@@ -348,7 +349,7 @@ def _slug_key(node: data.Node) -> str:
 
 def _platform(run: _Run) -> None:
     try:
-        current_operator()
+        latest = current_operator()
     except NoPlatformOperator:
         operator = PlatformOperator(
             legal_name=data.OPERATOR_NAME,
@@ -363,8 +364,36 @@ def _platform(run: _Run) -> None:
             user_contact_url=demo_pages.USER_CONTACT_URL,
             user_contact_languages=demo_pages.contact_languages(),
             valid_from=data.SEED_EPOCH,
+            logo=_operator_logo_image(run),
         )
         run.add(configure_platform_operator(operator, ctx=run.ctx))
+        return
+    if latest.logo_id is None:  # SEO.18: an operator seeded before the logo, as on STAGE
+        new = PlatformOperator(
+            **{name: getattr(latest, name) for name in OPERATOR_COPIED_FIELDS},
+            valid_from=timezone.now(),
+        )
+        new.logo = _operator_logo_image(run)
+        run.add(configure_platform_operator(new, ctx=run.ctx))
+
+
+def _operator_logo_image(run: _Run) -> MediaImage:
+    """SEO.18: the generated operator logo (the THM.38 mark), in the logos collection."""
+    image = MediaImage.objects.filter(title=data.OPERATOR_LOGO_TITLE).first()
+    if image is None:
+        image = MediaImage(
+            title=data.OPERATOR_LOGO_TITLE,
+            licence=ImageLicence.objects.get(code=OWN_WORK_LICENCE),
+            author=data.IMAGE_AUTHOR,
+            collection=Collection.objects.filter(svg_policy__isnull=False).order_by("path").first(),
+            file=ImageFile(
+                _named_bytes(logo_png(data.OPERATOR_LOGO_COLOUR, data.OPERATOR_LOGO_SIZE)),
+                name="demo-operator-logo.png",
+            ),
+        )
+        run.add(save_image(image))
+        run.files.append(image.file.name)
+    return image
 
 
 def _commission_rule(run: _Run) -> None:
@@ -1309,6 +1338,20 @@ def _cms(run: _Run, images: dict[str, MediaImage], vendors: list[Vendor]) -> Non
     )
     demo_home.seed_navigation(run, locales, [("shop", shop), ("blog", blog)], contact)
     _recruitment_home(run, home, images, shop)
+    _home_search_description(run, home)
+
+
+def _home_search_description(run: _Run, home: HomePage) -> None:
+    """SEO.18: the source home's meta description when an editor has set none; the aliases take
+    it with the publish."""
+    home.refresh_from_db()
+    if home.search_description.strip():
+        return
+    home.search_description = data.HOME_SEARCH_DESCRIPTION
+    _publish(home)
+    run.changes.update(
+        "cms.homepage", home.locale.language_code, {}, {"search_description": "seed"}
+    )
 
 
 def _recruitment_home(
