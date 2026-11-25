@@ -52,6 +52,10 @@ BLOCK_MESSAGES = {
         "We cannot calculate the VAT for this vendor's items to your address. Contact the vendor."
     ),
     engine.NO_PRICE: gettext_lazy("This item has no price yet."),
+    engine.BUSINESS_ONLY: gettext_lazy(
+        "This seller sells to businesses only. To buy these items, enter in your business "
+        "details a VAT number that passes the automatic check."
+    ),
 }
 # Why the add-to-cart form refuses an item without a price the buyer can see (#757).
 NO_PRICE_TO_BUY = gettext_lazy("This item has no price yet, so you can't buy it online.")

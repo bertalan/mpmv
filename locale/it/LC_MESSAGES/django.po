@@ -13257,6 +13257,14 @@ msgstr ""
 msgid "This product is no longer available."
 msgstr "Questo prodotto non è più disponibile."
 
+#: apps/orders/ui/present.py
+msgid ""
+"This seller sells to businesses only. To buy these items, enter in your business details a VAT "
+"number that passes the automatic check."
+msgstr ""
+"Questo venditore vende solo ad aziende e professionisti. Per acquistare questi articoli, inserisci"
+" nei dati aziendali una partita IVA che superi il controllo automatico."
+
 #: apps/accounts/templates/accounts/sessions/list.html
 #: themes/ride/templates/accounts/sessions/list.html
 msgid "this session"
