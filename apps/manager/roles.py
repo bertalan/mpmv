@@ -8,6 +8,14 @@ section checks, the data migration that seeds the groups, the drift system check
 Section checks ask whether the actor is a member of a role the cell allows (`allows`); they never
 call `has_perm`, which is true for every active superuser. The technical superuser is a
 break-glass account: it appears only in the two break-glass rows and holds no role by itself.
+
+Sync rule (CORE.27): the groups in the database come only from data migrations
+(`apps/manager/migrations`, through `role_groups.sync_role_groups`). Every change to this file that
+alters a group name or a role's permissions therefore ships a new manager data migration that calls
+the sync, and `test_role_groups.py` fails on a database migrated without it
+(`test_the_migration_seeded_each_group_with_exactly_its_permissions`,
+`test_a_roles_change_without_a_sync_migration_is_drift`). Until that migration is applied the
+drift check skips, so `migrate` is never blocked.
 """
 
 from collections.abc import Iterable, Mapping

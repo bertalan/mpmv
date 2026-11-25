@@ -270,3 +270,18 @@ def test_the_rename_merges_into_an_empty_group_already_holding_the_new_name() ->
     assert not Group.objects.filter(name="Platform: catalog and moderation").exists()
     assert _perms(new) == perms
     assert user.groups.filter(pk=new.pk).exists()
+
+
+def test_a_roles_change_without_a_sync_migration_is_drift(monkeypatch: pytest.MonkeyPatch) -> None:
+    """CORE.27: the groups come only from the migrations. A `roles.py` that grants one more
+    permission, with no sync migration shipped, differs from the migrated state."""
+    from dataclasses import replace
+
+    changed = tuple(
+        replace(r, permissions=(*r.permissions, "vendors.view_vendor")) if r.key == "support" else r
+        for r in roles.ROLES
+    )
+    assert role_drift() == []
+    monkeypatch.setattr(roles, "ROLES", changed)
+    assert [p for p in role_drift() if "vendors.view_vendor" in p]
+    assert {e.id for e in check_role_drift()} == {"manager.E004"}

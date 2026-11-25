@@ -171,15 +171,9 @@ SEED_MIGRATION = ("manager", "0002_seed_role_groups")  # first group seed; later
 
 def _manager_migrations_pending(connection: Any) -> bool:
     """True while any manager migration (the group seeds) or any orders migration is unapplied."""
-    from django.db.migrations.executor import MigrationExecutor
+    from apps.core.migration_safety import migrations_pending
 
-    executor = MigrationExecutor(connection)
-    applied = executor.loader.applied_migrations
-    if not any(app == "orders" for app, _ in applied):
-        return True
-    # Every manager node must be recorded, not only the leaf: a missing earlier one (the first
-    # group seed) is as pending as a missing later one.
-    return any(key not in applied for key in executor.loader.graph.nodes if key[0] == "manager")
+    return migrations_pending("manager", "orders", database=connection.alias)
 
 
 def check_role_drift(
