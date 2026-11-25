@@ -647,6 +647,16 @@ msgid "A picture for the banner. If you leave it empty, the banner has no pictur
 msgstr "Un'immagine per il banner. Se la lasci vuota, il banner non ha immagine."
 
 #: apps/cms/blocks.py
+msgid ""
+"A picture for the card: the home page shows it behind the title and the blog strip above it. If "
+"you leave it empty, a card to a blog post uses that post's main image, and any other card shows "
+"the theme's own artwork."
+msgstr ""
+"Un'immagine per la scheda: la home la mostra dietro il titolo e la striscia del blog sopra. Se la "
+"lasci vuota, una scheda verso un articolo del blog usa l'immagine principale dell'articolo, e ogni"
+" altra scheda mostra la grafica del tema."
+
+#: apps/cms/blocks.py
 msgid "A picture for the slide. If you leave it empty, the slide has no picture."
 msgstr "Un'immagine per la slide. Se la lasci vuota, la slide non ha immagine."
 

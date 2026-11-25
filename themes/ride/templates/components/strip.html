@@ -1,4 +1,4 @@
-{% load i18n theme_tags %}{% comment %}
+{% load i18n theme_tags responsive_images %}{% comment %}
 Multi-item strip of the `ride` theme (THM.14): products, vendors, testimonials or blog posts in a
 Bootstrap carousel. The items are grouped by the `in_groups` filter, one group per slide, so a
 slide shows up to `per_view` items side by side (fewer columns on a narrow screen; under 40rem one
@@ -13,6 +13,7 @@ Context:
 - `id` (required): unique on the page; `label` (required): the carousel's accessible name.
 - `slides`: a list of `title`, optional `text`, `meta`, `url`, `image_url` and `image_alt`
   (a testimonial: `text` is the quote, `title` the author).
+- `image`: a Wagtail image, shown as a responsive picture with `image_alt` (before `image_url`).
 - `per_view`: items per slide, 1 to 4 (default 4); `heading_level`: of the item titles (default 3).
 - `autoplay` (default off) and `interval` in ms (default 6000).
 {% endcomment %}{% firstof per_view 4 as size %}{% with groups=slides|in_groups:size %}{% with total=groups|length %}<section class="carousel slide ride-carousel ride-strip ride-strip--per-{{ size }}" id="{{ id }}" aria-roledescription="carousel" aria-label="{{ label }}" data-ride-carousel{% if autoplay %} data-autoplay="{{ interval|default:6000 }}"{% endif %}>
@@ -21,7 +22,7 @@ Context:
     {% for group in groups %}{% blocktranslate asvar slide_label with count=forloop.counter total=total %}{{ count }} of {{ total }}{% endblocktranslate %}<div class="carousel-item{% if forloop.first %} active{% endif %}" role="group" aria-roledescription="slide" aria-label="{{ slide_label }}">
       <ul class="ride-strip__group" role="list" tabindex="0">
         {% for slide in group %}<li class="ride-strip__item">
-          {% if slide.image_url %}<img src="{{ slide.image_url }}" alt="{{ slide.image_alt|default:'' }}" width="400" height="400" loading="lazy">{% endif %}
+          {% if slide.image %}{% responsive_image slide.image "card" alt=slide.image_alt class="ride-strip__image" %}{% elif slide.image_url %}<img src="{{ slide.image_url }}" alt="{{ slide.image_alt|default:'' }}" width="400" height="400" loading="lazy">{% endif %}
           <h{{ heading_level|default:3 }} class="ride-strip__title">{% with href=slide.url|safe_href %}{% if href %}<a href="{{ href }}">{{ slide.title }}</a>{% else %}{{ slide.title }}{% endif %}{% endwith %}</h{{ heading_level|default:3 }}>
           {% if slide.meta %}<p class="ride-strip__meta">{{ slide.meta }}</p>{% endif %}{% if slide.text %}<p>{{ slide.text }}</p>{% endif %}
         </li>{% endfor %}

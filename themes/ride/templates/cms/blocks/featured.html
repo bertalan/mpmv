@@ -1,13 +1,14 @@
-{% comment %}
+{% load responsive_images %}{% comment %}
 Featured links on `ride` as an icon feature row (THM.29): the app template's content (heading,
 one link and an optional text per card) as a row of columns, each with a decorative arrow icon.
 {% endcomment %}{% if cards and tiles %}
 <section class="block block-featured block-featured--tiles">
   {% if value.heading %}<h2>{{ value.heading }}</h2>{% endif %}
-  {# THM.24: image-led tiles. The card has no picture yet (part 2/2): the tile shows the theme's own artwork under a scrim, the title is laid over it and is the one link. #}
+  {# THM.24: image-led tiles. The card's picture (its own, or the blog post's) sits under a scrim, decorative (the title is the one link); without one the tile shows the theme's own artwork. #}
   <ul class="tile-grid list-unstyled" role="list">
     {% for card in cards %}
       <li class="tile">
+        {% if card.image %}{% responsive_image card.image "card" alt="" class="tile__image" %}{% endif %}
         <span class="tile__scrim" aria-hidden="true"></span>
         <h3 class="tile__title"><a class="stretched-link" href="{{ card.href }}">{{ card.label }}</a></h3>
         {% if card.text %}<p class="tile__text">{{ card.text|linebreaksbr }}</p>{% endif %}

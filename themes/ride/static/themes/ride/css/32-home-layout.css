@@ -70,14 +70,26 @@
     color: var(--color-text-inverse);
   }
 
+  .tile picture,
+  .tile__image {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: cover;
+  }
+
   .tile__scrim {
     position: absolute;
     inset: 0;
     z-index: -1;
     background: linear-gradient(
       to top,
-      color-mix(in srgb, var(--color-overlay) calc(var(--scrim-opacity) * 100%), transparent),
-      transparent 90%
+      color-mix(in srgb, var(--color-overlay) calc(var(--scrim-opacity) * 100%), transparent) 0%,
+      color-mix(in srgb, var(--color-overlay) calc(var(--scrim-opacity) * 100%), transparent) 60%,
+      transparent 100%
     );
   }
 
