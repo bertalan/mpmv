@@ -379,7 +379,7 @@ def _platform(run: _Run) -> None:
 
 def _operator_logo_image(run: _Run) -> MediaImage:
     """SEO.18: the generated operator logo (the THM.38 mark), in the logos collection."""
-    image = MediaImage.objects.filter(title=data.OPERATOR_LOGO_TITLE).first()
+    image: MediaImage | None = MediaImage.objects.filter(title=data.OPERATOR_LOGO_TITLE).first()
     if image is None:
         image = MediaImage(
             title=data.OPERATOR_LOGO_TITLE,
