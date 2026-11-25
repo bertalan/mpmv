@@ -128,7 +128,7 @@ def test_key_page_matches_its_visual_baseline(
     page.clock.set_fixed_time(utc(2026, 11, 18, 10))  # the page's JS sees one fixed "now"
     page.set_viewport_size({"width": 1280, "height": 900})
     if name == "cart":
-        # ORD.40: the line shows the product's cover; only here, so the product page keeps its baseline.
+        # ORD.40: the line shows the cover; only here, so the product page baseline stays.
         ProductImageFactory.create(
             product=Product.objects.get(translations__slug="blue-vase"),
             image=MediaImageFactory.create(),
