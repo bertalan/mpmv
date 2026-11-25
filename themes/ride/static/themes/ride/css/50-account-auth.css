@@ -49,4 +49,41 @@
     border: 2px dashed var(--color-border-control);
     border-radius: var(--radius-card);
   }
+
+  /* Sign-in (THM.27 2/2): a centred card on an image stage. The card is opaque, so text never
+     sits on the image. */
+  .signin-stage {
+    display: grid;
+    place-items: center;
+    min-block-size: 70vh;
+    padding: var(--space-l) var(--space-m);
+    background: var(--color-overlay) url(images/hero-placeholder.svg) center / cover no-repeat;
+  }
+
+  .signin-card {
+    inline-size: min(100%, 26rem);
+    margin: 0;
+  }
+
+  /* The show-password toggle is a link-styled button inside the field's right edge. The shared
+     toggle sheet (unlayered) gives it a 2.75rem box and a 0.5rem block margin, so the field is
+     3.75rem tall and the toggle fits inside it. */
+  .signin-field {
+    position: relative;
+  }
+
+  .signin-field .form-control {
+    min-block-size: 3.75rem;
+    padding-inline-end: 8.5rem;
+  }
+
+  .signin-field .password-toggle {
+    position: absolute;
+    inset-inline-end: 0;
+    inset-block-end: 0;
+    border: 0;
+    background: none;
+    color: var(--color-accent);
+    text-decoration: underline;
+  }
 }

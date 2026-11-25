@@ -1,0 +1,6 @@
+{% load i18n %}{% comment %}
+The order total beside the packages (THM.27 2/2). A shipping change swaps it out of band (`oob`),
+like the actions, because it sits outside #review-body now: the same amounts, only moved.
+{% endcomment %}<aside id="review-summary" class="cart-summary col-lg-4" aria-label="{% translate 'Order summary' %}"{% if oob %} hx-swap-oob="true"{% endif %}>
+  {% if order %}{% include "components/order_summary.html" with id="order-summary" title=_("Order total") lines=order.lines total=order.total note=order.note only %}{% endif %}
+</aside>

@@ -29,6 +29,52 @@
     }
   }
 
+  /* Review step (THM.27 2/2): packages left, summary right, the pay actions full width below. */
+  .checkout:has(.checkout-layout) {
+    max-inline-size: 75rem;
+  }
+
+  @media (min-width: 64rem) {
+    .checkout-layout .cart-summary {
+      position: sticky;
+      inset-block-start: 1rem;
+    }
+  }
+
+  /* Shipping options: a tile per option over the native radio (kept, so arrows, focus and the
+     checked state are the browser's). The whole tile is the click target through the label. */
+  .shipping-tile {
+    position: relative;
+    margin-block-end: 0.5rem;
+    padding-block: 0.75rem;
+    border: 1px solid var(--color-border-control);
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
+  }
+
+  .shipping-tile .shipping-tile__label::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
+
+  .shipping-tile:has(input:checked) {
+    border-color: var(--color-accent);
+    box-shadow: inset 0 0 0 2px var(--color-accent);
+    background: var(--color-accent-tint);
+  }
+
+  .shipping-tile:has(input:focus-visible) {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .shipping-tile {
+      transition: border-color 0.15s ease, background-color 0.15s ease;
+    }
+  }
+
   .checkout h1,
   .checkout h2,
   .checkout h3 {
