@@ -6816,12 +6816,13 @@ msgstr "Référence de la commande"
 
 #: themes/base/templates/components/order_summary.html
 #: themes/ride/templates/components/order_summary.html themes/ride/templates/orders/_cart_body.html
+#: themes/ride/templates/orders/_review_summary.html
 msgid "Order summary"
 msgstr "Récapitulatif de la commande"
 
 #: apps/orders/templates/orders/_cart_body.html apps/orders/templates/orders/_review_body.html
 #: apps/orders/templates/orders/confirmation.html themes/ride/templates/orders/_cart_body.html
-#: themes/ride/templates/orders/_review_body.html themes/ride/templates/orders/confirmation.html
+#: themes/ride/templates/orders/_review_summary.html themes/ride/templates/orders/confirmation.html
 msgid "Order total"
 msgstr "Total de la commande"
 
