@@ -13,6 +13,14 @@
     max-inline-size: 75rem;
   }
 
+  /* Line thumbnail (ORD.40): a square crop whatever the photo's shape. */
+  .cart-line__thumb {
+    inline-size: 6rem;
+    block-size: 6rem; /* the picture's height attribute is its real ratio, not this box */
+    aspect-ratio: 1;
+    object-fit: cover;
+  }
+
   .cart-summary .btn-lg {
     inline-size: 100%;
   }

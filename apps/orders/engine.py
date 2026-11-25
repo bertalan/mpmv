@@ -175,6 +175,7 @@ SHIPPING_BLOCKED = "shipping_blocked"
 SHIPPING_CHOICE_INVALID = "shipping_choice_invalid"
 TAX_BLOCKED = "tax_blocked"
 NO_PRICE = "no_price"
+BUSINESS_ONLY = "business_only"  # VEN.41: the seller sells to businesses only
 
 READY = "ready"
 QUOTE = "quote"
@@ -193,6 +194,23 @@ class Block:
     vendor_id: int | None = None
     product_id: int | None = None
     fields: tuple[str, ...] = ()
+
+
+BUSINESS_ONLY_MESSAGE = (
+    "This seller sells to businesses only. To buy these items, enter in your business details a "
+    "VAT number that passes the automatic check."
+)
+
+
+def business_only_block(
+    vendor_id: int, *, business_only: bool, verified_business: bool
+) -> Block | None:
+    """VEN.41: a business-only seller's package is refused to a buyer without a verified VAT
+    number (a consumer, or a business whose number is invalid, unchecked, stale or VIES-down:
+    fail closed). The refusal comes before payment and changes no price or tax."""
+    if not business_only or verified_business:
+        return None
+    return Block(code=BUSINESS_ONLY, message=BUSINESS_ONLY_MESSAGE, vendor_id=vendor_id)
 
 
 def missing_address_fields(address: Mapping[str, Any]) -> list[str]:

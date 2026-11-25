@@ -6,6 +6,7 @@ from typing import Any
 import pytest
 from django.template.loader import render_to_string
 
+from apps.core.tests.factories import MediaImageFactory
 from apps.themes.services import use_theme
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("english_interface")]
@@ -81,9 +82,14 @@ def test_the_amounts_are_unchanged() -> None:
 
 
 def test_a_line_with_an_image_shows_a_thumbnail() -> None:
-    line = {**LINE, "image_url": "/media/h.jpg", "image_alt": "Helmet"}
+    image = MediaImageFactory.create(file__filename="helmet.png")
+    line = {**LINE, "image": image, "image_alt": "Helmet photo"}
     html = cart(packages=[{**PACKAGE, "lines": [line]}])
-    assert 'src="/media/h.jpg"' in html
+    tag = re.search(r"<picture>.*?<img[^>]*>", html, re.S)
+    assert tag is not None
+    assert "helmet" in tag.group(0)
+    assert 'class="cart-line__thumb rounded"' in tag.group(0)
+    assert 'alt="Helmet photo"' in tag.group(0)
 
 
 def test_the_hint_replaces_the_link_when_the_cart_has_problems() -> None:
