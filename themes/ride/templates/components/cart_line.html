@@ -5,7 +5,7 @@ Bootstrap list-group item on the grid. Same context as `base`; the placeholder b
 decorative and is not drawn.
 {% endcomment %}{% with url=url|safe_href %}<li class="cart-line list-group-item py-3{% if problem %} cart-line--problem border border-2 border-danger{% endif %}">
   <div class="row g-3 align-items-center">
-    {% if image_url %}<div class="col-auto"><img class="rounded" src="{{ image_url }}" alt="{{ image_alt|default:'' }}" width="96" height="96" loading="lazy"></div>{% endif %}
+    {% if image_url %}<div class="col-auto"><img class="cart-line__thumb rounded" src="{{ image_url }}" alt="{{ image_alt|default:'' }}" width="96" height="96" loading="lazy"></div>{% endif %}
     <div class="col-12 col-md">
       <p class="cart-line__name fw-bold mb-1">{% if url %}<a class="link-body-emphasis" href="{{ url }}">{{ name }}</a>{% else %}{{ name }}{% endif %}</p>
       {% if variant %}<p class="cart-line__variant mb-1">{{ variant }}</p>{% endif %}

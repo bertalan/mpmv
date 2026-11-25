@@ -55,6 +55,8 @@ PRESETS: dict[str, Preset] = {
     "gallery": Preset((480, 960), "(min-width: 48rem) 33vw, 100vw", op="fill", ratio=(4, 3)),
     # Product cards and tiles in a grid.
     "card": Preset((320, 480, 640), "(min-width: 64rem) 25vw, (min-width: 40rem) 50vw, 100vw"),
+    # Cart and checkout line thumbnails (ORD.40): shown 96 px square, so 192 covers 2x screens.
+    "thumb": Preset((96, 192), "96px"),
     # Logos in a strip: 3rem high, so 96 px covers 2x screens.
     "logo": Preset((96,), "6rem", op="height", fallback="png"),
 }
@@ -117,7 +119,7 @@ def all_specs() -> list[str]:
 RENDER_GROUPS: dict[str, tuple[str, ...]] = {
     "hero": ("hero",),
     "content": ("content", "article", "gallery"),
-    "card": ("card", "avatar"),
+    "card": ("card", "avatar", "thumb"),
     "logo": ("logo",),
     "extras": (),
 }
@@ -144,6 +146,9 @@ def render_all(image: Any) -> None:
     """Make every rendition the pages can use for `image`: all groups, one after the other."""
     for group in RENDER_GROUPS:
         render_group(image, group)
+
+
+THUMB_SPEC = "format-jpeg|width-192"  # the thumb preset's JPEG rendition at 2x
 
 
 def rendition_or_original(image: Any, spec: str) -> tuple[str, int | None, int | None]:
