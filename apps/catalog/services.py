@@ -18,7 +18,6 @@ from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from typing import Any
 from urllib.parse import urlencode, urlsplit
-from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -39,7 +38,13 @@ from apps.core.changeset import ChangeSet
 from apps.core.i18n import primary_language
 from apps.core.models import MediaImage
 from apps.core.money import CURRENCY
-from apps.core.services import audit_changes, holds_permission, run_mutation, save_audited
+from apps.core.services import (
+    audit_changes,
+    business_tz,
+    holds_permission,
+    run_mutation,
+    save_audited,
+)
 from apps.core.sitemap_version import bump_sitemap_version
 from apps.core.text import ascii_int, nfc_deep
 from apps.vendors import services as vendors_services
@@ -186,7 +191,7 @@ def reference_price(
     return engine.reference_price(
         price_points(product, variant),
         at=at or timezone.now(),
-        tz=ZoneInfo(settings.BUSINESS_TIME_ZONE),
+        tz=business_tz(),
         currency=CURRENCY,
     )
 

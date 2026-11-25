@@ -44,3 +44,8 @@ class OrdersConfig(AppConfig):
         register_email_attachment(
             documents.ATTACHMENT_KIND, documents.vendor_confirmation_attachment
         )
+        from django.core import checks
+
+        from .checks import check_trigger_time_zone
+
+        checks.register(check_trigger_time_zone, checks.Tags.database)  # ARC.27

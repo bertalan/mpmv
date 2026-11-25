@@ -6,7 +6,8 @@ moving to another queue later means changing this file only. Application code:
 - declares a job with `@task("<app>.<job>")` in `apps/<app>/tasks.py`; the worker imports
   every `tasks` module of the installed apps;
 - runs it on a cron schedule with `@periodic("<cron>")`, read as wall-clock time in
-  `settings.BUSINESS_TIME_ZONE` (Europe/Rome), with cron's daylight saving time rules (see
+  `settings.BUSINESS_TIME_ZONE` (Europe/Rome, the bootstrap value of the operator's business time
+  zone: core.W920 warns when they differ), with cron's daylight saving time rules (see
   `_BusinessTimeCron`); the job receives `timestamp`, the Unix time of the tick;
 - prevents overlaps with `@locked()`: at most one run at a time and one job waiting;
 - queues it with `enqueue(job, **kwargs)`, inside the caller's database transaction.
@@ -107,7 +108,10 @@ class _BackoffStrategy(BaseRetryStrategy):
 # --- Business-time schedules ----------------------------------------------------------------
 
 
-def business_tz() -> ZoneInfo:
+def scheduler_tz() -> ZoneInfo:
+    """The zone cron schedules are read in: the bootstrap setting, because the scheduler runs in
+    Procrastinate's async loop, where no database query may run (ARC.27; core.W920 warns when
+    the operator's business time zone differs). Business code uses `services.business_tz()`."""
     return ZoneInfo(settings.BUSINESS_TIME_ZONE)
 
 
@@ -156,7 +160,7 @@ def _next_tick(iterator: _BusinessTimeCron, after: dt.datetime) -> dt.datetime:
 
 def next_run(cron: str, after: dt.datetime) -> dt.datetime:
     """First tick of `cron`, read in business time, strictly after `after` (returned in UTC)."""
-    return _next_tick(_BusinessTimeCron(cron, business_tz()), after)
+    return _next_tick(_BusinessTimeCron(cron, scheduler_tz()), after)
 
 
 class _BusinessTimePeriodicTask(PeriodicTask[..., Any, ...]):
@@ -164,7 +168,7 @@ class _BusinessTimePeriodicTask(PeriodicTask[..., Any, ...]):
 
     @functools.cached_property
     def croniter(self) -> Any:  # read by Procrastinate's scheduler
-        return _BusinessTimeCron(self.cron, business_tz())
+        return _BusinessTimeCron(self.cron, scheduler_tz())
 
 
 @dataclass(frozen=True)
@@ -525,7 +529,7 @@ def heartbeat(timestamp: int) -> None:
     logger.info(
         "core.heartbeat beat %d for the %s tick",
         beat.beats,
-        scheduled_for.astimezone(business_tz()).isoformat(),
+        scheduled_for.astimezone(scheduler_tz()).isoformat(),
     )
 
 

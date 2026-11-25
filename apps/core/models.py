@@ -457,6 +457,19 @@ def default_platform_refund_cases() -> list[str]:
     return list(PLATFORM_REFUND_CASES)
 
 
+def default_business_time_zone() -> str:
+    """ARC.27: a new operator row starts in the configured zone (`MPMV_BUSINESS_TIME_ZONE`)."""
+    return str(settings.BUSINESS_TIME_ZONE)
+
+
+def validate_time_zone(value: str) -> None:
+    """ARC.27: an IANA time zone name that this system knows, such as `Europe/Rome`."""
+    import zoneinfo
+
+    if value not in zoneinfo.available_timezones():
+        raise ValidationError(_("Enter a time zone name such as Europe/Rome."))
+
+
 class PlatformOperator(Versioned):
     """The legal entity running the marketplace, as versioned configuration (ARC.7).
 
@@ -508,6 +521,19 @@ class PlatformOperator(Versioned):
         help_text=_(
             "Whether VAT is added to the platform's commissions and fees. Ask your "
             "accountant if you are not sure."
+        ),
+    )
+    # ARC.27 (D-31): the one business time zone (fiscal year, order numbering year, retention
+    # dates, legal deadlines), read only through `services.business_tz()`; storage stays UTC.
+    business_time_zone = models.CharField(
+        "business time zone",
+        max_length=64,
+        default=default_business_time_zone,
+        validators=[validate_time_zone],
+        help_text=_(
+            "The time zone of the platform's calendar: when a day, a month or a year starts "
+            "for order numbers, deadlines and retention. For example Europe/Rome. Change it "
+            "only with your developer: scheduled jobs and order records depend on it."
         ),
     )
     dac7_authority_country = CountryField(

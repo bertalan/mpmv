@@ -30,6 +30,7 @@ def _form(**overrides: str | list[str]) -> dict[str, str | list[str]]:
         "tax_regime": "small_business",
         "commission_vat_mode": "none",
         "dac7_authority_country": "AT",
+        "business_time_zone": "Europe/Rome",
         "vendors_may_refund_outside": "on",
         "reverse_fees_on_vendor_refund": "on",
         "refund_fee_surcharge": "2.00",

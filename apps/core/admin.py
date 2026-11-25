@@ -99,6 +99,7 @@ class PlatformOperatorForm(forms.ModelForm[PlatformOperator]):
             "tax_regime",
             "commission_vat_mode",
             "dac7_authority_country",
+            "business_time_zone",
             "support_email",
             "compliance_email",
             "require_sales_terms",

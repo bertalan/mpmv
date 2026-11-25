@@ -13,6 +13,7 @@ from collections import defaultdict
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, cast
+from zoneinfo import ZoneInfo
 
 from django.apps import apps
 from django.conf import settings
@@ -20,7 +21,7 @@ from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser, Permission, PermissionsMixin
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.validators import validate_email
-from django.db import IntegrityError, connection, transaction
+from django.db import DatabaseError, IntegrityError, connection, transaction
 from django.db.models import F, Model, Q, QuerySet
 from django.template import Context, TemplateDoesNotExist
 from django.template.loader import select_template
@@ -126,6 +127,7 @@ OPERATOR_FIELDS = (
     "tax_regime",
     "commission_vat_mode",
     "dac7_authority_country",
+    "business_time_zone",
     "support_email",
     "compliance_email",
     "require_sales_terms",
@@ -166,6 +168,20 @@ def current_operator(at: dt.datetime | None = None) -> PlatformOperator:
         raise OverlappingPlatformOperators(str(exc)) from exc
     except NoValidRow as exc:
         raise NoPlatformOperator(str(exc)) from exc
+
+
+def business_tz() -> ZoneInfo:
+    """ARC.27 (D-31): the business time zone, from the current operator configuration.
+
+    The only reader of the business calendar (fiscal year, order numbering year, retention
+    dates, legal deadlines); storage stays UTC. Before an operator exists (a fresh install, a
+    migration) the bootstrap setting `BUSINESS_TIME_ZONE` stands in.
+    """
+    try:
+        name = current_operator().business_time_zone
+    except (NoPlatformOperator, OverlappingPlatformOperators, DatabaseError):
+        name = settings.BUSINESS_TIME_ZONE
+    return ZoneInfo(name)
 
 
 def latest_operator() -> PlatformOperator | None:

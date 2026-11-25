@@ -502,10 +502,13 @@ WAGTAILUSERS_PASSWORD_ENABLED = False
 WAGTAIL_GRAVATAR_PROVIDER_URL = None
 WAGTAIL_ENABLE_UPDATE_CHECK = False
 
-# UTC in the database; Europe/Rome for schedules and documents (spec 01 conventions).
+# UTC in the database; the business time zone for schedules and documents (spec 01 conventions).
 USE_TZ = True
 TIME_ZONE = "UTC"
-BUSINESS_TIME_ZONE = "Europe/Rome"
+# ARC.27 (D-31): the bootstrap business time zone, from the environment (owner 2026-11-25: not
+# in the code; UTC when unset). It seeds the operator's `business_time_zone` and is the zone
+# cron schedules run in; code reads `business_tz()`. STAGE and LIVE set it (Europe/Rome).
+BUSINESS_TIME_ZONE = env_str("MPMV_BUSINESS_TIME_ZONE", "") or "UTC"
 # Public holidays (ISO dates) the GPSR article 22 deadlines skip (CMP.3). Empty: working days are
 # Monday to Friday, the earliest deadline (owner decision 2026-11-09).
 COMPLIANCE_PUBLIC_HOLIDAYS: list[str] = []

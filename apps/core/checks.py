@@ -19,6 +19,9 @@
 - Site flags (ARC.29): `check --deploy` refuses `MPMV_DEMO_MODE` and `MPMV_FORCE_NOINDEX` where
   live data is held (core.E801).
 - Image formats (THM.12): a warning when Pillow cannot encode AVIF (core.W501).
+- Business time zone (ARC.27): cron schedules run in the bootstrap setting `BUSINESS_TIME_ZONE`
+  (the scheduler's async loop cannot query the database); a warning when the operator's
+  `business_time_zone` says otherwise (core.W920, a database check).
 """
 
 import ast
@@ -703,3 +706,26 @@ def check_public_forms(app_configs: Any = None, **kwargs: Any) -> list[checks.Ch
     ]
     messages += [checks.Info(message, id=check_id) for check_id, message in report.warnings]
     return messages
+
+
+def check_business_time_zone(
+    app_configs: Iterable[Any] | None, databases: Iterable[str] | None = None, **kwargs: Any
+) -> list[checks.CheckMessage]:
+    """core.W920 (ARC.27): the job schedules and the business calendar must agree."""
+    if not databases:
+        return []
+    from django.conf import settings
+
+    from .services import business_tz
+
+    zone = business_tz().key
+    if zone == settings.BUSINESS_TIME_ZONE:
+        return []
+    return [
+        checks.Warning(
+            f"The operator's business time zone is {zone}, but scheduled jobs still run in "
+            f"{settings.BUSINESS_TIME_ZONE}.",
+            hint="Set the BUSINESS_TIME_ZONE setting to the same zone and restart the worker.",
+            id="core.W920",
+        )
+    ]

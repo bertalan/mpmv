@@ -26,7 +26,6 @@ from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Final
 from urllib.parse import urlsplit, urlunsplit
-from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.contrib.auth.models import Permission
@@ -51,6 +50,7 @@ from apps.core.privacy import keyed_hash, normalise_email, suppression_digest
 from apps.core.services import (
     NoPlatformOperator,
     audit_changes,
+    business_tz,
     consume_rate_limit,
     current_operator,
     email_language,
@@ -484,8 +484,8 @@ def public_holidays() -> frozenset[dt.date]:
 
 
 def _business_date(moment: dt.datetime) -> dt.date:
-    """The calendar day of `moment` in business time (settings.BUSINESS_TIME_ZONE)."""
-    return timezone.localtime(moment, ZoneInfo(settings.BUSINESS_TIME_ZONE)).date()
+    """The calendar day of `moment` in business time (`business_tz()`, ARC.27)."""
+    return timezone.localtime(moment, business_tz()).date()
 
 
 #: How far in the future a receipt time may be (clocks of different machines).
