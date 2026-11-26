@@ -53,7 +53,7 @@ from apps.core.changeset import ChangeSet
 from apps.core.i18n import configured_languages, hreflang_alternates, primary_language
 from apps.core.image_licences import Credit
 from apps.core.money import CURRENCY
-from apps.core.services import run_mutation
+from apps.core.services import business_tz, run_mutation
 from apps.core.site_url import absolute_url
 from apps.vendors.models import Vendor
 from apps.vendors.seller_name import public_name
@@ -484,7 +484,7 @@ def record_legal_review(
         raise ValidationError({"stage": f"Unknown review stage {stage!r}."})
     if not reviewer:
         raise ValidationError({"reviewer": "Say who did the review."})
-    if reviewed_on > timezone.localdate():
+    if reviewed_on > timezone.localdate(timezone=business_tz()):
         raise ValidationError({"reviewed_on": "A review cannot be dated in the future."})
     if version.reviews.filter(stage=stage).exists():
         raise ValidationError({"stage": f"{stage} is already recorded on this version."})
@@ -713,7 +713,7 @@ def customer_terms_in_force(language: str, *, today: dt.date | None = None) -> T
     """The customer terms version in force in `language`, else in the site's default language
     (a checkout must not stop for a missing translation; the language is recorded). None when no
     live terms page has a version in force."""
-    day = today or timezone.localdate()
+    day = today or timezone.localdate(timezone=business_tz())
     for code in dict.fromkeys((language, settings.LANGUAGE_CODE)):
         page = (
             LegalPage.objects.live()
@@ -745,7 +745,7 @@ def _seed_legal_placeholders(home: HomePage, report: SeedReport) -> None:
     Idempotent: a language that has the page, whatever its text, is left alone.
     """
     primary = home.locale
-    today = timezone.localdate()
+    today = timezone.localdate(timezone=business_tz())
     for kind in engine.GO_LIVE_LEGAL_KINDS:
         source = LegalPage.objects.child_of(home).filter(kind=kind).first()
         if source is None:

@@ -850,7 +850,9 @@ class LegalPage(RoutablePageMixin, Page):  # type: ignore[misc]
         # An unsaved page (the editor's preview before the first save) has no versions yet.
         versions = list(self.versions.order_by("-number")) if self.pk else []
         stamps = [engine.VersionStamp(v.number, v.effective_date) for v in versions]
-        in_force = engine.version_in_force(stamps, timezone.localdate())
+        from apps.core.services import business_tz
+
+        in_force = engine.version_in_force(stamps, timezone.localdate(timezone=business_tz()))
         context["current_version"] = versions[0] if versions else None
         # A text is a draft until legal counsel has checked it (I18N.9), placeholders included.
         context["counsel_checked"] = bool(versions) and (
