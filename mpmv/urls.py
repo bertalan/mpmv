@@ -65,6 +65,7 @@ urlpatterns = [
     path("account/mfa/", include("apps.accounts.urls")),
     path("account/level/", include("apps.accounts.level_urls")),  # CORE.25 (D-32)
     path("account/sessions/", include("apps.accounts.session_urls")),  # CORE.24
+    path("account/password/", include("apps.accounts.password_urls")),  # CORE.28
     path("account/link/", include("apps.accounts.action_link_urls")),  # CORE.15
     path("account/privacy/", include("apps.compliance.account_urls")),  # CMP.4 self-service
     path("account/orders/", include("apps.orders.account_urls")),  # My orders (ORD.7)

@@ -9,6 +9,7 @@ import time
 import django_otp
 from django.conf import settings
 from django.http import HttpRequest
+from django_otp import DEVICE_ID_SESSION_KEY
 
 from apps.core.audit import audit_context
 
@@ -64,3 +65,19 @@ def is_recently_passkey_verified(request: HttpRequest, max_age: int | None = Non
         and request.session.get(VERIFIED_KIND_SESSION_KEY) == services.PASSKEY
         and request.session.get(VERIFIED_UV_SESSION_KEY) is True
     )
+
+
+def drop_verification(request: HttpRequest) -> None:
+    """Forget the session's second-factor verification: the next page asks for it again.
+
+    CORE.28: after a vendor member replaces a breached password, a fresh authentication comes
+    before any other action; `MfaRequiredMiddleware` sends the user to the verify page.
+    """
+    for key in (
+        DEVICE_ID_SESSION_KEY,
+        VERIFIED_AT_SESSION_KEY,
+        VERIFIED_KIND_SESSION_KEY,
+        VERIFIED_UV_SESSION_KEY,
+    ):
+        request.session.pop(key, None)
+    request.user.otp_device = None  # type: ignore[union-attr]  # set by OTPMiddleware
