@@ -9,7 +9,7 @@
   style (the CSP has no 'unsafe-inline'): the filter form is a plain GET form.
 {% endcomment %}
 {% block title %}{% if editorial.title %}{{ editorial.title }}{% else %}{{ name }}{% endif %}{% if window.page > 1 %} · {% blocktranslate with page=window.page %}Page {{ page }}{% endblocktranslate %}{% endif %}{% if current_site.site_name %} · {{ current_site.site_name }}{% endif %}{% endblock %}
-{% block description %}{% if editorial.description %}<meta name="description" content="{{ editorial.description }}">{% endif %}{% endblock %}
+{% block description %}{% if meta_description %}<meta name="description" content="{{ meta_description }}">{% endif %}{% endblock %}
 {% block head %}{{ block.super }}
   {% robots_meta robots %}
   {% if previous_url %}<link rel="prev" href="{{ previous_url }}">{% endif %}

@@ -5,11 +5,16 @@ helpers they need come through this module, the contract's only ignored import. 
 anything that touches the database, settings or the app registry.
 """
 
+import html
+import re
 import unicodedata
 from collections.abc import Iterable, Mapping
 from typing import Any
 
 from django.utils.text import slugify as _django_slugify
+
+META_DESCRIPTION_LIMIT = 160
+_SPACES = re.compile(r"\s+")
 
 
 def slugify(value: str) -> str:
@@ -75,3 +80,26 @@ def nfc_text_fields(instance: Any) -> None:
             if field.get_internal_type() in {"CharField", "TextField"}
         ),
     )
+
+
+def plain_text(value: str | None) -> str:
+    """`value` without HTML tags or entities, on one line with single spaces."""
+    from django.utils.html import strip_tags  # lazy: pure engines import this module
+
+    return _SPACES.sub(" ", html.unescape(strip_tags(value or ""))).strip()
+
+
+def meta_description(*candidates: str | None, limit: int = META_DESCRIPTION_LIMIT) -> str:
+    """SEO.17: the first candidate with any text, as plain text of at most `limit` characters.
+    A longer text ends on a whole word with an ellipsis; empty when every candidate is blank."""
+    for candidate in candidates:
+        found = plain_text(candidate)
+        if not found:
+            continue
+        if len(found) <= limit:
+            return found
+        head = found[: limit - 1]
+        if found[limit - 1] != " " and " " in head:
+            head = head.rsplit(" ", 1)[0]
+        return head.rstrip(" ,;:.-\u2013\u2014") + "…"
+    return ""
