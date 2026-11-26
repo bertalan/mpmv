@@ -1,4 +1,4 @@
-"""VEN.20 slice 2: the Manager shop page for holidays and closures (owner and staff, tenant scoped)."""
+"""VEN.20 slice 2: the Manager shop page for closures (owner and staff, tenant scoped)."""
 
 import datetime as dt
 from typing import Any
