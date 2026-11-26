@@ -11481,6 +11481,15 @@ msgstr ""
 "L'ordre des versions : les nombres les plus bas passent en premier, par exemple 1, 2, 3. Laissez 0"
 " pour conserver l'ordre dans lequel elles ont été ajoutées."
 
+#: apps/orders/tz.py
+msgid ""
+"The order records still compute their retention dates in %(zone)s, so the business time zone must "
+"stay %(zone)s until a developer updates them (ORD.41)."
+msgstr ""
+"Les données des commandes calculent encore leurs dates de conservation en %(zone)s : le fuseau "
+"horaire de l’activité doit donc rester %(zone)s jusqu’à ce qu’un développeur les mette à jour "
+"(ORD.41)."
+
 #: apps/manager/views.py
 msgid "The order was updated."
 msgstr "La commande a été mise à jour."
@@ -12541,13 +12550,13 @@ msgstr ""
 #: apps/core/models.py
 msgid ""
 "The time zone of the platform's calendar: when a day, a month or a year starts for order numbers, "
-"deadlines and retention. For example Europe/Rome. Change it only with your developer: scheduled "
-"jobs and order records depend on it."
+"deadlines and retention. For example Europe/Rome. Change it only with your developer, and only "
+"from 1 January: scheduled jobs, order records and tax periods depend on it."
 msgstr ""
 "Le fuseau horaire du calendrier de la plateforme : quand commencent un jour, un mois ou une année "
 "pour les numéros de commande, les délais et la conservation. Par exemple Europe/Rome. Ne le "
-"modifiez qu’avec votre développeur : les tâches planifiées et les données des commandes en "
-"dépendent."
+"modifiez qu’avec votre développeur, et seulement à partir du 1er janvier : les tâches planifiées, "
+"les données des commandes et les périodes fiscales en dépendent."
 
 #: apps/events/models.py
 msgid ""
