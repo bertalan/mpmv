@@ -5,6 +5,8 @@ Pure functions, no Django. They mirror the `get_meta_*` chain of the wagtail-seo
 
 from dataclasses import dataclass
 
+from apps.core.text import meta_description
+
 
 @dataclass(frozen=True)
 class PageMeta:
@@ -36,6 +38,6 @@ def resolve_meta(
     summary. Image: the page's SEO image, its main image, the site default, the operator logo."""
     return PageMeta(
         title=first_text(seo_title, page_title),
-        description=first_text(search_description, summary),
+        description=meta_description(search_description, summary),  # SEO.17: plain, ≤160
         image=first_text(page_seo_image, page_image, site_image, operator_image),
     )

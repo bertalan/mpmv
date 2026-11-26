@@ -11,7 +11,7 @@
   style (the CSP has no 'unsafe-inline') and no stylesheet of the app's minimal layout.
 {% endcomment %}
 {% block title %}{{ page_data.title }}{% if site_name %} · {{ site_name }}{% endif %}{% endblock %}
-{% block description %}{% if page_data.short_description %}<meta name="description" content="{{ page_data.short_description }}">{% endif %}{% endblock %}
+{% block description %}{% if meta_description %}<meta name="description" content="{{ meta_description }}">{% endif %}{% endblock %}
 {% block head %}{{ block.super }}
   <script src="{% static 'catalog/variant-image.js' %}" defer></script>
   {% robots_meta robots %}
