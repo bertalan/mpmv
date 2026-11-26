@@ -75,14 +75,15 @@ BUILT_IN = (
         order=23,
         allowed=vendor_action("profile"),
     ),
-    # The shop's holidays and closures (VEN.20): owners, like the other shop settings.
+    # The shop's holidays and closures (VEN.20): owners and staff, by the `orders` action: a
+    # closure moves the dispatch date, which is day-to-day operations (owner decision 2026-11-26).
     Section(
         CLOSURES_SECTION,
         Space.SHOP,
         _("Holidays and closures"),
         "manager:shop:closures",
         order=24,
-        allowed=vendor_action("profile"),
+        allowed=vendor_action("orders"),
     ),
     # The vendor's own events (EVT.4): owners and staff, by the `events` action of the matrix.
     Section(

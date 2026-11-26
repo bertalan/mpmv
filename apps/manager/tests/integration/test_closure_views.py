@@ -120,11 +120,35 @@ def test_another_shops_closure_is_a_404_to_edit_and_to_remove(
     assert not AuditLog.objects.filter(action__startswith="vendors.closure.").exists()
 
 
-def test_a_shop_staff_member_gets_404(client: Client, vendor: Vendor) -> None:
+def test_a_shop_staff_member_manages_closures_and_the_audit_names_them(
+    client: Client, vendor: Vendor
+) -> None:
     member = VendorMemberFactory.create(vendor=vendor, role="staff").user
     _login(client, member, vendor)
-    assert client.get(URL).status_code == 404
-    assert client.post(URL, _data()).status_code == 404
+    assert client.get(URL).status_code == 200
+    assert client.post(URL, _data()).status_code == 302
+    closure = VendorClosure.objects.get(vendor=vendor)
+    assert client.post(_edit(closure), _data(notice_days="2")).status_code == 302
+    entry = AuditLog.objects.get(action="vendors.closure.changed")
+    assert entry.actor_id == member.pk
+    assert client.post(f"{_edit(closure)}remove/").status_code == 302
+    assert not VendorClosure.objects.exists()
+
+
+def test_a_staff_member_of_another_shop_gets_404_on_this_shops_closure(
+    client: Client, vendor: Vendor, other_vendor: Vendor
+) -> None:
+    theirs = VendorClosureFactory.create(vendor=other_vendor)
+    member = VendorMemberFactory.create(vendor=vendor, role="staff").user
+    _login(client, member, vendor)
+    assert client.get(_edit(theirs)).status_code == 404
+    assert client.post(f"{_edit(theirs)}remove/").status_code == 404
+    assert VendorClosure.objects.filter(pk=theirs.pk).exists()
+
+
+def test_a_user_with_no_membership_gets_404(client: Client, customer: User) -> None:
+    verified_login(client, customer)
+    assert client.get(URL).status_code in (302, 403, 404)
     assert not VendorClosure.objects.exists()
 
 
