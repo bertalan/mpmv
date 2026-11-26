@@ -108,6 +108,8 @@ NOT_LISTED: Final = frozenset(
         "manager:shop:amendment_discard",
         "manager:shop:order_cancel",
         "manager:shop:fitment_product",
+        "manager:shop:closure_edit",  # VEN.20: needs a closure record
+        "manager:shop:closure_remove",
         "manager:shop:order_invoice_issued",
         "manager:platform:order",
         "manager:platform:order_draft",  # ORD.32: needs a draft record
