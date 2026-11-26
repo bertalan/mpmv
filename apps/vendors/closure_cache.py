@@ -5,6 +5,9 @@ storefront, the product pages and the cart of the vendor) puts `generation(vendo
 It moves when the vendor's schedule changes, after the change is committed. The notice also
 changes with the calendar, so such a cache must expire no later than the notice's first or last
 day (spec 04): that part belongs to the page cache itself.
+
+The counter lives in the default cache. With the per-process LocMem backend a bump in one worker
+is not seen by the others, so SEO.6 must run on a shared backend before it reads this.
 """
 
 from django.core.cache import cache
@@ -23,6 +26,7 @@ def drop_closure_cache(vendor_id: int) -> None:
     """Start a new generation for the vendor once the surrounding transaction commits."""
 
     def _bump() -> None:
-        cache.set(_key(vendor_id), generation(vendor_id) + 1, None)
+        generation(vendor_id)  # makes sure the key exists
+        cache.incr(_key(vendor_id))
 
     transaction.on_commit(_bump)

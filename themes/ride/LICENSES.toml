@@ -107,3 +107,12 @@ files = [
   "flags/fi.svg", "flags/fr.svg", "flags/gb.svg", "flags/gr.svg", "flags/hu.svg",
   "flags/it.svg", "flags/nl.svg", "flags/pl.svg", "flags/ro.svg", "flags/se.svg",
 ]
+
+# THM.38: the ride site icon, the same "M" mark in the ride red. Own work.
+[[asset]]
+name = "MPMV site icon (ride)"
+kind = "image"
+source = "https://github.com/bertalan/mpmv"
+author = "MPMV contributors"
+license = "CC0-1.0"
+files = ["site-icon/icon.svg", "site-icon/icon-32.png", "site-icon/apple-touch-icon.png"]

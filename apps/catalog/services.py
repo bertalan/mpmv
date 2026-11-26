@@ -2015,6 +2015,18 @@ class ListingAnchor:
         return language not in self.published
 
 
+def listing_description_texts(scope: ListingScope, language: str) -> tuple[str, str]:
+    """SEO.17: the SEO description and the description of the listing's term or category, in
+    `language` only (published there; a missing translation gives none, never the source's)."""
+    owner = scope.term or scope.category
+    if owner is None:
+        return ("", "")
+    row = owner.translations.filter(language=language, status=TranslationStatus.PUBLISHED).first()
+    if row is None:
+        return ("", "")
+    return (str(row.seo_description), str(row.description))
+
+
 def _languages() -> list[str]:
     return [str(code) for code, _name in settings.LANGUAGES]
 

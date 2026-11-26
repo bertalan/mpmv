@@ -25,9 +25,12 @@ from apps.core.models import MediaImage
 from apps.core.money import CURRENCY, round_line
 from apps.orders import engine
 from apps.orders.services import CheckoutPreview
+from apps.shipping import services as shipping_services
+from apps.shipping.engine import ClosureNotice
 from apps.tax import engine as tax_engine
 from apps.tax import prices as tax_prices
 from apps.vendors.models import Vendor
+from apps.vendors.services import business_today
 
 # The message of each blocking code, in the visitor's language. Unknown codes fall back to the
 # engine's own English message.
@@ -115,6 +118,7 @@ class PackageView:
     total: str = ""
     note: str = ""
     vendor_id: int = 0
+    closure_notice: ClosureNotice | None = None
 
 
 def thumbnail_alt(name: str, alt: str) -> str:
@@ -216,6 +220,10 @@ def package_views(
     thumbnails = product_pages.line_thumbnails(
         [(product, variant) for product, variant in lines], language
     )
+    # One query for every vendor of the cart (the closure notice of each package).
+    notices = shipping_services.closure_notices(
+        {package.vendor_id for package in preview.packages}, business_today()
+    )
     out: list[PackageView] = []
     for index, package in enumerate(preview.packages, start=1):
         vendor = vendors.get(package.vendor_id)
@@ -238,6 +246,7 @@ def package_views(
             field_name=f"ship_{vendor.public_id}" if vendor is not None else "",
             summary_id=f"package-{index}",
             vendor_id=package.vendor_id,
+            closure_notice=notices.get(package.vendor_id),
         )
         if quote and vendor is not None and vendor.slug:
             view.quote_url = slugs.vendor_path(

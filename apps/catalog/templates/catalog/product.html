@@ -9,7 +9,7 @@
   shown only when the product sells online; htmx swaps the answer into #add-to-cart-result. The gallery is the theme's `components/gallery.html`; `related` holds the related products (spec 03).
 {% endcomment %}
 {% block title %}{{ page_data.title }}{% if site_name %} · {{ site_name }}{% endif %}{% endblock %}
-{% block description %}{% if page_data.short_description %}<meta name="description" content="{{ page_data.short_description }}">{% endif %}{% endblock %}
+{% block description %}{% if meta_description %}<meta name="description" content="{{ meta_description }}">{% endif %}{% endblock %}
 {% block head %}
   {% robots_meta robots %}
   <link rel="stylesheet" href="{% static 'catalog/product.css' %}">

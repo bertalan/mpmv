@@ -19,6 +19,7 @@ from typing import Any
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.http import HttpRequest
+from django.templatetags.static import static
 from django.urls import reverse
 from wagtail.models import Site
 
@@ -107,6 +108,7 @@ def clear_caches() -> None:
     palette_asset.cache_clear()
     registered_surfaces.cache_clear()
     palette_violations.cache_clear()
+    _icon_path.cache_clear()
     from .appearance import clear_cache  # lazy: appearance imports this module
 
     clear_cache()
@@ -328,3 +330,26 @@ def save_palette(
         updated=PALETTE_CONFIGURED,
         dry_run=dry_run,
     )
+
+
+SITE_ICON_DIR = "site-icon"
+
+
+def icon_url(slug: str, name: str) -> str:
+    """The static URL of site icon `name` (THM.38) of theme `slug`, or of `base` when it ships none.
+
+    A theme with its own `site-icon/` files wins; one without inherits `base`'s. The URL goes
+    through the static storage, so a hashed name is served with a long cache. The files are
+    looked up in the theme sources, so this needs no build.
+    """
+    return static(_icon_path(slug, name))
+
+
+@functools.lru_cache(maxsize=64)
+def _icon_path(slug: str, name: str) -> str:
+    """The static path behind `icon_url`, looked up on disk once per theme and file."""
+    for owner in (slug, "base"):
+        path = f"themes/{owner}/{SITE_ICON_DIR}/{name}"
+        if (themes_dir() / owner / "static" / path).is_file():
+            return path
+    return f"themes/base/{SITE_ICON_DIR}/{name}"

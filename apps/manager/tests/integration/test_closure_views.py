@@ -1,4 +1,4 @@
-"""VEN.20 slice 2: the Manager shop page for holidays and closures (owner only, tenant scoped)."""
+"""VEN.20 slice 2: the Manager shop page for holidays and closures (owner and staff, tenant scoped)."""
 
 import datetime as dt
 from typing import Any
@@ -146,9 +146,9 @@ def test_a_staff_member_of_another_shop_gets_404_on_this_shops_closure(
     assert VendorClosure.objects.filter(pk=theirs.pk).exists()
 
 
-def test_a_user_with_no_membership_gets_404(client: Client, customer: User) -> None:
+def test_a_user_with_no_membership_is_refused(client: Client, customer: User) -> None:
     verified_login(client, customer)
-    assert client.get(URL).status_code in (302, 403, 404)
+    assert client.get(URL).status_code == 403
     assert not VendorClosure.objects.exists()
 
 

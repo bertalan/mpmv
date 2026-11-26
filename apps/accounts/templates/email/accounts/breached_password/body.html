@@ -1,0 +1,6 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+<p>{% blocktranslate %}The account {{ user_email }} ({{ user_id }}) signed in with a password that appears in a known data breach. It must choose a new password and verify its second factor again before any other action. Its activity is not blocked. Review the account in the audit log.{% endblocktranslate %}</p>
+</body>
+</html>

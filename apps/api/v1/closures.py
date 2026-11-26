@@ -4,7 +4,9 @@ A thin adapter over `apps.vendors.services` (`add_closure`, `update_closure`, `d
 the payload becomes the service's input, the service validates, applies or dry-runs, and audits.
 `vendor_id` is the vendor's public id. The caller's key scopes the data (CORE.13): a vendor key
 reaches its own vendor only; another vendor, and another vendor's closure under its own id, are
-a 404, as for one that does not exist. A platform key reaches every vendor. Scopes:
+a 404, as for one that does not exist. The id lookup comes before the view reads a valid body; a
+malformed body is a 400 or 422 whoever the vendor is, which says nothing about existence.
+A platform key reaches every vendor. Scopes:
 `closures:read` and `closures:write`. A range that has ended is history: changing or deleting it
 is a 422 problem.
 """
@@ -129,7 +131,7 @@ def create_closure(
 ) -> Status[dict[str, Any]]:
     """201 with the ChangeSet; 200 with it on `?dry_run=true`. An invalid range is a 422 problem
     naming the fields. It takes effect at once and needs no review."""
-    # The vendor is looked up first, so another vendor is a 404 whatever the body.
+    # The vendor is looked up first, so another vendor is a 404 whatever a valid body says.
     vendor = _vendor(request, vendor_id)
     body = payload or ClosureCreateIn()
     start, end = body.start_date, body.end_date

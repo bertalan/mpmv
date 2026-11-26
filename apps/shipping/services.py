@@ -392,12 +392,23 @@ def vendor_closed_periods(
     }
 
 
+def closure_notices(vendor_ids: Iterable[int], today: dt.date) -> dict[int, ClosureNotice | None]:
+    """The neutral notice of each vendor on `today` (None for none), in one query whatever the
+    number of vendors. `today` is the date in the business time zone
+    (`apps.vendors.services.business_today()`): storefront, product page, cart and checkout must
+    all pass the same one."""
+    return {
+        vendor_id: closure_notice_for(
+            [
+                (ClosureRule(c.start_date, c.end_date, c.repeats_yearly), c.notice_days)
+                for c in closures
+            ],
+            today,
+        )
+        for vendor_id, closures in _closure_rows(vendor_ids).items()
+    }
+
+
 def closure_notice(vendor_id: int, today: dt.date) -> ClosureNotice | None:
-    """The neutral notice of a vendor on `today`, or None. `today` is the date in the business
-    time zone (`apps.vendors.services.business_today()`): storefront, product page, cart and
-    checkout must all pass the same one."""
-    closures = _closure_rows([vendor_id])[vendor_id]
-    rules = [
-        (ClosureRule(c.start_date, c.end_date, c.repeats_yearly), c.notice_days) for c in closures
-    ]
-    return closure_notice_for(rules, today)
+    """The neutral notice of one vendor on `today`, or None (see `closure_notices`)."""
+    return closure_notices([vendor_id], today)[vendor_id]
