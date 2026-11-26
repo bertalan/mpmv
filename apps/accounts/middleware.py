@@ -9,10 +9,12 @@ verification; JSON clients get 403.
 
 from collections.abc import Callable
 from typing import Any
+from urllib.parse import urlencode
 
 from django.contrib.auth.models import AnonymousUser
-from django.http import HttpRequest
+from django.http import HttpRequest, HttpResponseRedirect, JsonResponse
 from django.http.response import HttpResponseBase
+from django.urls import reverse
 from django.utils import translation
 
 from apps.core.http import client_ip
@@ -20,6 +22,7 @@ from apps.core.i18n import configured_languages, translate_path
 
 from . import levels, lifetimes, services
 from .decorators import MFA_EXEMPT_ATTR, mfa_redirect
+from .http import return_url, wants_json
 from .mfa_session import is_verified
 from .models import User
 from .services import has_second_factor, mfa_required
@@ -71,6 +74,64 @@ class MfaRequiredMiddleware:
         if not (enrolled or mfa_required(user)):
             return None
         return mfa_redirect(request, "mfa:verify" if enrolled else "mfa:setup")
+
+
+# CORE.28: what a user who must change a breached password may still reach: the change page,
+# the second-factor pages a sign-in needs (not the factor list or removal), sign-out, and what
+# the change page loads (images, the palette stylesheet).
+BREACH_ALLOWED_VIEW_NAMES = frozenset(
+    {
+        "password:change",
+        "mfa:setup",
+        "mfa:totp",
+        "mfa:verify",
+        "mfa:recovery_codes",
+        "mfa:passkey_register_options",
+        "mfa:passkey_register",
+        "mfa:passkey_auth_options",
+        "mfa:passkey_auth",
+        "logout",
+        "admin:logout",
+        "wagtailadmin_logout",
+        "media",
+        "palette:css",
+        "healthz",
+        "readyz",
+    }
+)
+
+
+class BreachedPasswordMiddleware:
+    """CORE.28: a sign-in found the password in a known breach (`User.password_breached_at`).
+
+    After `MfaRequiredMiddleware`, so a role that must use MFA verifies the second factor first.
+    Every other page then redirects to the change page (JSON clients get 403) until a new
+    password is set, which clears the flag. The account's activity is not blocked otherwise.
+    """
+
+    def __init__(self, get_response: Callable[[HttpRequest], HttpResponseBase]) -> None:
+        self.get_response = get_response
+
+    def __call__(self, request: HttpRequest) -> HttpResponseBase:
+        return self.get_response(request)
+
+    def process_view(
+        self,
+        request: HttpRequest,
+        view_func: Callable[..., Any],
+        view_args: tuple[Any, ...],
+        view_kwargs: dict[str, Any],
+    ) -> HttpResponseBase | None:
+        user = request.user
+        if not isinstance(user, User) or user.password_breached_at is None:
+            return None
+        match = request.resolver_match
+        if match is not None and match.view_name in BREACH_ALLOWED_VIEW_NAMES:
+            return None
+        url = reverse("password:change")
+        if wants_json(request):
+            return JsonResponse({"error": "password_change_required", "url": url}, status=403)
+        return HttpResponseRedirect(f"{url}?{urlencode({'next': return_url(request)})}")
 
 
 class PreferredLanguageMiddleware:

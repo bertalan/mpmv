@@ -13,6 +13,7 @@ from django.http import HttpRequest
 
 from apps.core.http import client_ip
 
+from .breach import password_is_breached
 from .captcha import captcha_passes
 from .models import User
 from .services import login_retry_after
@@ -51,3 +52,35 @@ class LoginProtectionBackend(BaseBackend):
         """
         user = ModelBackend().get_user(user_id)
         return user if isinstance(user, User) else None
+
+
+# Set on the user object `authenticate()` returns when its password is in a known breach;
+# `signals.flag_breached_on_login` records it once the sign-in completes (CORE.28).
+BREACH_FOUND_ATTR = "_mpmv_password_breached"
+
+
+class BreachCheckBackend(ModelBackend):
+    """`ModelBackend`, plus the breached-password check of each successful password sign-in.
+
+    Listed right before `ModelBackend` (kept for existing sessions and explicit `backend=`
+    logins). The check fails open (`password_is_breached`): the service down lets the sign-in
+    through and the check runs again next time. An account already flagged is not checked again.
+    A wrong password raises PermissionDenied, so `ModelBackend` does not hash it a second time;
+    `authenticate()` then answers None and sends `user_login_failed`, as when every backend fails.
+    """
+
+    def authenticate(
+        self,
+        request: HttpRequest | None,
+        username: str | None = None,
+        password: str | None = None,
+        **kwargs: Any,
+    ) -> User | None:
+        if password is None or (username is None and kwargs.get(User.USERNAME_FIELD) is None):
+            return None  # not a password sign-in: let the other backends decide
+        user = super().authenticate(request, username=username, password=password, **kwargs)
+        if user is None:
+            raise PermissionDenied
+        if isinstance(user, User) and user.password_breached_at is None:
+            setattr(user, BREACH_FOUND_ATTR, password_is_breached(password))
+        return user

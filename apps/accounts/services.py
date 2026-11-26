@@ -39,9 +39,11 @@ from apps.core.models import AuditLog
 from apps.core.opschecks import Alert
 from apps.core.privacy import keyed_hash
 from apps.core.services import (
+    NoPlatformOperator,
     audit_changes,
     clear_throttle,
     consume_rate_limit,
+    current_operator,
     enqueue_email,
     holds_permission,
     record_throttle_failure,
@@ -63,6 +65,8 @@ from .models import (
     normalize_email_address,
 )
 from .session_store import SESSION_GENERATION_KEY, SessionStore
+
+logger = logging.getLogger(__name__)
 
 # --- Login and registration protection (CORE.5, spec 02 "Authentication")
 #
@@ -742,8 +746,86 @@ def record_password_change(
         {"has_usable_password": had_usable_password},
         {"has_usable_password": user.has_usable_password()},
     )
+    _clear_breached_password(user)  # CORE.28: a new password lifts the forced change
     end_sessions_after_change(user, reason="password", ctx=ctx)
     return changeset
+
+
+# --- Breached password at sign-in (CORE.28, owner decision Q-11)
+#
+# The check itself runs in `backends.BreachCheckBackend`, the one place that sees the password;
+# a sign-in that completes (`user_logged_in`) then records what it found. Only a timestamp is
+# stored on the user, never the password or a hash of it, and there is no automatic block: the
+# user must choose a new password before any other page (`BreachedPasswordMiddleware`).
+
+BREACH_FOUND = "accounts.user.password_breached"
+BREACH_NOTICE_TEMPLATE = "accounts.breached_password"
+
+
+def record_breached_password(
+    user: User, *, privileged: bool, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Flag `user` after a sign-in found the password in a known breach, audited.
+
+    `privileged` (a role that must use MFA: every vendor member, staff, editors) also queues a
+    notice to the platform operator's support address through the outbox, in the same
+    transaction. An account already flagged changes nothing.
+    """
+    changeset = ChangeSet()
+    if user.password_breached_at is not None:
+        return changeset
+    now = timezone.now()
+    changeset.update(
+        USER_MODEL,
+        str(user.public_id),
+        {"password_breached_at": None},
+        {"password_breached_at": now.isoformat()},
+    )
+    if dry_run:
+        return changeset
+    with transaction.atomic():
+        User.objects.filter(pk=user.pk).update(password_breached_at=now)
+        user.password_breached_at = now
+        record(
+            ctx,
+            BREACH_FOUND,
+            USER_MODEL,
+            str(user.public_id),
+            None,
+            {"privileged": privileged},
+        )
+        if privileged:
+            _notify_breached_password(user, now)
+    return changeset
+
+
+def _notify_breached_password(user: User, when: dt.datetime) -> None:
+    try:
+        recipient = current_operator().support_email.strip()
+    except NoPlatformOperator:
+        recipient = ""
+    if not recipient:
+        logger.warning(
+            "user %s signed in with a breached password and no platform support email is "
+            "configured: no staff notice sent",
+            user.public_id,
+        )
+        return
+    enqueue_email(
+        recipient=recipient,
+        template_key=BREACH_NOTICE_TEMPLATE,
+        language=settings.LANGUAGE_CODE,
+        context={"user_email": user.email, "user_id": str(user.public_id)},
+        idempotency_key=f"accounts:breached:{user.public_id}:{int(when.timestamp())}",
+    )
+
+
+def _clear_breached_password(user: User) -> None:
+    """Lift the forced change once a new password is set (part of the audited change)."""
+    User.objects.filter(pk=user.pk, password_breached_at__isnull=False).update(
+        password_breached_at=None
+    )
+    user.password_breached_at = None
 
 
 # --- Unlocking an account (CORE.8, owner decision Q-18)
