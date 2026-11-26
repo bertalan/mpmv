@@ -29,3 +29,12 @@ def test_the_image_chain_is_page_then_main_then_site_then_operator() -> None:
             {"a": "page_seo_image", "b": "page_image", "c": "site_image"}.get(expected, "x"), None
         )
     assert resolve_meta(page_title="x").image == ""
+
+
+def test_the_description_is_plain_text_cut_on_a_word() -> None:
+    """SEO.17: a rich-text summary becomes plain text within 160 characters."""
+    summary = "<p>" + " ".join(["ceramics"] * 40) + "</p>"
+    found = resolve_meta(page_title="x", summary=summary).description
+    assert len(found) <= 160
+    assert found.endswith("ceramics…")
+    assert "<" not in found
