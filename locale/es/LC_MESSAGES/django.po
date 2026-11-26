@@ -1032,6 +1032,10 @@ msgstr ""
 "Un título que se muestra sobre los productos, por ejemplo «Nuestros favoritos». Hasta 120 "
 "caracteres. Si lo deja vacío, no se muestra ningún título."
 
+#: apps/accounts/templates/email/accounts/breached_password/subject.txt
+msgid "A vendor or staff account signed in with a breached password"
+msgstr "Una cuenta de vendedor o del personal inició sesión con una contraseña filtrada"
+
 #: apps/events/admin_views.py apps/events/models.py
 msgid "A vendor's first events up to this number go through review."
 msgstr ""
@@ -2224,6 +2228,11 @@ msgstr "Modificar los datos"
 msgid "Change order %(number)s"
 msgstr "Modificar el pedido %(number)s"
 
+#: apps/accounts/templates/accounts/password/change.html
+#: themes/ride/templates/accounts/password/change.html
+msgid "Change password"
+msgstr "Cambiar la contraseña"
+
 #: apps/orders/amendment_engine.py
 msgid ""
 "Change the address and the carrier in two separate amendments: the address first, then the carrier"
@@ -2251,6 +2260,11 @@ msgstr "Modificar este pedido"
 #: themes/base/templates/components/garage_menu.html
 msgid "Change vehicle"
 msgstr "Cambiar vehículo"
+
+#: apps/accounts/templates/accounts/password/change.html
+#: themes/ride/templates/accounts/password/change.html
+msgid "Change your password"
+msgstr "Cambie su contraseña"
 
 #: apps/manager/templates/manager/amendment.html apps/manager/templates/manager/platform/orders.html
 msgid "Changes are disabled."
@@ -8948,9 +8962,11 @@ msgstr "Mostrar solo los productos de una categoría y de las categorías que de
 msgid "Show only the products of one vendor."
 msgstr "Mostrar solo los productos de un vendedor."
 
-#: apps/accounts/forms.py apps/manager/templates/manager/login.html apps/vendors/forms.py
+#: apps/accounts/forms.py apps/accounts/templates/accounts/password/change.html
+#: apps/manager/templates/manager/login.html apps/vendors/forms.py
 #: apps/vendors/templates/vendors/claim/account.html
-#: apps/vendors/templates/vendors/claim/sign_in.html themes/ride/templates/manager/login.html
+#: apps/vendors/templates/vendors/claim/sign_in.html
+#: themes/ride/templates/accounts/password/change.html themes/ride/templates/manager/login.html
 msgid "Show password"
 msgstr "Mostrar contraseña"
 
@@ -9614,6 +9630,18 @@ msgstr ""
 "facturas electrónicas emitidas a su nombre. 0000000 se utiliza junto con una dirección PEC, que "
 "indica en el campo PEC; XXXXXXX es para las empresas establecidas fuera de Italia. Su asesor "
 "fiscal o su programa de facturación pueden indicarle el código."
+
+#: apps/accounts/templates/email/accounts/breached_password/body.html
+#: apps/accounts/templates/email/accounts/breached_password/body.txt
+msgid ""
+"The account %(user_email)s (%(user_id)s) signed in with a password that appears in a known data "
+"breach. It must choose a new password and verify its second factor again before any other action. "
+"Its activity is not blocked. Review the account in the audit log."
+msgstr ""
+"La cuenta %(user_email)s (%(user_id)s) inició sesión con una contraseña que aparece en una "
+"filtración de datos conocida. Debe elegir una nueva contraseña y verificar de nuevo su segundo "
+"factor antes de cualquier otra acción. Su actividad no se bloquea. Revise la cuenta en el registro"
+" de auditoría."
 
 #: apps/vendors/models.py
 msgid "The address (https only) of your public page that explains returns."
@@ -15855,6 +15883,15 @@ msgstr ""
 #: apps/manager/event_block_forms.py
 msgid "Your own products, up to 12. Required."
 msgstr "Sus propios productos, hasta 12. Obligatorio."
+
+#: apps/accounts/templates/accounts/password/change.html
+#: themes/ride/templates/accounts/password/change.html
+msgid ""
+"Your password appears in a known data breach, so others may know it. Please choose a new password "
+"before you continue."
+msgstr ""
+"Su contraseña aparece en una filtración de datos conocida, así que otras personas podrían "
+"conocerla. Elija una nueva contraseña antes de continuar."
 
 #: apps/accounts/breach.py
 msgid "Your password must not appear in a known data breach."

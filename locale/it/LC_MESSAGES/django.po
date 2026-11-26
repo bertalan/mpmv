@@ -1033,6 +1033,10 @@ msgstr ""
 "Un titolo mostrato sopra i prodotti, per esempio 'I nostri preferiti'. Fino a 120 caratteri. Se lo"
 " lasci vuoto, non viene mostrato nessun titolo."
 
+#: apps/accounts/templates/email/accounts/breached_password/subject.txt
+msgid "A vendor or staff account signed in with a breached password"
+msgstr "Un account di venditore o dello staff ha effettuato l'accesso con una password violata"
+
 #: apps/events/admin_views.py apps/events/models.py
 msgid "A vendor's first events up to this number go through review."
 msgstr ""
@@ -2224,6 +2228,11 @@ msgstr "Modifica i dati"
 msgid "Change order %(number)s"
 msgstr "Modifica l'ordine %(number)s"
 
+#: apps/accounts/templates/accounts/password/change.html
+#: themes/ride/templates/accounts/password/change.html
+msgid "Change password"
+msgstr "Cambia password"
+
 #: apps/orders/amendment_engine.py
 msgid ""
 "Change the address and the carrier in two separate amendments: the address first, then the carrier"
@@ -2252,6 +2261,11 @@ msgstr "Modifica questo ordine"
 #: themes/base/templates/components/garage_menu.html
 msgid "Change vehicle"
 msgstr "Cambia veicolo"
+
+#: apps/accounts/templates/accounts/password/change.html
+#: themes/ride/templates/accounts/password/change.html
+msgid "Change your password"
+msgstr "Cambi la password"
 
 #: apps/manager/templates/manager/amendment.html apps/manager/templates/manager/platform/orders.html
 msgid "Changes are disabled."
@@ -8939,9 +8953,11 @@ msgstr "Mostra solo i prodotti di una categoria e delle categorie sotto di essa.
 msgid "Show only the products of one vendor."
 msgstr "Mostra solo i prodotti di un venditore."
 
-#: apps/accounts/forms.py apps/manager/templates/manager/login.html apps/vendors/forms.py
+#: apps/accounts/forms.py apps/accounts/templates/accounts/password/change.html
+#: apps/manager/templates/manager/login.html apps/vendors/forms.py
 #: apps/vendors/templates/vendors/claim/account.html
-#: apps/vendors/templates/vendors/claim/sign_in.html themes/ride/templates/manager/login.html
+#: apps/vendors/templates/vendors/claim/sign_in.html
+#: themes/ride/templates/accounts/password/change.html themes/ride/templates/manager/login.html
 msgid "Show password"
 msgstr "Mostra password"
 
@@ -9601,6 +9617,18 @@ msgstr ""
 "elettroniche a te intestate. 0000000 si usa insieme a un indirizzo PEC, che indichi nel campo PEC;"
 " XXXXXXX è per le imprese con sede fuori dall'Italia. Il codice te lo può dire il tuo "
 "commercialista o il tuo programma di fatturazione."
+
+#: apps/accounts/templates/email/accounts/breached_password/body.html
+#: apps/accounts/templates/email/accounts/breached_password/body.txt
+msgid ""
+"The account %(user_email)s (%(user_id)s) signed in with a password that appears in a known data "
+"breach. It must choose a new password and verify its second factor again before any other action. "
+"Its activity is not blocked. Review the account in the audit log."
+msgstr ""
+"L'account %(user_email)s (%(user_id)s) ha effettuato l'accesso con una password che compare in una"
+" violazione di dati nota. Deve scegliere una nuova password e verificare di nuovo il secondo "
+"fattore prima di qualsiasi altra azione. La sua attività non è bloccata. Controlli l'account nel "
+"registro di audit."
 
 #: apps/vendors/models.py
 msgid "The address (https only) of your public page that explains returns."
@@ -15848,6 +15876,15 @@ msgstr ""
 #: apps/manager/event_block_forms.py
 msgid "Your own products, up to 12. Required."
 msgstr "I tuoi prodotti, fino a 12. Obbligatorio."
+
+#: apps/accounts/templates/accounts/password/change.html
+#: themes/ride/templates/accounts/password/change.html
+msgid ""
+"Your password appears in a known data breach, so others may know it. Please choose a new password "
+"before you continue."
+msgstr ""
+"La Sua password compare in una violazione di dati nota, quindi altri potrebbero conoscerla. Scelga"
+" una nuova password prima di continuare."
 
 #: apps/accounts/breach.py
 msgid "Your password must not appear in a known data breach."
