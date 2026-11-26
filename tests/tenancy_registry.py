@@ -614,6 +614,9 @@ ENDPOINTS: dict[str, Access] = {
     ),
     "sessions:list": NoVendorData(OWN_ACCOUNT + " The user's own sessions (CORE.24)."),
     "sessions:end_others": NoVendorData(OWN_ACCOUNT + " Ends the user's own other sessions."),
+    "password:change": NoVendorData(
+        OWN_ACCOUNT + " Changes the user's own password after the current one (CORE.28)."
+    ),
     "sessions:end_one": NoVendorData(
         OWN_ACCOUNT + " The session is looked up among the user's own (CORE.24).",
         kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},

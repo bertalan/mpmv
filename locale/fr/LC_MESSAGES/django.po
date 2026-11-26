@@ -1049,6 +1049,10 @@ msgstr ""
 "Un titre affiché au-dessus des produits, par exemple 'Nos coups de cœur'. 120 caractères au "
 "maximum. Si vous le laissez vide, aucun titre n'est affiché."
 
+#: apps/accounts/templates/email/accounts/breached_password/subject.txt
+msgid "A vendor or staff account signed in with a breached password"
+msgstr "Un compte vendeur ou du personnel s'est connecté avec un mot de passe compromis"
+
 #: apps/events/admin_views.py apps/events/models.py
 msgid "A vendor's first events up to this number go through review."
 msgstr "Les premiers événements d'un vendeur, jusqu'à ce nombre, passent par une vérification."
@@ -2270,6 +2274,11 @@ msgstr "Modifier les informations"
 msgid "Change order %(number)s"
 msgstr "Modifier la commande %(number)s"
 
+#: apps/accounts/templates/accounts/password/change.html
+#: themes/ride/templates/accounts/password/change.html
+msgid "Change password"
+msgstr "Changer le mot de passe"
+
 #: apps/orders/amendment_engine.py
 msgid ""
 "Change the address and the carrier in two separate amendments: the address first, then the carrier"
@@ -2298,6 +2307,11 @@ msgstr "Modifier cette commande"
 #: themes/base/templates/components/garage_menu.html
 msgid "Change vehicle"
 msgstr "Changer de véhicule"
+
+#: apps/accounts/templates/accounts/password/change.html
+#: themes/ride/templates/accounts/password/change.html
+msgid "Change your password"
+msgstr "Changez votre mot de passe"
 
 #: apps/manager/templates/manager/amendment.html apps/manager/templates/manager/platform/orders.html
 msgid "Changes are disabled."
@@ -9063,9 +9077,11 @@ msgstr "Afficher uniquement les produits d'une catégorie et des catégories qui
 msgid "Show only the products of one vendor."
 msgstr "Afficher uniquement les produits d'un vendeur."
 
-#: apps/accounts/forms.py apps/manager/templates/manager/login.html apps/vendors/forms.py
+#: apps/accounts/forms.py apps/accounts/templates/accounts/password/change.html
+#: apps/manager/templates/manager/login.html apps/vendors/forms.py
 #: apps/vendors/templates/vendors/claim/account.html
-#: apps/vendors/templates/vendors/claim/sign_in.html themes/ride/templates/manager/login.html
+#: apps/vendors/templates/vendors/claim/sign_in.html
+#: themes/ride/templates/accounts/password/change.html themes/ride/templates/manager/login.html
 msgid "Show password"
 msgstr "Afficher le mot de passe"
 
@@ -9732,6 +9748,18 @@ msgstr ""
 "électroniques qui vous sont adressées. 0000000 s'utilise avec une adresse PEC, que vous indiquez "
 "dans le champ PEC ; XXXXXXX est destiné aux entreprises établies hors d'Italie. Votre comptable ou"
 " votre logiciel de facturation peut vous communiquer ce code."
+
+#: apps/accounts/templates/email/accounts/breached_password/body.html
+#: apps/accounts/templates/email/accounts/breached_password/body.txt
+msgid ""
+"The account %(user_email)s (%(user_id)s) signed in with a password that appears in a known data "
+"breach. It must choose a new password and verify its second factor again before any other action. "
+"Its activity is not blocked. Review the account in the audit log."
+msgstr ""
+"Le compte %(user_email)s (%(user_id)s) s'est connecté avec un mot de passe qui figure dans une "
+"fuite de données connue. Il doit choisir un nouveau mot de passe et vérifier de nouveau son second"
+" facteur avant toute autre action. Son activité n'est pas bloquée. Veuillez vérifier le compte "
+"dans le journal d'audit."
 
 #: apps/vendors/models.py
 msgid "The address (https only) of your public page that explains returns."
@@ -16077,6 +16105,15 @@ msgstr ""
 #: apps/manager/event_block_forms.py
 msgid "Your own products, up to 12. Required."
 msgstr "Vos propres produits, 12 au maximum. Obligatoire."
+
+#: apps/accounts/templates/accounts/password/change.html
+#: themes/ride/templates/accounts/password/change.html
+msgid ""
+"Your password appears in a known data breach, so others may know it. Please choose a new password "
+"before you continue."
+msgstr ""
+"Votre mot de passe figure dans une fuite de données connue : d'autres personnes pourraient le "
+"connaître. Veuillez choisir un nouveau mot de passe avant de continuer."
 
 #: apps/accounts/breach.py
 msgid "Your password must not appear in a known data breach."

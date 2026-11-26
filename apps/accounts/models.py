@@ -71,6 +71,10 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
     # db_default: rows inserted by historical models in migration tests (and old workers
     # during a deploy) do not know the column (CORE.24).
     session_generation = models.PositiveIntegerField(default=0, db_default=0, editable=False)
+    # CORE.28: when a sign-in found the password in a known breach. Set, the user must choose a
+    # new password before any other page; a password change clears it. Never the password or a
+    # hash of it. Nullable, so rows inserted without the column (old workers) stay unflagged.
+    password_breached_at = models.DateTimeField(null=True, blank=True, editable=False)
 
     objects: ClassVar[UserManager] = UserManager()
 
