@@ -532,6 +532,9 @@ ENDPOINTS: dict[str, Access] = {
     "healthz": NoVendorData("Liveness probe with a constant answer."),
     "readyz": NoVendorData("Readiness probe: a status only, no data."),
     "robots_txt": NoVendorData("robots.txt (SEO.8): constant text for crawlers; no vendor data."),
+    "favicon:ico": NoVendorData(
+        "/favicon.ico (THM.38): redirect to a static theme icon; no tenant data."
+    ),
     "sitemap": NoVendorData("Sitemap index (SEO.2): public page URLs only, no tenant data."),
     "sitemap_section": NoVendorData(
         "Per-language, per-type sitemap (SEO.2): public page URLs only, no tenant data.",

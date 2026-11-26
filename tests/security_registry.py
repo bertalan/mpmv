@@ -63,6 +63,7 @@ PUBLIC: dict[str, str] = {
     "healthz": "Liveness probe with a constant answer.",
     "readyz": "Readiness probe: a status only, no data.",
     "robots_txt": "robots.txt (SEO.8): constant text for crawlers, no vendor data.",
+    "favicon:ico": "/favicon.ico (THM.38): anonymous GET answers 302 to a static icon, no data.",
     "email_webhook": "Email provider feedback: refused unless the payload is signed (ARC.16).",
     "payments_webhook": (
         "Payment provider events (PAY.2): refused unless the payload is signed and fresh; with "

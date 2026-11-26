@@ -14,3 +14,13 @@
 # files = ["fonts/barlow-400.woff2"]   # paths relative to static/themes/<slug>/
 #
 # `base` uses the system font stack and inline SVG only, so it has no assets yet.
+
+# THM.38: the default site icon, a rounded square with an "M", hand-drawn as SVG; the PNG sizes
+# are rendered from the same shapes. Own work.
+[[asset]]
+name = "MPMV site icon (base)"
+kind = "image"
+source = "https://github.com/bertalan/mpmv"
+author = "MPMV contributors"
+license = "CC0-1.0"
+files = ["site-icon/icon.svg", "site-icon/icon-32.png", "site-icon/apple-touch-icon.png"]
