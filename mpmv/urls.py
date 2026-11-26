@@ -80,6 +80,7 @@ urlpatterns = [
     # Staff-only styleguide of the active theme (THM.4); a string, as no app imports themes.
     path("_styleguide/", include("apps.themes.urls")),
     path("palette/", include("apps.themes.palette_urls")),  # site palette CSS (THM.31)
+    path("", include("apps.themes.favicon_urls")),  # /favicon.ico (THM.38)
     # Temporary staff "Site links" page for STAGE testing (OPS.12); remove before LIVE.
     path("_links/", include("apps.seo.urls")),
     *i18n_patterns(

@@ -23,6 +23,9 @@ state; fixed to the bottom of the viewport, last in reading order like in the ta
   <title>{% block title %}{% firstof page.seo_title page.title %} · {{ site_name }}{% endblock %}</title>
   {% block description %}{% page_description_meta %}{% endblock %}
   <meta name="htmx-config" content='{"allowEval":false,"allowScriptTags":false,"includeIndicatorStyles":false,"selfRequestsOnly":true}'>
+  <link rel="icon" href="{% site_icon_href 'icon.svg' %}" type="image/svg+xml">
+  <link rel="icon" href="{% site_icon_href 'icon-32.png' %}" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="{% site_icon_href 'apple-touch-icon.png' %}">
   {% with "themes/"|add:theme.slug|add:"/theme.css" as theme_css %}<link rel="stylesheet" href="{% static theme_css %}">{% endwith %}
   {% palette_css_href as palette_href %}{% if palette_href %}<link rel="stylesheet" href="{{ palette_href }}">{% endif %}
   {% block foundation_scripts %}{% endblock %}

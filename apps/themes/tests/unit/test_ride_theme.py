@@ -387,6 +387,8 @@ def test_placeholder_images_are_our_own_svg_with_a_licence_entry() -> None:
     for entry in images:
         assert entry["license"] == "CC0-1.0"
         for file in entry["files"]:
+            if file.startswith("site-icon/") and file.endswith(".png"):
+                continue  # THM.38: PNG sizes rendered from our own icon.svg
             assert file.endswith(".svg")
             svg = (STATIC / file).read_text(encoding="utf-8")
             assert "<image" not in svg  # no embedded raster (stock photo)

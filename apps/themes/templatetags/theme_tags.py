@@ -20,7 +20,7 @@ from django.utils.safestring import SafeString
 from .. import engine
 from ..appearance import active_payment_appearance
 from ..flags import flag_path
-from ..services import active_palette, palette_href
+from ..services import active_palette, icon_url, palette_href
 
 register = template.Library()
 
@@ -132,6 +132,12 @@ def in_groups(value: object, size: object) -> list[list[object]]:
         step = 1
     step = step if step > 0 else 1
     return [items[start : start + step] for start in range(0, len(items), step)]
+
+
+@register.simple_tag(takes_context=True)
+def site_icon_href(context: template.Context, name: str) -> str:
+    """The static URL of the active theme's site icon `name` (THM.38), `base`'s when it has none."""
+    return icon_url(context["theme"].slug, name)
 
 
 @register.simple_tag(takes_context=True)
