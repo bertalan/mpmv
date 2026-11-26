@@ -992,12 +992,9 @@ def expand_closures(
     return tuple(sorted(found, key=lambda c: (c.start, c.end)))
 
 
-def earliest_dispatch_date(ordered_on: date, closed: Sequence[ClosedPeriod]) -> date:
-    """`ordered_on`, or the day after the closure it falls in.
-
-    Overlapping and adjacent periods (next start no later than the day after the current end)
-    count as one closure, so 1-15 and 16-31 August leave on 1 September.
-    """
+def merge_periods(closed: Sequence[ClosedPeriod]) -> list[ClosedPeriod]:
+    """Overlapping and adjacent periods (next start no later than the day after the current
+    end) as one, sorted."""
     merged: list[ClosedPeriod] = []
     for period in sorted(closed, key=lambda c: (c.start, c.end)):
         if merged and period.start <= merged[-1].end + timedelta(days=1):
@@ -1005,10 +1002,61 @@ def earliest_dispatch_date(ordered_on: date, closed: Sequence[ClosedPeriod]) -> 
                 merged[-1] = ClosedPeriod(merged[-1].start, period.end)
         else:
             merged.append(period)
-    for period in merged:
+    return merged
+
+
+def earliest_dispatch_date(ordered_on: date, closed: Sequence[ClosedPeriod]) -> date:
+    """`ordered_on`, or the day after the closure it falls in.
+
+    Overlapping and adjacent periods count as one closure, so 1-15 and 16-31 August leave on
+    1 September.
+    """
+    for period in merge_periods(closed):
         if period.start <= ordered_on <= period.end:
             return period.end + timedelta(days=1)
     return ordered_on
+
+
+@dataclass(frozen=True)
+class ClosureNotice:
+    """What the neutral notice says: the merged closed period and the first dispatch day."""
+
+    start: date
+    end: date
+    dispatch_on: date
+
+
+# A notice starts at most 60 days ahead (`notice_days`), and later periods may chain onto the
+# one shown, so the notice looks this far ahead for periods to merge.
+NOTICE_LOOKAHEAD_DAYS = 730
+
+
+def closure_notice_for(
+    rules: Sequence[tuple[ClosureRule, int]], today: date
+) -> ClosureNotice | None:
+    """The notice to show on `today` for `(rule, notice_days)` pairs, or None.
+
+    A period shows from `notice_days` before its start until its end. Periods that overlap or
+    touch show as one merged period, visible while any of its parts is; the first such period
+    that has not ended is the one shown.
+    """
+    window_end = today + timedelta(days=NOTICE_LOOKAHEAD_DAYS)
+    parts: list[tuple[ClosedPeriod, int]] = [
+        (period, days)
+        for rule, days in rules
+        for period in expand_closures([rule], today, window_end)
+    ]
+    for merged in merge_periods([period for period, _ in parts]):
+        if merged.end < today:
+            continue
+        visible = any(
+            period.start - timedelta(days=days) <= today <= period.end
+            for period, days in parts
+            if merged.start <= period.start and period.end <= merged.end
+        )
+        if visible:
+            return ClosureNotice(merged.start, merged.end, merged.end + timedelta(days=1))
+    return None
 
 
 def delivery_window(dispatch_on: date, min_days: int, max_days: int) -> tuple[date, date]:

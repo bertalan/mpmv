@@ -114,6 +114,7 @@ class PackageView:
     summary_lines: list[dict[str, str]] = field(default_factory=list)
     total: str = ""
     note: str = ""
+    vendor_id: int = 0
 
 
 def thumbnail_alt(name: str, alt: str) -> str:
@@ -236,6 +237,7 @@ def package_views(
             messages=shared,
             field_name=f"ship_{vendor.public_id}" if vendor is not None else "",
             summary_id=f"package-{index}",
+            vendor_id=package.vendor_id,
         )
         if quote and vendor is not None and vendor.slug:
             view.quote_url = slugs.vendor_path(

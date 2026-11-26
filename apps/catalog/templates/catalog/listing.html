@@ -1,5 +1,5 @@
 {% extends "layouts/base.html" %}
-{% load i18n static event_feeds events_tags %}
+{% load i18n static event_feeds events_tags dispatch %}
 {% comment %}
   Listing page (CAT.8): category, taxonomy term, brand, vendor storefront. Minimal and semantic;
   THM.3 and THM.7 restyle it. No inline script or style (the CSP has no 'unsafe-inline'): the
@@ -25,6 +25,7 @@
       <p class="listing-count">{% blocktranslate count counter=window.total %}{{ counter }} product{% plural %}{{ counter }} products{% endblocktranslate %}</p>
     </header>
     {% include "components/garage_banner.html" %}
+    {% if scope.vendor %}{% closure_notice scope.vendor.pk %}{% endif %}
     {% if vendor_profile %}{% include "catalog/includes/vendor_profile.html" %}{% endif %}
     {% if brand_profile and not brand_profile.is_empty %}{% include "catalog/includes/brand_profile.html" %}{% endif %}
     {% if editorial.before %}{{ editorial.before }}{% endif %}

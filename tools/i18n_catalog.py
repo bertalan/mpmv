@@ -63,6 +63,7 @@ SCOPES = (
     "apps/orders/templates",
     "apps/seo",
     "apps/orders/ui",
+    "apps/shipping/templates/shipping",  # the closure notice (VEN.20)
     "apps/vendors/templates/email",  # the vendor emails (I18N.20 3c)
     "apps/events/templates/email",  # the event moderation emails (EVT.11)
     "apps/catalog/templates/email",  # brand rejected notice to the vendor (I18N.20 3c)

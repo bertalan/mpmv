@@ -1,5 +1,6 @@
-{% load i18n responsive_images %}<section class="package" aria-labelledby="{{ package.summary_id }}-title">
+{% load i18n responsive_images dispatch %}<section class="package" aria-labelledby="{{ package.summary_id }}-title">
   <h2 id="{{ package.summary_id }}-title">{% blocktranslate with vendor=package.vendor %}Sold by {{ vendor }}{% endblocktranslate %}</h2>
+  {% if mode == "cart" %}{% closure_notice package.vendor_id %}{% endif %}
   {% for message in package.messages %}{% include "components/alert.html" with level="warning" message=message only %}{% endfor %}
   {% if package.quote_url %}<p><a class="button button--secondary" href="{{ package.quote_url }}">{% translate "Request a quote" %}</a></p>{% endif %}
   <ul class="cart-lines" role="list">

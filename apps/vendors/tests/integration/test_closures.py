@@ -1,6 +1,7 @@
 """VEN.20: audited services for a vendor's holiday and closure schedule (spec 04, case 10)."""
 
 import datetime as dt
+from typing import Any
 
 import pytest
 from django.core.exceptions import ValidationError
@@ -153,3 +154,25 @@ def test_factory_row_can_be_updated_through_the_service() -> None:
     update_closure(closure, notice_days=7, ctx=CTX, today=TODAY)
     closure.refresh_from_db()
     assert closure.notice_days == 7
+
+
+def test_a_change_moves_the_cache_generation_and_a_dry_run_does_not(
+    django_capture_on_commit_callbacks: Any,
+) -> None:
+    from apps.vendors.closure_cache import generation
+
+    vendor = VendorFactory.create()
+    before = generation(vendor.pk)
+    with django_capture_on_commit_callbacks(execute=True):
+        add_closure(vendor, D(2027, 8, 1), D(2027, 8, 15), ctx=CTX, today=TODAY, dry_run=True)
+    assert generation(vendor.pk) == before
+    with django_capture_on_commit_callbacks(execute=True):
+        add_closure(vendor, D(2027, 8, 1), D(2027, 8, 15), ctx=CTX, today=TODAY)
+    closure = VendorClosure.objects.get(vendor=vendor)
+    assert generation(vendor.pk) == before + 1
+    with django_capture_on_commit_callbacks(execute=True):
+        update_closure(closure, notice_days=3, ctx=CTX, today=TODAY)
+    assert generation(vendor.pk) == before + 2
+    with django_capture_on_commit_callbacks(execute=True):
+        delete_closure(closure, ctx=CTX, today=TODAY)
+    assert generation(vendor.pk) == before + 3

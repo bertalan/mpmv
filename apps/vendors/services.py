@@ -77,6 +77,7 @@ from apps.core.uploads import UploadRefused, check_document
 from apps.core.validity import next_start_error
 
 from . import engine
+from .closure_cache import drop_closure_cache
 from .models import (
     CommissionRule,
     ContractAcceptance,
@@ -4104,6 +4105,24 @@ def closure_messages() -> dict[str, str]:
     }
 
 
+def _saving(closure: VendorClosure) -> Callable[[], None]:
+    """The write of `run_mutation`: save, then drop the vendor's cached notices (on commit)."""
+
+    def write() -> None:
+        closure.save()
+        drop_closure_cache(closure.vendor_id)
+
+    return write
+
+
+def _deleting(closure: VendorClosure) -> Callable[[], None]:
+    def write() -> None:
+        closure.delete()
+        drop_closure_cache(closure.vendor_id)
+
+    return write
+
+
 def _closure_problems(closure: VendorClosure, today: dt.date) -> None:
     coded = engine.closure_errors(
         closure.start_date,
@@ -4152,7 +4171,7 @@ def add_closure(
     _closure_problems(closure, today or business_today())
     changes = ChangeSet()
     changes.create(CLOSURE_MODEL, str(closure.public_id), closure.snapshot())
-    return run_mutation(changes, closure.save, ctx=ctx, action=CLOSURE_ADDED, dry_run=dry_run)
+    return run_mutation(changes, _saving(closure), ctx=ctx, action=CLOSURE_ADDED, dry_run=dry_run)
 
 
 def update_closure(
@@ -4181,7 +4200,9 @@ def update_closure(
         _closure_problems(stored, now)
         changes = ChangeSet()
         changes.update(CLOSURE_MODEL, str(stored.public_id), before, stored.snapshot())
-        return run_mutation(changes, stored.save, ctx=ctx, action=CLOSURE_CHANGED, dry_run=dry_run)
+        return run_mutation(
+            changes, _saving(stored), ctx=ctx, action=CLOSURE_CHANGED, dry_run=dry_run
+        )
 
 
 def delete_closure(
@@ -4197,5 +4218,5 @@ def delete_closure(
         changes = ChangeSet()
         changes.delete(CLOSURE_MODEL, str(stored.public_id), stored.snapshot())
         return run_mutation(
-            changes, stored.delete, ctx=ctx, action=CLOSURE_REMOVED, dry_run=dry_run
+            changes, _deleting(stored), ctx=ctx, action=CLOSURE_REMOVED, dry_run=dry_run
         )
