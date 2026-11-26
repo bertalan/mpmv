@@ -42,3 +42,30 @@ def placeholder_webp(key: str, colour: tuple[int, int, int], *, scale: float = 1
     buffer = io.BytesIO()
     image.save(buffer, format="WEBP", quality=80, method=4)
     return buffer.getvalue()
+
+
+def logo_png(colour: tuple[int, int, int], size: int) -> bytes:
+    """SEO.18: a square PNG of the site-icon mark (THM.38): a rounded square in `colour` with a
+    white "M" drawn as a polygon, so no font file is needed."""
+    image = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    draw.rounded_rectangle((0, 0, size - 1, size - 1), radius=size // 5, fill=(*colour, 255))
+    u = size / 16  # the mark on a 16-unit grid
+    points = [
+        (3, 12),
+        (3, 4),
+        (5, 4),
+        (8, 8),
+        (11, 4),
+        (13, 4),
+        (13, 12),
+        (11, 12),
+        (11, 7.5),
+        (8, 11),
+        (5, 7.5),
+        (5, 12),
+    ]
+    draw.polygon([(x * u, y * u) for x, y in points], fill=(255, 255, 255, 255))
+    out = io.BytesIO()
+    image.save(out, format="PNG", optimize=True)
+    return out.getvalue()
