@@ -11,7 +11,6 @@ import unicodedata
 from collections.abc import Iterable, Mapping
 from typing import Any
 
-from django.utils.html import strip_tags
 from django.utils.text import slugify as _django_slugify
 
 META_DESCRIPTION_LIMIT = 160
@@ -85,6 +84,8 @@ def nfc_text_fields(instance: Any) -> None:
 
 def plain_text(value: str | None) -> str:
     """`value` without HTML tags or entities, on one line with single spaces."""
+    from django.utils.html import strip_tags  # lazy: pure engines import this module
+
     return _SPACES.sub(" ", html.unescape(strip_tags(value or ""))).strip()
 
 
