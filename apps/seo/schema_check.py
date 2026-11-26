@@ -1,8 +1,9 @@
 """A schema check for structured data graphs (SEO.1; SEO.7 extends it to the other page types).
 
 `rich_result_errors` lists what Google's rich results require of the nodes it knows (Product,
-BreadcrumbList, Article, ProfilePage and Event); `dangling_references` lists every `@id`
-reference that resolves to no node of the same graph.
+BreadcrumbList, Article, ProfilePage and Event) and the property-domain errors the schema.org
+validator reports (SEO.16); `dangling_references` lists every `@id` reference that resolves to
+no node of the same graph.
 """
 
 from collections.abc import Collection, Iterator, Mapping
@@ -35,6 +36,59 @@ def dangling_references(document: Mapping[str, Any]) -> list[str]:
             if set(child) == {"@id"} and child["@id"] not in defined:
                 missing.append(str(child["@id"]))
     return list(dict.fromkeys(missing))
+
+
+# SEO.16: the schema.org types the graph emits that are a `CreativeWork` (the range of
+# `hasPart`) and the ones that define `inLanguage` (`CreativeWork` and `Event`, among those
+# emitted). A type outside both sets, such as `ItemList`, `Organization` or `Product`, has none.
+CREATIVE_WORKS = frozenset(
+    {
+        "WebPage",
+        "ItemPage",
+        "CollectionPage",
+        "ProfilePage",
+        "AboutPage",
+        "ContactPage",
+        "SearchResultsPage",
+        "FAQPage",
+        "WebSite",
+        "Article",
+        "BlogPosting",
+        "ImageObject",
+    }
+)
+HAS_IN_LANGUAGE = CREATIVE_WORKS | {"Event"}
+
+
+def _label(node: Mapping[str, Any]) -> str:
+    return f"{node.get('@type')} {node.get('@id') or '(no @id)'}"
+
+
+def _domain_errors(document: Mapping[str, Any]) -> list[str]:
+    """`inLanguage` on a type that does not define it, and a `hasPart` that is not a
+    `CreativeWork`; a reference outside the graph is not judged."""
+    kinds = {node["@id"]: node.get("@type") for node in _nodes(document) if "@id" in node}
+    errors: list[str] = []
+    for node in _walk(list(_nodes(document))):
+        kind = node.get("@type")
+        if not isinstance(kind, str):
+            continue
+        if "inLanguage" in node and kind not in HAS_IN_LANGUAGE:
+            errors.append(f"{_label(node)}: inLanguage is not a property of {kind}")
+        parts = node.get("hasPart") or []
+        for part in parts if isinstance(parts, list) else [parts]:
+            if not isinstance(part, Mapping):
+                continue
+            target = part.get("@type") or kinds.get(part.get("@id"))
+            if isinstance(target, str) and target not in CREATIVE_WORKS:
+                errors.append(
+                    f"{_label(node)}: hasPart points at {_article(target)}, not a CreativeWork"
+                )
+    return errors
+
+
+def _article(kind: str) -> str:
+    return f"an {kind}" if kind[:1] in "AEIOU" else f"a {kind}"
 
 
 def _offer_errors(label: str, offer: Mapping[str, Any]) -> list[str]:
@@ -93,6 +147,7 @@ def rich_result_errors(
     """`person_names` are the normalised names of the natural persons the document is about
     (`engine.natural_person_names`): no `Organization` may carry one (SEO.15)."""
     errors: list[str] = _person_errors(document, person_names) if person_names else []
+    errors += _domain_errors(document)
     for node in _nodes(document):
         kind = node.get("@type")
         if kind in {"Product", "ProductGroup"}:

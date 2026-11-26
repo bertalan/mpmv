@@ -40,6 +40,7 @@ from django.http import HttpRequest
 from . import encryption, flags
 from .crypto import DecryptionError
 from .http import trusted_proxy_networks
+from .migration_safety import migrations_pending
 from .models import TranslationModel, known_time_zones
 
 # Workflow fields of the base model: never translated texts.
@@ -446,6 +447,8 @@ def check_encrypted_data(
     for alias in databases:
         connection = connections[alias]
         for column in encryption.encrypted_columns():
+            if migrations_pending(column.model._meta.app_label, database=alias):
+                continue  # CORE.27: `migrate` checks first; the column may not exist yet
             try:
                 with transaction.atomic(using=alias):
                     usage = encryption.key_usage(

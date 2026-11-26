@@ -11,8 +11,11 @@ from apps.core.audit import user_context
 from apps.core.http import client_ip
 from apps.core.i18n import configured_languages
 
+from .backends import BREACH_FOUND_ATTR
 from .models import User
 from .services import (
+    mfa_required,
+    record_breached_password,
     record_failed_login,
     record_successful_login,
     set_preferred_language,
@@ -74,3 +77,15 @@ def index_session_on_login(
     index_session(
         user, session, user_agent=request.headers.get("user-agent"), ip=client_ip(request)
     )
+
+
+def flag_breached_on_login(
+    sender: Any, request: HttpRequest | None, user: AbstractBaseUser, **kwargs: Any
+) -> None:
+    """CORE.28: the sign-in's password was found in a breach (`backends.BreachCheckBackend`):
+    flag the account, audit it and, for a role that must use MFA, tell the platform staff."""
+    if not isinstance(user, User) or not getattr(user, BREACH_FOUND_ATTR, False):
+        return
+    setattr(user, BREACH_FOUND_ATTR, False)
+    ip = client_ip(request) if request is not None else None
+    record_breached_password(user, privileged=mfa_required(user), ctx=user_context(user, ip))

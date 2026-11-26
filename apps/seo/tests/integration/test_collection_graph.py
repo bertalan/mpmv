@@ -142,7 +142,8 @@ def test_category_listing_is_a_collection_page_with_the_products_of_the_page(
     web = of(graph, "CollectionPage")
     [items] = item_lists(graph)
     assert web["mainEntity"] == {"@id": items["@id"]}
-    assert web["inLanguage"] == items["inLanguage"] == language
+    assert web["inLanguage"] == language
+    assert "inLanguage" not in items  # SEO.16
     assert items["numberOfItems"] == 3
     elements = items["itemListElement"]
     assert [e["position"] for e in elements] == [1, 2, 3]
@@ -199,7 +200,7 @@ def test_vendor_storefront_is_a_profile_page_with_its_products() -> None:
     assert len(shop) == 1
     assert web["mainEntity"] == {"@id": shop[0]["@id"]}
     [items] = item_lists(graph)
-    assert {"@id": items["@id"]} in web["hasPart"]
+    assert "hasPart" not in web  # SEO.16: hasPart only takes a CreativeWork
     assert items["itemListElement"][0]["item"]["name"] == "Storefront mug"
 
 

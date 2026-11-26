@@ -742,6 +742,14 @@ msgstr ""
 "Una domanda che farebbe un nuovo venditore, per esempio 'Quanto costa?'. Obbligatoria: senza non "
 "si può salvare la domanda."
 
+#: apps/vendors/services.py
+msgid "A range that has already ended cannot be saved."
+msgstr "Un intervallo già concluso non può essere salvato."
+
+#: apps/vendors/services.py
+msgid "A range that has ended stays as history."
+msgstr "Un intervallo concluso resta nello storico."
+
 #: apps/manager/amendment_views.py
 msgid "a refund to the customer"
 msgstr "un rimborso al cliente"
@@ -1033,6 +1041,10 @@ msgstr ""
 "Un titolo mostrato sopra i prodotti, per esempio 'I nostri preferiti'. Fino a 120 caratteri. Se lo"
 " lasci vuoto, non viene mostrato nessun titolo."
 
+#: apps/accounts/templates/email/accounts/breached_password/subject.txt
+msgid "A vendor or staff account signed in with a breached password"
+msgstr "Un account di venditore o dello staff ha effettuato l'accesso con una password violata"
+
 #: apps/events/admin_views.py apps/events/models.py
 msgid "A vendor's first events up to this number go through review."
 msgstr ""
@@ -1055,6 +1067,18 @@ msgstr "Per quella parte è già stato registrato un recesso."
 #: apps/compliance/templates/compliance/withdrawal_choose.html
 msgid "a withdrawal was already recorded."
 msgstr "è già stato registrato un recesso."
+
+#: apps/vendors/services.py
+msgid "A yearly range cannot end on 29 February."
+msgstr "Un intervallo annuale non può terminare il 29 febbraio."
+
+#: apps/vendors/services.py
+msgid "A yearly range cannot start on 29 February."
+msgstr "Un intervallo annuale non può iniziare il 29 febbraio."
+
+#: apps/vendors/services.py
+msgid "A yearly range must last less than one year."
+msgstr "Un intervallo annuale deve durare meno di un anno."
 
 #: apps/manager/forms.py
 msgid "About the shop"
@@ -1304,6 +1328,14 @@ msgstr ""
 #: apps/manager/templates/manager/platform/stray_payments.html
 msgid "Age in days"
 msgstr "Età in giorni"
+
+#: themes/base/templates/components/ai_image_label.html
+msgid "AI-edited image"
+msgstr "Immagine modificata con IA"
+
+#: themes/base/templates/components/ai_image_label.html
+msgid "AI-generated image"
+msgstr "Immagine generata con IA"
 
 #: apps/core/templates/email/core/ops_alert/body.html
 #: apps/core/templates/email/core/ops_alert/body.txt
@@ -2224,6 +2256,11 @@ msgstr "Modifica i dati"
 msgid "Change order %(number)s"
 msgstr "Modifica l'ordine %(number)s"
 
+#: apps/accounts/templates/accounts/password/change.html
+#: themes/ride/templates/accounts/password/change.html
+msgid "Change password"
+msgstr "Cambia password"
+
 #: apps/orders/amendment_engine.py
 msgid ""
 "Change the address and the carrier in two separate amendments: the address first, then the carrier"
@@ -2252,6 +2289,11 @@ msgstr "Modifica questo ordine"
 #: themes/base/templates/components/garage_menu.html
 msgid "Change vehicle"
 msgstr "Cambia veicolo"
+
+#: apps/accounts/templates/accounts/password/change.html
+#: themes/ride/templates/accounts/password/change.html
+msgid "Change your password"
+msgstr "Cambi la password"
 
 #: apps/manager/templates/manager/amendment.html apps/manager/templates/manager/platform/orders.html
 msgid "Changes are disabled."
@@ -3873,6 +3915,10 @@ msgstr "Cerca l'ordine"
 msgid "Fingerprint %(hash)s."
 msgstr "Impronta %(hash)s."
 
+#: apps/vendors/models.py
+msgid "First closed day."
+msgstr "Primo giorno di chiusura."
+
 #: apps/manager/event_forms.py
 msgid "First day"
 msgstr "Primo giorno"
@@ -4392,6 +4438,10 @@ msgstr ""
 "Quanti giorni ha il consumatore per restituire la merce dopo averla ricevuta. La legge fissa un "
 "minimo di 14 giorni per le vendite ai consumatori, quindi un numero inferiore viene rifiutato. "
 "Obbligatorio."
+
+#: apps/vendors/models.py
+msgid "How many days before the closure the notice appears (0 to 60)."
+msgstr "Quanti giorni prima della chiusura compare l'avviso (da 0 a 60)."
 
 #: apps/cms/forms_pages.py
 msgid ""
@@ -5021,6 +5071,10 @@ msgstr "Lingua: %(language)s. Lingua originale dell’evento: %(original)s."
 msgid "Languages:"
 msgstr "Lingue:"
 
+#: apps/vendors/models.py
+msgid "Last closed day."
+msgstr "Ultimo giorno di chiusura."
+
 #: apps/manager/event_forms.py
 msgid "Last day"
 msgstr "Ultimo giorno"
@@ -5578,6 +5632,10 @@ msgstr "I nomi cambiano per lingua"
 #: apps/seo/providers.py
 msgid "Necessary"
 msgstr "Necessari"
+
+#: apps/catalog/admin.py
+msgid "Needed to review or publish a text written by a machine."
+msgstr "Serve per rivedere o pubblicare un testo scritto da una macchina."
 
 #: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
 msgid "Needed with this product"
@@ -8534,6 +8592,15 @@ msgstr ""
 msgid "Saved."
 msgstr "Salvato."
 
+#: apps/catalog/models.py
+msgid ""
+"Say so when AI made the image or changed what it shows. The product page then shows an 'AI-"
+"generated image' or 'AI-edited image' label next to it."
+msgstr ""
+"Indicalo quando l'IA ha creato l'immagine o ne ha cambiato il contenuto. La pagina del prodotto "
+"mostra allora accanto all'immagine l'etichetta «Immagine generata con IA» o «Immagine modificata "
+"con IA»."
+
 #: apps/compliance/forms.py
 msgid "Say whether the content is illegal or only against the platform terms."
 msgstr "Indica se il contenuto è illegale o va solo contro i termini della piattaforma."
@@ -8943,9 +9010,11 @@ msgstr "Mostra solo i prodotti di una categoria e delle categorie sotto di essa.
 msgid "Show only the products of one vendor."
 msgstr "Mostra solo i prodotti di un venditore."
 
-#: apps/accounts/forms.py apps/manager/templates/manager/login.html apps/vendors/forms.py
+#: apps/accounts/forms.py apps/accounts/templates/accounts/password/change.html
+#: apps/manager/templates/manager/login.html apps/vendors/forms.py
 #: apps/vendors/templates/vendors/claim/account.html
-#: apps/vendors/templates/vendors/claim/sign_in.html themes/ride/templates/manager/login.html
+#: apps/vendors/templates/vendors/claim/sign_in.html
+#: themes/ride/templates/accounts/password/change.html themes/ride/templates/manager/login.html
 msgid "Show password"
 msgstr "Mostra password"
 
@@ -9605,6 +9674,18 @@ msgstr ""
 "elettroniche a te intestate. 0000000 si usa insieme a un indirizzo PEC, che indichi nel campo PEC;"
 " XXXXXXX è per le imprese con sede fuori dall'Italia. Il codice te lo può dire il tuo "
 "commercialista o il tuo programma di fatturazione."
+
+#: apps/accounts/templates/email/accounts/breached_password/body.html
+#: apps/accounts/templates/email/accounts/breached_password/body.txt
+msgid ""
+"The account %(user_email)s (%(user_id)s) signed in with a password that appears in a known data "
+"breach. It must choose a new password and verify its second factor again before any other action. "
+"Its activity is not blocked. Review the account in the audit log."
+msgstr ""
+"L'account %(user_email)s (%(user_id)s) ha effettuato l'accesso con una password che compare in una"
+" violazione di dati nota. Deve scegliere una nuova password e verificare di nuovo il secondo "
+"fattore prima di qualsiasi altra azione. La sua attività non è bloccata. Controlli l'account nel "
+"registro di audit."
 
 #: apps/vendors/models.py
 msgid "The address (https only) of your public page that explains returns."
@@ -10348,6 +10429,10 @@ msgstr "L’email di un account esistente. Le maiuscole non contano."
 msgid ""
 "The email or the password is not correct, or the account is locked for a while. Please try again."
 msgstr "L’email o la password non sono corrette, oppure l’account è bloccato per un po’. Riprova."
+
+#: apps/vendors/services.py
+msgid "The end date cannot be before the start date."
+msgstr "La data di fine non può precedere la data di inizio."
 
 #: apps/manager/event_forms.py
 msgid "The event"
@@ -11265,6 +11350,10 @@ msgstr "La segnalazione è in revisione."
 #: apps/manager/termination_views.py
 msgid "The notice is withdrawn and the vendor is told."
 msgstr "Il preavviso è ritirato e il venditore ne viene informato."
+
+#: apps/vendors/services.py
+msgid "The notice lead time is 0 to %(days)s days."
+msgstr "L'anticipo dell'avviso va da 0 a %(days)s giorni."
 
 #: apps/compliance/templates/email/compliance/termination_withdrawn/subject.txt
 msgid "The notice of termination of your seller account is withdrawn"
@@ -12624,6 +12713,10 @@ msgstr ""
 "predefiniti."
 
 #: apps/vendors/models.py
+msgid "The vendor this closure belongs to."
+msgstr "Il venditore a cui appartiene questa chiusura."
+
+#: apps/vendors/models.py
 msgid "The vendor this consent belongs to."
 msgstr "Il venditore a cui appartiene questo consenso."
 
@@ -13426,6 +13519,10 @@ msgstr "Spunta se un software ha aiutato a trovare il contenuto."
 #: apps/compliance/forms.py
 msgid "Tick it if software took the decision."
 msgstr "Spunta se la decisione è stata presa da un software."
+
+#: apps/vendors/models.py
+msgid "Tick it if the shop closes on the same days every year."
+msgstr "Spunti se il negozio chiude negli stessi giorni ogni anno."
 
 #: apps/vendors/models.py
 msgid ""
@@ -15222,6 +15319,14 @@ msgstr ""
 "Chi ha scritto l'articolo. Il nome compare sotto il titolo e rimanda alla pagina dell'autore. Se "
 "lo lasci vuoto, non viene mostrato alcun autore."
 
+#: apps/catalog/models.py
+msgid ""
+"Who wrote the text. A machine text can only be set to reviewed or published after a person has "
+"read and checked it."
+msgstr ""
+"Chi ha scritto il testo. Un testo scritto da una macchina può essere impostato come rivisto o "
+"pubblicato solo dopo che una persona lo ha letto e controllato."
+
 #: apps/orders/templates/orders/_legal_recap.html themes/ride/templates/orders/_legal_recap.html
 msgid "Who you buy from and on which terms"
 msgstr "Da chi compri e a quali condizioni"
@@ -15871,6 +15976,15 @@ msgstr ""
 #: apps/manager/event_block_forms.py
 msgid "Your own products, up to 12. Required."
 msgstr "I tuoi prodotti, fino a 12. Obbligatorio."
+
+#: apps/accounts/templates/accounts/password/change.html
+#: themes/ride/templates/accounts/password/change.html
+msgid ""
+"Your password appears in a known data breach, so others may know it. Please choose a new password "
+"before you continue."
+msgstr ""
+"La Sua password compare in una violazione di dati nota, quindi altri potrebbero conoscerla. Scelga"
+" una nuova password prima di continuare."
 
 #: apps/accounts/breach.py
 msgid "Your password must not appear in a known data breach."

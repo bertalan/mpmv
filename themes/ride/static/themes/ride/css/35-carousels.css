@@ -245,6 +245,13 @@
     color: var(--color-text-muted);
   }
 
+  .gallery__ai-label {
+    margin: var(--space-xs) 0 0;
+    color: var(--color-text);
+    font-size: var(--font-size-s, 0.875rem);
+    font-weight: 600;
+  }
+
   .ride-video__poster {
     margin: 0 0 var(--space-s);
   }

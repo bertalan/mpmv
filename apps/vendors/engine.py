@@ -2260,3 +2260,43 @@ def trader_contact(
         phone=phone.strip(),
         email=email.strip(),
     )
+
+
+# --- Holiday and closure schedule (VEN.20) -----------------------------------------------------
+
+CLOSURE_MAX_NOTICE_DAYS: Final = 60
+# Error codes: the adapters (`vendors.services`) turn them into translated messages.
+CLOSURE_END_BEFORE_START: Final = "end_before_start"
+CLOSURE_NOTICE_RANGE: Final = "notice_range"
+CLOSURE_YEARLY_LEAP_START: Final = "yearly_leap_start"
+CLOSURE_YEARLY_LEAP_END: Final = "yearly_leap_end"
+CLOSURE_YEARLY_TOO_LONG: Final = "yearly_too_long"
+
+
+def _is_leap_day(day: dt.date) -> bool:
+    return day.month == 2 and day.day == 29
+
+
+def closure_errors(
+    start: dt.date, end: dt.date, *, repeats_yearly: bool, notice_days: int
+) -> dict[str, list[str]]:
+    """Invalid fields of a closure range, by field name, each with error codes; empty when valid.
+
+    A yearly range lasts less than one year and never starts or ends on 29 February, so it means
+    the same days every year. A one-off range may use any date.
+    """
+    errors: dict[str, list[str]] = {}
+    if end < start:
+        errors["end_date"] = [CLOSURE_END_BEFORE_START]
+    if not 0 <= notice_days <= CLOSURE_MAX_NOTICE_DAYS:
+        errors["notice_days"] = [CLOSURE_NOTICE_RANGE]
+    if repeats_yearly:
+        if _is_leap_day(start):
+            errors["start_date"] = [CLOSURE_YEARLY_LEAP_START]
+        if _is_leap_day(end):
+            errors["end_date"] = [CLOSURE_YEARLY_LEAP_END]
+        if "end_date" not in errors and "start_date" not in errors:
+            same_day_next_year = dt.date(start.year + 1, start.month, start.day)
+            if end >= same_day_next_year:
+                errors["end_date"] = [CLOSURE_YEARLY_TOO_LONG]
+    return errors

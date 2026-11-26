@@ -1,5 +1,6 @@
 """SEO.7: the product page's widgets (related products, other sellers) feed the page graph as
-named `ItemList`s of product ids, linked from the `ItemPage` by `hasPart`, without offers."""
+named `ItemList`s of product ids, without offers, in the `ItemPage` graph (not linked by
+`hasPart`, SEO.16)."""
 
 import json
 import re
@@ -86,7 +87,7 @@ def test_related_products_are_a_named_list_linked_from_the_page() -> None:
     graph = graph_of("main-item")
     [related] = lists(graph)
     assert related["name"]
-    assert related["inLanguage"] == primary_language()
+    assert "inLanguage" not in related  # SEO.16
     assert related["numberOfItems"] == 2
     urls = {e["item"]["url"] for e in related["itemListElement"]}
     assert urls == {
@@ -94,7 +95,7 @@ def test_related_products_are_a_named_list_linked_from_the_page() -> None:
         for p in others
     }
     assert all("offers" not in e["item"] for e in related["itemListElement"])
-    assert {"@id": related["@id"]} in page_of(graph)["hasPart"]
+    assert "hasPart" not in page_of(graph)  # SEO.16
 
 
 def test_other_sellers_are_a_second_list_with_a_distinct_id() -> None:
@@ -108,8 +109,7 @@ def test_other_sellers_are_a_second_list_with_a_distinct_id() -> None:
     found = lists(graph)
     assert len(found) == 2
     assert len({n["@id"] for n in found}) == 2
-    parts = page_of(graph)["hasPart"]
-    assert all({"@id": n["@id"]} in parts for n in found)
+    assert "hasPart" not in page_of(graph)  # SEO.16
     assert all(n["numberOfItems"] == 1 for n in found)
     for node in found:
         positions = [e["position"] for e in node["itemListElement"]]

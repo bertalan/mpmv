@@ -1,0 +1,9 @@
+{% load i18n %}{% comment %}
+AI Act label of a product image (CMP.8, article 50): "AI-generated image" or "AI-edited image",
+shown with the image, with the IPTC digital source type as a data attribute for machines.
+
+  {% include "components/ai_image_label.html" with image=image only %}
+
+- `image.ai_origin`: `generated` or `edited` (anything else shows nothing);
+- `image.ai_source_type`: the IPTC digital source type URI.
+{% endcomment %}{% if image.ai_origin == "generated" %}<p class="gallery__ai-label" data-ai-origin="generated" data-digital-source-type="{{ image.ai_source_type }}">{% translate "AI-generated image" %}</p>{% elif image.ai_origin == "edited" %}<p class="gallery__ai-label" data-ai-origin="edited" data-digital-source-type="{{ image.ai_source_type }}">{% translate "AI-edited image" %}</p>{% endif %}

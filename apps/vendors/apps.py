@@ -23,6 +23,7 @@ class VendorsConfig(AppConfig):
         "salestermsinforce",
         "returnpolicyversion",
         "notincountry",
+        "vendorclosure",
     )
     unaudited_models = {
         "vendortranslation": "storefront texts under the translation workflow, no legal or "

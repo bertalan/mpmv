@@ -146,11 +146,10 @@ def search_template(site: str, home_path: str, parameter: str = "s") -> str:
     return f"{site}{home_path}?{parameter}={{search_term_string}}"
 
 
-def item_list_node(
-    *, list_id: str, name: str, language: str, entries: Iterable[ListEntry]
-) -> dict[str, Any]:
+def item_list_node(*, list_id: str, name: str, entries: Iterable[ListEntry]) -> dict[str, Any]:
     """An `ItemList` of pages in order (`position`, and the item's `@id`, `url`, `name`);
-    empty for no entries. A page listed twice stays once."""
+    empty for no entries. A page listed twice stays once. No `inLanguage`: schema.org defines it
+    on `CreativeWork` and `Event`, not on `ItemList` (SEO.16); the name is in the page language."""
     seen: set[str] = set()
     elements: list[dict[str, Any]] = []
     for entry in entries:
@@ -173,7 +172,6 @@ def item_list_node(
         "@type": "ItemList",
         "@id": list_id,
         "name": name,
-        "inLanguage": language,
         "numberOfItems": len(elements),
         "itemListElement": elements,
     }

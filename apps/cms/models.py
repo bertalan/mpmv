@@ -78,6 +78,7 @@ from wagtail_localize.fields import BaseTranslatableField, SynchronizedField, Tr
 from wagtail_localize.models import Translation
 
 from apps.core import images as rendition_images
+from apps.core import text as core_text
 from apps.core.fields import LanguageField
 from apps.core.images import rendition_or_original
 from apps.core.nfc_forms import NFCInlinePanel, NFCModelForm, NFCPageForm
@@ -1417,6 +1418,9 @@ class BlogIndexPage(RoutablePageMixin, Page):  # type: ignore[misc]
         if author is not None:
             context["author_bio"] = author.translated("bio", self.locale_id)
             context["author_job_title"] = author.translated("job_title", self.locale_id)
+            context["meta_description"] = core_text.meta_description(
+                context["author_bio"]
+            )  # SEO.17
         paginator = Paginator(queryset, self.PER_PAGE)
         try:
             posts: PaginatorPage[Any] = paginator.page(request.GET.get("page", 1))

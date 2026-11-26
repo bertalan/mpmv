@@ -180,6 +180,7 @@ from apps.vendors.models import (
     SelfCertification,
     Vendor,
     VendorClaim,
+    VendorClosure,
     VendorFeatureFlag,
     VendorMember,
     VendorTranslation,
@@ -192,6 +193,7 @@ from apps.vendors.tests.factories import (
     SalesTermsVersionFactory,
     SelfCertificationFactory,
     VendorClaimFactory,
+    VendorClosureFactory,
     VendorFeatureFlagFactory,
     VendorMemberFactory,
     VendorTranslationFactory,
@@ -242,6 +244,7 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     VendorFeatureFlag: lambda vendor: VendorFeatureFlagFactory.create(vendor=vendor),
     CrossVendorConsent: lambda vendor: CrossVendorConsentFactory.create(vendor=vendor),
     VendorClaim: lambda vendor: VendorClaimFactory.create(vendor=vendor),
+    VendorClosure: lambda vendor: VendorClosureFactory.create(vendor=vendor),
     Product: lambda vendor: ProductFactory.create(vendor=vendor),
     ProductTranslation: lambda vendor: ProductTranslationFactory.create(
         product=ProductFactory.create(vendor=vendor)
@@ -529,6 +532,9 @@ ENDPOINTS: dict[str, Access] = {
     "healthz": NoVendorData("Liveness probe with a constant answer."),
     "readyz": NoVendorData("Readiness probe: a status only, no data."),
     "robots_txt": NoVendorData("robots.txt (SEO.8): constant text for crawlers; no vendor data."),
+    "favicon:ico": NoVendorData(
+        "/favicon.ico (THM.38): redirect to a static theme icon; no tenant data."
+    ),
     "sitemap": NoVendorData("Sitemap index (SEO.2): public page URLs only, no tenant data."),
     "sitemap_section": NoVendorData(
         "Per-language, per-type sitemap (SEO.2): public page URLs only, no tenant data.",
@@ -608,6 +614,9 @@ ENDPOINTS: dict[str, Access] = {
     ),
     "sessions:list": NoVendorData(OWN_ACCOUNT + " The user's own sessions (CORE.24)."),
     "sessions:end_others": NoVendorData(OWN_ACCOUNT + " Ends the user's own other sessions."),
+    "password:change": NoVendorData(
+        OWN_ACCOUNT + " Changes the user's own password after the current one (CORE.28)."
+    ),
     "sessions:end_one": NoVendorData(
         OWN_ACCOUNT + " The session is looked up among the user's own (CORE.24).",
         kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},

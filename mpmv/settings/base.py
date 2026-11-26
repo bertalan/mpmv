@@ -156,6 +156,8 @@ MIDDLEWARE = [
     # CORE.4: which device verified the session, then confine required roles to the MFA pages.
     "django_otp.middleware.OTPMiddleware",
     "apps.accounts.middleware.MfaRequiredMiddleware",
+    # CORE.28: a sign-in found the password in a breach: the change page before any other page.
+    "apps.accounts.middleware.BreachedPasswordMiddleware",
     "apps.accounts.middleware.SessionLevelMiddleware",  # CORE.25 (D-32): the passkey window timers
     # CORE.17: one gate per Manager space (404, login or MFA) for every URL under /manager/.
     "apps.manager.middleware.ManagerGateMiddleware",
@@ -175,6 +177,9 @@ AUTHENTICATION_BACKENDS = [
     "apps.accounts.backends.LoginProtectionBackend",
     # Vendors do not get the Wagtail admin (spec 15): before ModelBackend, whose groups grant it.
     "apps.vendors.backends.VendorAdminRefusalBackend",
+    # CORE.28: the password sign-in with the breached-password check (fail-open).
+    "apps.accounts.backends.BreachCheckBackend",
+    # Still listed: sessions signed in before CORE.28 and explicit `backend=` logins name it.
     "django.contrib.auth.backends.ModelBackend",
 ]
 

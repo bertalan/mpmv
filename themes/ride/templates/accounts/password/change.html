@@ -1,0 +1,31 @@
+{% extends "layouts/account.html" %}
+{% load i18n static %}
+{% comment %}CORE.28: the password change a breached-password sign-in forces.
+CMP.9: autocomplete tokens, the show-password module, each error tied to its field.{% endcomment %}
+{% block title %}{% translate "Change your password" %} · MPMV{% endblock %}
+{% block head %}<link rel="stylesheet" href="{% static 'accounts/password-toggle.css' %}">
+<script type="module" src="{% static 'accounts/password-toggle.js' %}"></script>{% endblock %}
+{% block account_content %}
+<h1>{% translate "Change your password" %}</h1>
+{% if breached %}<div class="alert alert-warning" role="alert">{% translate "Your password appears in a known data breach, so others may know it. Please choose a new password before you continue." %}</div>{% endif %}
+<form method="post" action="{{ request.get_full_path }}" class="col-md-8 col-lg-6 p-0">
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ next }}">
+  <div class="mb-3">
+    <label class="form-label" for="id_old_password">{{ form.old_password.label }}</label>
+    <input class="form-control{% if form.old_password.errors %} is-invalid{% endif %}" type="password" name="old_password" id="id_old_password" autocomplete="current-password" data-password-toggle="{% translate 'Show password' %}" required{% if form.old_password.errors %} aria-invalid="true" aria-describedby="old-password-error"{% endif %}>
+    {% if form.old_password.errors %}<div class="invalid-feedback" id="old-password-error" role="alert">{{ form.old_password.errors|join:" " }}</div>{% endif %}
+  </div>
+  <div class="mb-3">
+    <label class="form-label" for="id_new_password1">{{ form.new_password1.label }}</label>
+    <input class="form-control{% if form.new_password1.errors %} is-invalid{% endif %}" type="password" name="new_password1" id="id_new_password1" autocomplete="new-password" data-password-toggle="{% translate 'Show password' %}" required{% if form.new_password1.errors %} aria-invalid="true" aria-describedby="new-password1-error"{% endif %}>
+    {% if form.new_password1.errors %}<div class="invalid-feedback" id="new-password1-error" role="alert">{{ form.new_password1.errors|join:" " }}</div>{% endif %}
+  </div>
+  <div class="mb-3">
+    <label class="form-label" for="id_new_password2">{{ form.new_password2.label }}</label>
+    <input class="form-control{% if form.new_password2.errors %} is-invalid{% endif %}" type="password" name="new_password2" id="id_new_password2" autocomplete="new-password" data-password-toggle="{% translate 'Show password' %}" required{% if form.new_password2.errors %} aria-invalid="true" aria-describedby="new-password2-error"{% endif %}>
+    {% if form.new_password2.errors %}<div class="invalid-feedback" id="new-password2-error" role="alert">{{ form.new_password2.errors|join:" " }}</div>{% endif %}
+  </div>
+  <button type="submit" class="btn btn-primary">{% translate "Change password" %}</button>
+</form>
+{% endblock %}

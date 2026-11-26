@@ -149,6 +149,14 @@ def test_an_author_without_articles_gets_the_bio_and_an_empty_state(
     assert gettext("No articles by this author yet.") in page.get_text()
 
 
+def test_the_author_page_describes_itself_with_the_bio(
+    blog: BlogIndexPage, ada: BlogAuthor
+) -> None:
+    """SEO.17: the bio, as plain text, is the page's meta description."""
+    [meta] = _html("/blog/author/ada-example/").select('meta[name="description"]')
+    assert meta["content"] == "Ada throws bowls on the wheel."
+
+
 def test_an_unknown_author_is_not_found(blog: BlogIndexPage) -> None:
     assert Client().get("/blog/author/nobody/").status_code == 404
 
