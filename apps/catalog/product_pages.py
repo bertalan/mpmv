@@ -37,7 +37,7 @@ from apps.vendors.models import Vendor
 from apps.vendors.return_engine import ReturnPolicy
 from apps.vendors.return_services import effective_return_policy
 
-from . import engine, services, slugs
+from . import ai_labels, engine, services, slugs
 from .models import Product, ProductImage, ProductStatus, ProductTranslation, SalesMode, Variant
 
 
@@ -60,6 +60,7 @@ class GalleryImage:
     alt: str
     caption: str = ""
     is_cover: bool = False
+    ai_origin: str = ai_labels.AI_NONE  # CMP.8: none, generated or edited
 
 
 @dataclass(frozen=True)
@@ -128,6 +129,7 @@ def _gallery_image(row: ProductImage, language: str, fallback: str) -> GalleryIm
         alt=(text.alt_text if text is not None else "") or fallback,
         caption=text.caption if text is not None else "",
         is_cover=row.is_cover,
+        ai_origin=row.ai_origin,
     )
 
 
@@ -426,7 +428,16 @@ def other_sellers(
 
 
 def _items(images: Sequence[GalleryImage]) -> list[dict[str, Any]]:
-    return [{"image": item.image, "alt": item.alt, "caption": item.caption} for item in images]
+    return [
+        {
+            "image": item.image,
+            "alt": item.alt,
+            "caption": item.caption,
+            "ai_origin": item.ai_origin,
+            "ai_source_type": ai_labels.iptc_source_type(item.ai_origin),
+        }
+        for item in images
+    ]
 
 
 def gallery_items(page: ProductPage) -> list[dict[str, Any]]:

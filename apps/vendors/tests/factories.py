@@ -36,6 +36,7 @@ from apps.vendors.models import (
     Vendor,
     VendorApplication,
     VendorClaim,
+    VendorClosure,
     VendorContract,
     VendorContractTranslation,
     VendorFeatureFlag,
@@ -408,6 +409,20 @@ class CrossVendorConsentFactory(DjangoModelFactory[CrossVendorConsent]):
     in_bundles = False
     valid_from = factory.LazyFunction(lambda: timezone.now() - dt.timedelta(days=1))
     set_by = "staff:factory"
+
+
+class VendorClosureFactory(DjangoModelFactory[VendorClosure]):
+    """A one-off closure in August 2099 (VEN.20). Production code writes them with
+    `services.add_closure`, which validates and audits."""
+
+    class Meta:
+        model = VendorClosure
+
+    vendor = factory.SubFactory(VendorFactory)
+    start_date = dt.date(2099, 8, 1)
+    end_date = dt.date(2099, 8, 15)
+    repeats_yearly = False
+    notice_days = 14
 
 
 class VendorClaimFactory(DjangoModelFactory[VendorClaim]):

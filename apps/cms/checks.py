@@ -17,6 +17,8 @@ from django.apps import AppConfig
 from django.conf import settings
 from django.core import checks
 
+from apps.core.migration_safety import migrations_pending
+
 LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
 
 
@@ -96,6 +98,8 @@ def check_reserved_root_slugs(
 
     from . import engine
 
+    if migrations_pending("wagtailcore"):  # CORE.27: `migrate` checks before it applies
+        return []
     try:
         clashing = list(
             Page.objects.filter(depth=3, slug__in=engine.RESERVED_ROOT_SLUGS).values_list(
@@ -126,6 +130,8 @@ def check_snippet_workflow(
 
     from .models import ContentSnippet, content_snippet_workflow
 
+    if migrations_pending("cms", "wagtailcore"):  # CORE.27
+        return []
     try:
         if ContentSnippet._meta.db_table not in connection.introspection.table_names():
             return []

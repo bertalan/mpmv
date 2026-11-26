@@ -749,6 +749,14 @@ msgstr ""
 "Eine Frage, die ein neuer Verkäufer stellen würde, zum Beispiel 'Was kostet es?'. Pflichtfeld: "
 "Ohne sie kann die Frage nicht gespeichert werden."
 
+#: apps/vendors/services.py
+msgid "A range that has already ended cannot be saved."
+msgstr "Ein bereits beendeter Zeitraum kann nicht gespeichert werden."
+
+#: apps/vendors/services.py
+msgid "A range that has ended stays as history."
+msgstr "Ein beendeter Zeitraum bleibt als Verlauf erhalten."
+
 #: apps/manager/amendment_views.py
 msgid "a refund to the customer"
 msgstr "eine Erstattung an den Kunden"
@@ -1072,6 +1080,18 @@ msgstr "Für diesen Teil wurde bereits ein Widerruf erfasst."
 msgid "a withdrawal was already recorded."
 msgstr "ein Widerruf wurde bereits erfasst."
 
+#: apps/vendors/services.py
+msgid "A yearly range cannot end on 29 February."
+msgstr "Ein jährlicher Zeitraum kann nicht am 29. Februar enden."
+
+#: apps/vendors/services.py
+msgid "A yearly range cannot start on 29 February."
+msgstr "Ein jährlicher Zeitraum kann nicht am 29. Februar beginnen."
+
+#: apps/vendors/services.py
+msgid "A yearly range must last less than one year."
+msgstr "Ein jährlicher Zeitraum muss kürzer als ein Jahr sein."
+
 #: apps/manager/forms.py
 msgid "About the shop"
 msgstr "Über den Shop"
@@ -1324,6 +1344,14 @@ msgstr ""
 #: apps/manager/templates/manager/platform/stray_payments.html
 msgid "Age in days"
 msgstr "Alter in Tagen"
+
+#: themes/base/templates/components/ai_image_label.html
+msgid "AI-edited image"
+msgstr "Mit KI bearbeitetes Bild"
+
+#: themes/base/templates/components/ai_image_label.html
+msgid "AI-generated image"
+msgstr "KI-generiertes Bild"
 
 #: apps/core/templates/email/core/ops_alert/body.html
 #: apps/core/templates/email/core/ops_alert/body.txt
@@ -3931,6 +3959,10 @@ msgstr "Bestellung suchen"
 msgid "Fingerprint %(hash)s."
 msgstr "Fingerabdruck %(hash)s."
 
+#: apps/vendors/models.py
+msgid "First closed day."
+msgstr "Erster Tag der Schließung."
+
 #: apps/manager/event_forms.py
 msgid "First day"
 msgstr "Erster Tag"
@@ -4451,6 +4483,10 @@ msgstr ""
 "Wie viele Tage ein Verbraucher nach Erhalt Zeit hat, Waren zurückzusenden. Das Gesetz sieht für "
 "Verkäufe an Verbraucher mindestens 14 Tage vor, daher wird eine kleinere Zahl abgelehnt. "
 "Pflichtfeld."
+
+#: apps/vendors/models.py
+msgid "How many days before the closure the notice appears (0 to 60)."
+msgstr "Wie viele Tage vor der Schließung der Hinweis erscheint (0 bis 60)."
 
 #: apps/cms/forms_pages.py
 msgid ""
@@ -5085,6 +5121,10 @@ msgstr "Sprache: %(language)s. Originalsprache der Veranstaltung: %(original)s."
 msgid "Languages:"
 msgstr "Sprachen:"
 
+#: apps/vendors/models.py
+msgid "Last closed day."
+msgstr "Letzter Tag der Schließung."
+
 #: apps/manager/event_forms.py
 msgid "Last day"
 msgstr "Letzter Tag"
@@ -5644,6 +5684,10 @@ msgstr "Namen unterscheiden sich je Sprache"
 #: apps/seo/providers.py
 msgid "Necessary"
 msgstr "Notwendig"
+
+#: apps/catalog/admin.py
+msgid "Needed to review or publish a text written by a machine."
+msgstr "Erforderlich, um einen maschinell geschriebenen Text zu prüfen oder zu veröffentlichen."
 
 #: apps/catalog/templates/catalog/product.html themes/ride/templates/catalog/product.html
 msgid "Needed with this product"
@@ -8626,6 +8670,14 @@ msgstr ""
 msgid "Saved."
 msgstr "Gespeichert."
 
+#: apps/catalog/models.py
+msgid ""
+"Say so when AI made the image or changed what it shows. The product page then shows an 'AI-"
+"generated image' or 'AI-edited image' label next to it."
+msgstr ""
+"Geben Sie das an, wenn KI das Bild erstellt oder seinen Inhalt verändert hat. Die Produktseite "
+"zeigt dann neben dem Bild den Hinweis „KI-generiertes Bild“ oder „Mit KI bearbeitetes Bild“."
+
 #: apps/compliance/forms.py
 msgid "Say whether the content is illegal or only against the platform terms."
 msgstr ""
@@ -10470,6 +10522,10 @@ msgstr ""
 "Die E-Mail-Adresse oder das Passwort ist nicht korrekt, oder das Konto ist für eine Weile "
 "gesperrt. Bitte versuchen Sie es erneut."
 
+#: apps/vendors/services.py
+msgid "The end date cannot be before the start date."
+msgstr "Das Enddatum darf nicht vor dem Startdatum liegen."
+
 #: apps/manager/event_forms.py
 msgid "The event"
 msgstr "Die Veranstaltung"
@@ -11405,6 +11461,10 @@ msgstr "Die Meldung wird geprüft."
 #: apps/manager/termination_views.py
 msgid "The notice is withdrawn and the vendor is told."
 msgstr "Die Kündigung ist zurückgenommen und der Verkäufer wurde informiert."
+
+#: apps/vendors/services.py
+msgid "The notice lead time is 0 to %(days)s days."
+msgstr "Die Vorlaufzeit des Hinweises beträgt 0 bis %(days)s Tage."
 
 #: apps/compliance/templates/email/compliance/termination_withdrawn/subject.txt
 msgid "The notice of termination of your seller account is withdrawn"
@@ -12766,6 +12826,10 @@ msgstr ""
 "Der Verkäufer, zu dem diese Standardwerte gehören. Jeder Verkäufer hat einen Satz Standardwerte."
 
 #: apps/vendors/models.py
+msgid "The vendor this closure belongs to."
+msgstr "Der Verkäufer, zu dem diese Schließung gehört."
+
+#: apps/vendors/models.py
 msgid "The vendor this consent belongs to."
 msgstr "Der Verkäufer, zu dem diese Einwilligung gehört."
 
@@ -13586,6 +13650,10 @@ msgstr "Setzen Sie das Häkchen, wenn eine Software bei der Auffindung des Inhal
 #: apps/compliance/forms.py
 msgid "Tick it if software took the decision."
 msgstr "Setzen Sie das Häkchen, wenn eine Software die Entscheidung getroffen hat."
+
+#: apps/vendors/models.py
+msgid "Tick it if the shop closes on the same days every year."
+msgstr "Ankreuzen, wenn der Shop jedes Jahr an denselben Tagen schließt."
 
 #: apps/vendors/models.py
 msgid ""
@@ -15422,6 +15490,14 @@ msgid ""
 msgstr ""
 "Wer den Artikel geschrieben hat. Der Name erscheint unter dem Titel und verlinkt auf die Seite des"
 " Autors. Wenn Sie das Feld leer lassen, wird kein Autor angezeigt."
+
+#: apps/catalog/models.py
+msgid ""
+"Who wrote the text. A machine text can only be set to reviewed or published after a person has "
+"read and checked it."
+msgstr ""
+"Wer den Text geschrieben hat. Ein maschinell geschriebener Text kann erst als geprüft oder "
+"veröffentlicht gesetzt werden, nachdem eine Person ihn gelesen und kontrolliert hat."
 
 #: apps/orders/templates/orders/_legal_recap.html themes/ride/templates/orders/_legal_recap.html
 msgid "Who you buy from and on which terms"

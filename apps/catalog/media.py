@@ -34,6 +34,7 @@ from apps.vendors.models import Vendor
 from apps.vendors.scoping import is_platform_staff
 from apps.vendors.services import has_vendor_permission
 
+from . import ai_labels
 from .models import Product, ProductImage, ProductImageTranslation, Variant
 from .services import require_catalog_editor
 
@@ -44,6 +45,7 @@ IMAGE_COVER_SET = "catalog.product_image.cover_set"
 IMAGE_COVER_LOCK_CHANGED = "catalog.product_image.cover_lock_changed"
 IMAGE_LANGUAGE_SET = "catalog.product_image.language_set"
 IMAGE_REORDERED = "catalog.product_image.reordered"
+IMAGE_AI_ORIGIN_SET = "catalog.product_image.ai_origin_set"
 IMAGE_DELETED = "catalog.product_image.deleted"
 IMAGE_TEXT_SET = "catalog.product_image.text_set"
 
@@ -57,6 +59,7 @@ def image_snapshot(row: ProductImage) -> dict[str, Any]:
         "position": row.position,
         "is_cover": row.is_cover,
         "cover_locked": row.cover_locked,
+        "ai_origin": row.ai_origin,
     }
 
 
@@ -132,6 +135,7 @@ def upload_image(
     language: str | None = None,
     alt_text: str = "",
     caption: str = "",
+    ai_origin: str = ai_labels.AI_NONE,
     dry_run: bool = False,
 ) -> ChangeSet:
     """Add an uploaded image to the product's gallery (or `variant`'s own), with renditions.
@@ -143,6 +147,7 @@ def upload_image(
     """
     _authorise(product.vendor, ctx)
     _check_language(language)
+    _check_ai_origin(ai_origin)
     if variant is not None and variant.product_id != product.pk:
         raise ValidationError({"variant": "The variant belongs to another product."})
     vendor = product.vendor
@@ -188,6 +193,7 @@ def upload_image(
             language=language,
             position=(last.first() + 1) if last.exists() else 0,
             source_hash=source_hash,
+            ai_origin=ai_origin,
         )
         if dry_run:
             changes.create(IMAGE_MODEL, "new", image_snapshot(row))
@@ -315,6 +321,30 @@ def set_language(
             language=language, is_cover=after["is_cover"], cover_locked=after["cover_locked"]
         )
         audit_changes(changes, ctx=ctx, action=IMAGE_LANGUAGE_SET)
+    return changes
+
+
+def _check_ai_origin(ai_origin: str) -> None:
+    if ai_origin not in ai_labels.AI_ORIGINS:
+        raise ValidationError({"ai_origin": "Choose none, generated or edited."})
+
+
+def set_ai_origin(
+    row: ProductImage, ai_origin: str, *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Say whether AI made or edited the image (CMP.8): the product page then labels it."""
+    _check_ai_origin(ai_origin)
+    _authorise(row.product.vendor, ctx)
+    changes = ChangeSet()
+    with transaction.atomic():
+        _lock_product(row.product)
+        stored = ProductImage.objects.select_related("product", "variant").get(pk=row.pk)
+        before = image_snapshot(stored)
+        changes.update(IMAGE_MODEL, _key(stored), before, {**before, "ai_origin": ai_origin})
+        if dry_run or changes.is_empty:
+            return changes
+        ProductImage.objects.filter(pk=stored.pk).update(ai_origin=ai_origin)
+        audit_changes(changes, ctx=ctx, action=IMAGE_AI_ORIGIN_SET)
     return changes
 
 
