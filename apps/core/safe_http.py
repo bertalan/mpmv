@@ -32,7 +32,7 @@ type IPAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
 DEFAULT_PORTS = {"https": 443, "http": 80}
 REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
 _CHUNK = 16 * 1024
-_FORBIDDEN_CHARS = re.compile(r"[\x00-\x20\x7f\\]|[^\x00-\x7f]")
+_FORBIDDEN_CHARS = re.compile(r"[\x00-\x20\x7f\\]")
 _LEGACY_IPV4 = re.compile(r"^[0-9a-fx.]+$", re.IGNORECASE)
 
 _METADATA = frozenset(
@@ -107,7 +107,7 @@ def _legacy_ipv4(host: str) -> bool:
 def check_url(url: str, *, allowed_schemes: Sequence[str] = ("https",)) -> Target:
     """Validate `url` and split it; raises `UnsafeUrl`. No network access."""
     if _FORBIDDEN_CHARS.search(url):
-        raise UnsafeUrl("URL contains a control character, space, backslash or non-ASCII text")
+        raise UnsafeUrl("URL contains a control character, space or backslash")
     try:
         parts = urlsplit(url)
         port = parts.port
@@ -127,6 +127,11 @@ def check_url(url: str, *, allowed_schemes: Sequence[str] = ("https",)) -> Targe
     host = hostname.lower().rstrip(".")
     if not host or ".." in host or "%" in host:
         raise UnsafeUrl("URL host is malformed")
+    if not host.isascii():  # IDN: convert first, then judge the ASCII form (fullwidth dots etc.)
+        try:
+            host = host.encode("idna").decode("ascii").rstrip(".")
+        except UnicodeError:
+            raise UnsafeUrl("URL host is not a valid name") from None
     try:
         address: IPAddress | None = ipaddress.ip_address(host)
     except ValueError:
@@ -136,12 +141,10 @@ def check_url(url: str, *, allowed_schemes: Sequence[str] = ("https",)) -> Targe
             raise UnsafeUrl("URL host is an IPv4 address in a non-standard spelling")
         if host == "localhost" or host.endswith(".localhost"):
             raise BlockedAddress("localhost is refused")
-        try:
-            host = host.encode("idna").decode("ascii")
-        except UnicodeError:
-            raise UnsafeUrl("URL host is not a valid name") from None
     elif is_blocked_ip(address):
         raise BlockedAddress("address is not publicly routable")
+    if not (parts.path + parts.query).isascii():
+        raise UnsafeUrl("URL path or query is not ASCII (percent-encode it)")
     path = parts.path or "/"
     if parts.query:
         path = f"{path}?{parts.query}"

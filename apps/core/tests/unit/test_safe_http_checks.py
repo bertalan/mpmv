@@ -108,6 +108,13 @@ def test_idn_becomes_punycode() -> None:
     assert check_url("https://bücher.example/").host == "xn--bcher-kva.example"
 
 
+def test_an_idn_spelling_of_an_ip_or_localhost_is_refused() -> None:
+    with pytest.raises((UnsafeUrl, BlockedAddress)):
+        check_url("https://127\u30020\u30020\u30021/")
+    with pytest.raises(BlockedAddress):
+        check_url("https://localhost\u3002/")
+
+
 def test_http_needs_opt_in_and_port_80_only() -> None:
     assert check_url("http://example.com/", allowed_schemes=("https", "http")).port == 80
     with pytest.raises(UnsafeUrl):
