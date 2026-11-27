@@ -31,3 +31,16 @@ through it. `apps/ingest/enrich_engine.py` holds the pure schema and policy chec
 and encrypted storage are ING.14. The Gemini call uses `apps.core.outbound.open_url` (no redirects);
 a TODO(MIG.12) marks the move to `safe_http` when it lands. The key is sent in a header and never
 logged. Only product data is sent, never customer data.
+
+## Hardening (peer and lane-a reviews)
+
+- Markup is never accepted (no sanitiser backs it): tags, comments, entity-encoded tags, `javascript:`
+  URLs and markdown links go to review. No template renders enriched text with `|safe`
+  (checked by grep); keep it that way.
+- Schema: every key must be present and below its hard ceiling (`HARD_MAX_LENGTHS`), whatever the policy.
+- The environmental, fitment and boilerplate lists match whole words, after NFKC and case folding.
+  Harmless sentences such as "compatible with dishwashers" still go to review: the safe side.
+- Gemini: the transport maps every failure (HTTP, `http.client`, socket, timeout) to `ProviderError`,
+  reads at most 1 MB, and retries 429 and 5xx twice with a pause. The supplier text goes into the
+  prompt as one JSON block marked as data; the schema and policy checks are the real gate.
+  `get_enricher()` raises `ProviderError` when `gemini` has no key: callers must handle it.
