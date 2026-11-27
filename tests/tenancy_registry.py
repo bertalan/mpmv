@@ -794,6 +794,19 @@ ENDPOINTS: dict[str, Access] = {
         sample={"public_id": NIL_UUID, "amendment": NIL_UUID},
     ),
     # EVT.4: the vendor's own events; another vendor's id is a 404 on every view that takes one.
+    # VEN.20: the shop's closures; another shop's closure is a 404 to edit or remove.
+    "manager:shop:closures": VendorScopedList(
+        make=lambda vendor: VendorClosureFactory.create(vendor=vendor)
+    ),
+    "manager:shop:closure_edit": VendorScoped(
+        make=lambda vendor: VendorClosureFactory.create(vendor=vendor),
+        sample={"public_id": NIL_UUID},
+    ),
+    "manager:shop:closure_remove": VendorScoped(
+        make=lambda vendor: VendorClosureFactory.create(vendor=vendor),
+        methods=("POST",),
+        sample={"public_id": NIL_UUID},
+    ),
     "manager:shop:events": VendorScopedList(
         make=lambda vendor: EventPageFactory.create(vendor=vendor),
         identify=lambda event: str(event.title),  # type: ignore[attr-defined]
@@ -1303,6 +1316,19 @@ def active_vendor_events_key(client: Client, tenants: CrossTenant) -> dict[str, 
     return vendor_api_key(["events:read", "events:write"])(client, tenants)
 
 
+def active_closures_key(client: Client, tenants: CrossTenant) -> dict[str, str]:
+    """A write key is refused (403) while its vendor is not active (CORE.14): activate Vendor A."""
+    Vendor.objects.filter(pk=tenants.a.vendor.pk).update(status=Vendor.Status.ACTIVE)
+    tenants.a.vendor.refresh_from_db()
+    return vendor_api_key(["closures:read", "closures:write"])(client, tenants)
+
+
+def closure_kwargs(obj: models.Model) -> dict[str, str]:
+    """The URL parameters that name a closure: its vendor's public id and its own."""
+    assert isinstance(obj, VendorClosure)
+    return {"vendor_id": str(obj.vendor.public_id), "closure_id": str(obj.public_id)}
+
+
 API_OPERATIONS: dict[str, Access] = {
     "GET /api/v1/me": NoVendorData("The calling API client itself, with its own vendor."),
     # CAT.3
@@ -1346,5 +1372,30 @@ API_OPERATIONS: dict[str, Access] = {
     "POST /api/v1/events/{public_id}/translations": VendorScoped(
         make=lambda vendor: EventPageFactory.create(vendor=vendor),
         login=active_vendor_events_key,
+    ),
+    # VEN.20: the closures of a vendor. Vendor A's key names Vendor B's id and closure: a 404.
+    "GET /api/v1/vendors/{vendor_id}/closures": VendorScoped(
+        make=lambda vendor: VendorClosureFactory.create(vendor=vendor),
+        login=active_closures_key,
+        kwargs=closure_kwargs,
+        sample={"vendor_id": NIL_UUID},
+    ),
+    "POST /api/v1/vendors/{vendor_id}/closures": VendorScoped(
+        make=lambda vendor: VendorClosureFactory.create(vendor=vendor),
+        login=active_closures_key,
+        kwargs=closure_kwargs,
+        sample={"vendor_id": NIL_UUID},
+    ),
+    "PATCH /api/v1/vendors/{vendor_id}/closures/{closure_id}": VendorScoped(
+        make=lambda vendor: VendorClosureFactory.create(vendor=vendor),
+        login=active_closures_key,
+        kwargs=closure_kwargs,
+        sample={"vendor_id": NIL_UUID, "closure_id": NIL_UUID},
+    ),
+    "DELETE /api/v1/vendors/{vendor_id}/closures/{closure_id}": VendorScoped(
+        make=lambda vendor: VendorClosureFactory.create(vendor=vendor),
+        login=active_closures_key,
+        kwargs=closure_kwargs,
+        sample={"vendor_id": NIL_UUID, "closure_id": NIL_UUID},
     ),
 }

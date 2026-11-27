@@ -134,6 +134,19 @@ class RequestIdMiddleware:
         return response
 
 
+class BusinessZoneMemoMiddleware:
+    """Ask the operator's business time zone once per request (ARC.27, `business_tz_memo`)."""
+
+    def __init__(self, get_response: Callable[[HttpRequest], HttpResponseBase]) -> None:
+        self.get_response = get_response
+
+    def __call__(self, request: HttpRequest) -> HttpResponseBase:
+        from .services import business_tz_memo
+
+        with business_tz_memo():
+            return self.get_response(request)
+
+
 class AdminNetworkAllowlistMiddleware:
     """Answer 404 on the Django admin path to a client outside `ADMIN_ALLOWED_NETWORKS` (OPS.5).
 

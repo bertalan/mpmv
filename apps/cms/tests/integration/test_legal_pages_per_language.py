@@ -48,6 +48,7 @@ from apps.cms.tests.factories import LegalPageFactory, LegalPageReviewFactory
 from apps.core.audit import AuditContext
 from apps.core.i18n import configured_languages, primary_language
 from apps.core.models import AuditLog
+from apps.core.services import business_tz
 from tests.i18n import language_prefix, other_language, third_language, translated
 
 pytestmark = pytest.mark.django_db
@@ -271,7 +272,7 @@ def test_a_review_dry_run_writes_nothing(seeded: SeedReport) -> None:
 def test_a_review_cannot_be_dated_in_the_future_or_recorded_twice(seeded: SeedReport) -> None:
     page = _publish(LegalPageFactory.create(live=False))
     version = page.versions.get()
-    tomorrow = timezone.localdate() + dt.timedelta(days=1)
+    tomorrow = timezone.localdate(timezone=business_tz()) + dt.timedelta(days=1)  # ARC.27
     with pytest.raises(ValidationError):
         record_legal_review(version, "counsel_check", reviewer="X", reviewed_on=tomorrow, ctx=CTX)
     with pytest.raises(ValidationError):

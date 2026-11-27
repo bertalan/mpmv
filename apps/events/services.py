@@ -83,7 +83,7 @@ from apps.core.geocoding import AddressQuery, GeocodeResult
 from apps.core.geocoding import services as geocoding
 from apps.core.i18n import configured_languages
 from apps.core.models import AuditLog, ImageLicence, MediaImage
-from apps.core.services import consume_rate_limit, save_audited
+from apps.core.services import business_tz, consume_rate_limit, save_audited
 from apps.core.text import nfc_deep
 from apps.vendors.engine import VendorAction
 from apps.vendors.models import Vendor, VendorMember
@@ -1198,7 +1198,7 @@ def send_review_digest(
     pages = [page for page, _state in events_awaiting_review()]
     with transaction.atomic():
         changes = notifications.send_digest(
-            pages, day=today or timezone.localdate(), dry_run=dry_run
+            pages, day=today or timezone.localdate(timezone=business_tz()), dry_run=dry_run
         )
         if changes.changes and not dry_run:
             record(
