@@ -181,6 +181,10 @@ def _manager_pages() -> dict[str, str]:
         "manager:platform:order": "platform",
         "manager:platform:order_drafts": "platform",  # ORD.32
         "manager:platform:stray_payments": "platform",  # PAY.4
+        "manager:platform:shop_closures": "platform",  # VEN.20
+        "manager:platform:shop_closures_vendor": "platform",
+        "manager:platform:shop_closure_edit": "platform",
+        "manager:platform:shop_closure_remove": "platform",
         "manager:platform:order_draft": "platform",
         "manager:platform:amendment_settings": "platform",
         "manager:platform:trust_rules": "platform",  # TRU.1 part 2
@@ -231,6 +235,13 @@ def _open(name: str) -> tuple[Client, str]:
             kwargs = {"version": TrustRulesFactory.create().version}  # type: ignore[dict-item]
         if name == "manager:platform:order":
             kwargs = {"public_id": paid_vendor_order().public_id}
+        if name.startswith("manager:platform:shop_closure"):
+            closure = VendorClosureFactory.create()
+            kwargs = {"vendor_id": closure.vendor.public_id}
+            if name != "manager:platform:shop_closures_vendor":
+                kwargs["public_id"] = closure.public_id
+        if name == "manager:platform:shop_closures":
+            kwargs = {}
         if name == "manager:platform:order_draft":
             draft = StaffDraftFactory.create()
             StaffDraftLineFactory.create(draft=draft)

@@ -18,7 +18,7 @@ show-password toggle sits inside the password field.
   {% if form.errors %}
     <div class="alert alert-danger" id="login-error" role="alert">
       <p class="fw-bold mb-1">{% translate "Error" %}</p>
-      <p class="mb-0">{% translate "The email or the password is not correct, or the account is locked for a while. Please try again." %}</p>
+      <p class="mb-0">{% if form.lock_message %}{{ form.lock_message }}{% else %}{% translate "The email or the password is not correct, or the account is locked for a while. Please try again." %}{% endif %}</p>
     </div>
   {% endif %}
   <form method="post" action="{{ request.get_full_path }}" class="p-0">

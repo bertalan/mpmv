@@ -51,3 +51,11 @@ def test_static_files_use_hashed_compressed_storage() -> None:
 def test_other_environments_keep_the_base_middleware() -> None:
     live_settings()
     assert "whitenoise.middleware.WhiteNoiseMiddleware" not in settings.MIDDLEWARE
+
+
+def test_the_api_docs_are_closed_on_live_and_open_on_stage_and_locally() -> None:
+    """CORE.29 (Q-13): STAGE inherits the LIVE module but keeps the docs open."""
+    assert live_settings()["API_DOCS_PUBLIC"] is False
+    with mock.patch("mpmv.settings.base.SECRET_KEY", secrets.token_urlsafe(50)):
+        assert runpy.run_module("mpmv.settings.stage")["API_DOCS_PUBLIC"] is True
+    assert settings.API_DOCS_PUBLIC is True

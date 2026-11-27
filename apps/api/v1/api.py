@@ -16,6 +16,7 @@ from ninja.openapi.docs import Swagger
 
 from .catalog import router as catalog_router
 from .closures import router as closures_router
+from .docs_gate import restrict_docs
 from .endpoints import router as v1_router
 from .errors import install_problem_handlers
 from .events import router as events_router
@@ -55,6 +56,7 @@ def create_api(*, urls_namespace: str = "api-v1") -> ApiV1:
         description=DESCRIPTION,
         urls_namespace=urls_namespace,
         docs=Swagger(settings={"persistAuthorization": False}),
+        docs_decorator=restrict_docs,
     )
     install_problem_handlers(api)
     api.add_decorator(track_calls, mode="view")

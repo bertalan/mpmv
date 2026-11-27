@@ -698,6 +698,11 @@ STRIPE_CONNECT_WEBHOOK_SECRET = env_str("MPMV_STRIPE_CONNECT_WEBHOOK_SECRET", ""
 STRIPE_API_VERSION = env_str("MPMV_STRIPE_API_VERSION", "")  # empty: the account's default
 STRIPE_WEBHOOK_TOLERANCE_SECONDS = 300  # Stripe's recommended replay window
 
+# The API documentation (Swagger UI and openapi.json) is open locally and on STAGE; the LIVE
+# settings turn this off, and then only a valid API key or a signed-in staff member gets it, anybody
+# else gets 404 (CORE.29, owner decision Q-13).
+API_DOCS_PUBLIC = True
+
 # Per-API-key rate limit (CORE.12, CORE.16, apps.api.engine): fixed windows counted in PostgreSQL,
 # so every app process shares one counter per key. API_RATE_LIMIT is the key-wide limit of every
 # key, set per environment with MPMV_API_RATE_LIMIT (default 120/minute, owner decision MQ-4);

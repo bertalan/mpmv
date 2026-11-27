@@ -9,6 +9,7 @@ from django.urls import include, path
 
 from . import (
     amendment_views,
+    closure_staff_views,
     closure_views,
     event_block_views,
     event_views,
@@ -276,6 +277,23 @@ platform = (
             "orders/<uuid:public_id>/cancel/",
             amendment_views.PlatformCancelView.as_view(),
             name="order_cancel",
+        ),
+        # VEN.20: staff manage the closures of any shop (pick a shop, list, add, edit, remove).
+        path("shop-closures/", closure_staff_views.ShopPickerView.as_view(), name="shop_closures"),
+        path(
+            "shop-closures/<uuid:vendor_id>/",
+            closure_staff_views.StaffClosuresView.as_view(),
+            name="shop_closures_vendor",
+        ),
+        path(
+            "shop-closures/<uuid:vendor_id>/<uuid:public_id>/",
+            closure_staff_views.StaffClosureEditView.as_view(),
+            name="shop_closure_edit",
+        ),
+        path(
+            "shop-closures/<uuid:vendor_id>/<uuid:public_id>/remove/",
+            closure_staff_views.StaffClosureDeleteView.as_view(),
+            name="shop_closure_remove",
         ),
         # PAY.4: the open stray-payment alerts and their manual close (POST, a reason).
         path("stray-payments/", stray_views.StrayPaymentsView.as_view(), name="stray_payments"),
