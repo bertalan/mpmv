@@ -1,11 +1,44 @@
-"""Thin views around Wagtail's page serving (CMS.1)."""
+"""Thin views around Wagtail's page serving (CMS.1, I18N.21)."""
 
-from django.http import HttpRequest
+from django.http import Http404, HttpRequest
 from django.http.response import HttpResponseBase
+from django.utils import translation
+from wagtail.models import Page
 from wagtail.views import serve
+
+from apps.core.i18n import primary_language
+
+# Set on the request when a page is shown in place of its missing translation: the language of
+# the text actually shown. The layout reads it (`{% language_fallback_notice %}`).
+FALLBACK_ATTR = "language_fallback"
 
 
 def home(request: HttpRequest) -> HttpResponseBase:
     """The active language's home page (`/`, `/it/`, `/de/`), served by Wagtail."""
     response: HttpResponseBase = serve(request, "")
+    return response
+
+
+def serve_page(request: HttpRequest, path: str) -> HttpResponseBase:
+    """Wagtail's page view, with the primary-language fallback (I18N.21, spec 09 §9.2).
+
+    A path with no live page in the requested language is looked up in the primary language's
+    tree and served in place, the interface staying in the requested language. Wagtail's own
+    `serve` still runs, so view restrictions and the page hooks apply to the page shown; a draft
+    or private page is never found (routing only returns live pages). A page type that sets
+    `language_fallback = False` (events, legal pages) keeps its 404.
+    """
+    language = translation.get_language()
+    primary = primary_language()
+    if language == primary or Page.route_for_request(request, path) is not None:
+        response: HttpResponseBase = serve(request, path)
+        return response
+    del request._wagtail_route_for_request  # type: ignore[attr-defined]  # Wagtail's cache
+    with translation.override(primary):
+        route = Page.route_for_request(request, path)
+    if route is None or not getattr(route[0].specific_class, "language_fallback", True):
+        request._wagtail_route_for_request = route  # type: ignore[attr-defined]
+        raise Http404
+    setattr(request, FALLBACK_ATTR, primary)
+    response = serve(request, path)  # reads the route cached just above
     return response

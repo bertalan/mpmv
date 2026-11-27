@@ -159,6 +159,8 @@ class EventIndexPage(RoutablePageMixin, Page):  # type: ignore[misc]  # Wagtail 
     are file-like routes, the original-language fallback with EVT.8, the map with EVT.15.
     """
 
+    language_fallback: ClassVar[bool] = False  # Q-72: events never fall back (I18N.21)
+
     base_form_class = NFCPageForm
 
     intro = RichTextField(
@@ -447,6 +449,8 @@ class EventPage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is 
     Status = EventStatus
 
     vendor_scope: ClassVar[str] = "vendor"
+    # Q-72: an event has no URL under a language it lacks, so it never falls back (I18N.21).
+    language_fallback: ClassVar[bool] = False
     objects = EventPageManager()
 
     # The id the vendor area and the API show (like BaseModel's); each translation has its own,

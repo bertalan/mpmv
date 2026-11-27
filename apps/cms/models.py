@@ -724,7 +724,7 @@ class LegalPage(RoutablePageMixin, Page):  # type: ignore[misc]
         PLATFORM_TERMS = "platform_terms", _("Platform terms of use")
         RANKING = "ranking", _("Ranking parameters")
 
-    # Read by the visitor-content fallback (spec 09 §9.2) when it comes: legal pages opt out.
+    # Read by the visitor-content fallback (`views.serve_page`, I18N.21): legal pages opt out.
     language_fallback: ClassVar[bool] = False
 
     kind = models.CharField(
