@@ -97,6 +97,7 @@ from apps.fitment.tests.factories import (
     ProductFitmentStateFactory,
 )
 from apps.ingest.models import (
+    EnrichmentVersion,
     ImportRun,
     ItemChange,
     MappingTable,
@@ -111,6 +112,7 @@ from apps.ingest.models import (
     SupplierSource,
 )
 from apps.ingest.tests.factories import (
+    EnrichmentVersionFactory,
     ImportRunFactory,
     ItemChangeFactory,
     MappingTableFactory,
@@ -292,6 +294,9 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     SourceItem: lambda vendor: SourceItemFactory.create(source__vendor=vendor),
     SourceObservation: lambda vendor: SourceObservationFactory.create(item__source__vendor=vendor),
     ProductDraft: lambda vendor: ProductDraftFactory.create(item__source__vendor=vendor),
+    EnrichmentVersion: lambda vendor: EnrichmentVersionFactory.create(
+        draft__item__source__vendor=vendor
+    ),
     SourceState: lambda vendor: SourceStateFactory.create(item__source__vendor=vendor),
     SourceStateVersion: lambda vendor: SourceStateVersionFactory.create(
         item__source__vendor=vendor

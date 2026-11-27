@@ -27,6 +27,7 @@ from apps.vendors.scoping import VendorScopedManager
 from . import engine
 
 __all__ = [
+    "EnrichmentVersion",
     "ImportRun",
     "ItemChange",
     "ItemKind",
@@ -77,6 +78,7 @@ class ReviewKind(models.TextChoices):
     IDENTITY_CHANGE = "identity_change", "Identity change"
     STALE = "stale", "Stale"
     DUPLICATE_SKU = "duplicate_sku", "Ambiguous SKU match"
+    TEXT_POLICY = "text_policy", "AI text outside the policy"
 
 
 class ReviewDecision(models.TextChoices):
@@ -558,6 +560,54 @@ class ProductDraft(BaseModel):
 
     def __str__(self) -> str:
         return f"Draft of {self.item}"
+
+
+class EnrichmentOutcome(models.TextChoices):
+    ACCEPTED = "accepted", "Accepted"
+    OUT_OF_POLICY = "out_of_policy", "Out of policy"
+    SCHEMA_INVALID = "schema_invalid", "Schema invalid"
+
+
+class EnrichmentVersion(BaseModel):
+    """Archive of one AI enrichment output (ING.5): kept whether or not it was applied."""
+
+    Outcome = EnrichmentOutcome
+
+    vendor_scope: ClassVar[str] = "draft__item__vendor"
+
+    draft = models.ForeignKey(
+        ProductDraft,
+        on_delete=models.CASCADE,
+        related_name="enrichment_versions",
+        help_text=_("The draft this text was written for."),
+    )
+    lang = models.CharField(max_length=16, help_text=_("The language of the text."))
+    provider = models.CharField(max_length=40, help_text=_("Which AI provider wrote the text."))
+    model = models.CharField(max_length=80, help_text=_("Which model of the provider wrote it."))
+    prompt_version = models.CharField(
+        max_length=40, help_text=_("The version of the instructions the model was given.")
+    )
+    outcome = models.CharField(
+        max_length=20,
+        choices=Outcome,
+        help_text=_("Whether the text was accepted, outside the policy or not in the right shape."),
+    )
+    raw = models.JSONField(
+        default=dict, blank=True, help_text=_("The answer of the provider, as it came.")
+    )
+    violations = models.JSONField(
+        default=list, blank=True, help_text=_("What the text broke, as a list. Empty if accepted.")
+    )
+
+    objects = VendorScopedManager()
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [models.Index(fields=["draft", "lang"], name="ingest_enrich_draft_lang")]
+        constraints = [_in("outcome", EnrichmentOutcome, "ingest_enrichment_outcome_valid")]
+
+    def __str__(self) -> str:
+        return f"{self.draft} {self.lang} ({self.outcome})"
 
 
 class ImportRun(BaseModel):

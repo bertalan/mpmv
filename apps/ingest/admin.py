@@ -15,6 +15,7 @@ from apps.core.audit import audit_context
 
 from . import services
 from .models import (
+    EnrichmentVersion,
     ImportRun,
     MappingTable,
     ProductDraft,
@@ -109,3 +110,10 @@ class ProductDraftAdmin(_ReadOnly, admin.ModelAdmin[ProductDraft]):
     list_display = ("item", "status", "updated_at")
     list_filter = ("status",)
     list_select_related = ("item",)
+
+
+@admin.register(EnrichmentVersion)
+class EnrichmentVersionAdmin(_ReadOnly, admin.ModelAdmin[EnrichmentVersion]):
+    list_display = ("draft", "lang", "provider", "model", "prompt_version", "outcome", "created_at")
+    list_filter = ("outcome", "provider")
+    list_select_related = ("draft",)
