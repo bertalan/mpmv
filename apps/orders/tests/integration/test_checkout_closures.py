@@ -148,3 +148,21 @@ def test_today_is_the_business_day_of_the_checkout_instant() -> None:
     assert dates == {closed.pk: dt.date(2026, 8, 16), open_.pk: dt.date(2026, 8, 1)}
     placed = {v.vendor.pk: v.expected_dispatch_on for v in preview.vendors}
     assert placed == dates
+
+
+def test_a_chain_of_closures_past_day_180_moves_the_dispatch_to_its_end() -> None:
+    """The second range starts on day 181, right after the first: one closure of 200 days."""
+    seller = vendor("Alpha Shop")
+    today = business_today()
+    VendorClosureFactory.create(
+        vendor=seller, start_date=today - dt.timedelta(days=1), end_date=today + dt.timedelta(180)
+    )
+    VendorClosureFactory.create(
+        vendor=seller,
+        start_date=today + dt.timedelta(days=181),
+        end_date=today + dt.timedelta(days=200),
+    )
+    cart = CartFactory.create()
+    add(cart, seller, "30.00", "Blue vase")
+    (package,) = checkout.build_checkout(cart, ADDRESS).packages
+    assert package.dispatch_on == today + dt.timedelta(days=201)

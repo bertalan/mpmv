@@ -26,7 +26,6 @@ from apps.core.models import MediaImage
 from apps.core.money import CURRENCY, round_line
 from apps.orders import engine
 from apps.orders.services import CheckoutPreview
-from apps.shipping import services as shipping_services
 from apps.shipping.engine import ClosureNotice, delivery_window
 from apps.tax import engine as tax_engine
 from apps.tax import prices as tax_prices
@@ -231,11 +230,9 @@ def package_views(
     thumbnails = product_pages.line_thumbnails(
         [(product, variant) for product, variant in lines], language
     )
-    # One query for every vendor of the cart (the closure notice of each package).
-    today = business_today()
-    notices = shipping_services.closure_notices(
-        {package.vendor_id for package in preview.packages}, today
-    )
+    # The closure notices and the day the checkout read them for (VEN.20): no second query.
+    today = preview.business_day or business_today()
+    notices = preview.closure_notices
     out: list[PackageView] = []
     for index, package in enumerate(preview.packages, start=1):
         vendor = vendors.get(package.vendor_id)

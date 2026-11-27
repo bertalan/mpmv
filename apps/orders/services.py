@@ -11,7 +11,7 @@ import contextlib
 import datetime as dt
 import logging
 import uuid
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, Protocol
@@ -41,6 +41,7 @@ from apps.core.services import (
     flag_enabled,
     scrub_order_emails,
 )
+from apps.shipping.engine import ClosureNotice
 from apps.shipping.models import Carrier
 from apps.vendors import services as vendors_services
 from apps.vendors.models import Vendor
@@ -968,6 +969,10 @@ class CheckoutPreview:
     packages: Sequence[engine.PackageSummary] = ()
     blocks: Sequence[engine.Block] = ()
     totals: engine.Totals | None = None
+    # VEN.20: the business day the preview was built for and each vendor's closure notice, read
+    # with the dispatch dates, so the page shows what the checkout used.
+    business_day: dt.date | None = None
+    closure_notices: Mapping[int, ClosureNotice | None] = field(default_factory=dict)
 
     @property
     def placeable(self) -> bool:
