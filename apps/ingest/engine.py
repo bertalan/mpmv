@@ -5,10 +5,17 @@ import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from typing import Any, Final, Literal
 from urllib.parse import urlsplit, urlunsplit
 
-from apps.catalog.engine import sku_match_key
+from apps.catalog.engine import (
+    ProductIn,
+    TranslationIn,
+    publication_errors,
+    sku_match_key,
+    to_price,
+)
 
 # --- Import run status machine
 
@@ -290,3 +297,100 @@ def latest_field_values(
             if flagged.get(field) is True and (fields is None or field in fields):
                 latest[field] = value
     return latest
+
+
+# --- Publishing drafts (ING.7)
+
+
+@dataclass(frozen=True)
+class DraftProblem:
+    """Why a draft cannot be turned into a catalog payload."""
+
+    reason: str
+
+
+def is_publishable_status(status: str) -> bool:
+    """Only a draft marked `ready` is published; a person or the pipeline sets it."""
+    return status == "ready"
+
+
+def _text(value: object) -> str:
+    return value.strip() if isinstance(value, str) else ""
+
+
+def _decimal(value: object) -> Decimal | None:
+    if value is None or isinstance(value, bool) or value == "":
+        return None
+    try:
+        number = Decimal(str(value))
+    except InvalidOperation:
+        raise ValueError(str(value)) from None
+    if not number.is_finite():
+        raise ValueError(str(value))
+    return number
+
+
+def _whole(value: object) -> int | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool) or not isinstance(value, int | str):
+        raise ValueError(str(value))
+    return int(value)
+
+
+def plan_draft_product(
+    sku: str,
+    extracted: Mapping[str, Any],
+    enriched: Mapping[str, Any],
+    *,
+    language: str,
+) -> ProductIn | DraftProblem:
+    """The catalog payload of a draft, with the text in `language` only (D-18 bis, Q-71).
+
+    Other languages in `enriched` are ignored: a new draft publishes in the primary language
+    only, and an existing product keeps the texts it already has because the catalog upsert
+    leaves languages the payload omits alone. The enriched text wins over the extracted one.
+    Pure: no ORM. Returns a `DraftProblem` for a draft that would not pass the catalog rules.
+    """
+    written = enriched.get(language)
+    text = written if isinstance(written, Mapping) else {}
+
+    def pick(field: str) -> str:
+        return _text(text.get(field)) or _text(extracted.get(field))
+
+    title = pick("title")
+    if not title:
+        return DraftProblem("The draft has no title.")
+    try:
+        price = _decimal(extracted.get("price"))
+        weight = _decimal(extracted.get("weight_kg"))
+        sizes = [_whole(extracted.get(f"{d}_mm")) for d in ("length", "width", "height")]
+    except ValueError as exc:
+        return DraftProblem(f"The draft has a malformed number: {exc}.")
+    if price is None or price < 0:
+        return DraftProblem("The draft has no valid price.")
+    payload = ProductIn(
+        sku=sku,
+        price_net=to_price(price),
+        weight_kg=weight,
+        length_mm=sizes[0],
+        width_mm=sizes[1],
+        height_mm=sizes[2],
+        country_of_origin=_text(extracted.get("country_of_origin")),
+        translations=(
+            TranslationIn(
+                language=language,
+                title=title,
+                short_description=pick("short_description"),
+                description=pick("description"),
+                material=pick("material"),
+                colour=pick("colour"),
+            ),
+        ),
+    )
+    problems = publication_errors(
+        payload.sales_mode, payload.price_net, payload.weight_kg, [language], language
+    )
+    if problems:
+        return DraftProblem(" ".join(problems))
+    return payload
