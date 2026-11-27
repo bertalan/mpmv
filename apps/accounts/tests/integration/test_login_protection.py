@@ -14,7 +14,7 @@ from django.contrib.auth import authenticate
 from django.test import Client, override_settings
 from django.urls import reverse
 from django.utils import timezone, translation
-from django.utils.translation import ngettext
+from django.utils.translation import npgettext
 
 from apps.accounts.models import User
 from apps.accounts.services import (
@@ -197,9 +197,10 @@ def test_unknown_emails_are_locked_exactly_like_real_ones(client: Client) -> Non
 # --- The waiting time (CORE.29, owner decision Q-12)
 
 
-def _wait_message(minutes: int) -> str:
+def _wait_message(minutes: int, context: str = "staff sign-in") -> str:
     with translation.override(primary_language()):
-        return ngettext(
+        return npgettext(
+            context,
             "Too many attempts. Please try again in %(minutes)s minute.",
             "Too many attempts. Please try again in %(minutes)s minutes.",
             minutes,
@@ -220,7 +221,8 @@ def test_a_locked_login_shows_the_waiting_time_the_same_for_known_and_unknown_em
 def test_the_waiting_time_is_rounded_up_to_whole_minutes(client: Client, staff: User) -> None:
     _fail(client, staff.email, ACCOUNT_LOCKOUT.free_attempts)
     account = Throttle.objects.get(key=f"{ACCOUNT_KEY_PREFIX}{staff.email}")
-    for seconds, minutes in ((59, 1), (61, 2), (90, 2), (120, 2), (121, 3)):
+    assert account.locked_until is not None
+    for seconds, minutes in ((59, 1), (60, 1), (61, 2), (90, 2), (120, 2), (121, 3)):
         # A frozen distance: shift the lock so that exactly `seconds` remain at the request.
         remaining = dt.timedelta(seconds=seconds)
         with mock.patch("django.utils.timezone.now", return_value=account.locked_until - remaining):
@@ -251,7 +253,7 @@ def test_the_manager_login_shows_the_waiting_time_too(
     page = client.post(
         reverse("login"), {"username": staff.email, "password": password}, REMOTE_ADDR=IP
     ).content.decode()
-    assert _wait_message(1) in page
+    assert _wait_message(1, "") in page
 
 
 # --- Per-IP progressive lockout

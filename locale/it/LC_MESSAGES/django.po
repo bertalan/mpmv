@@ -13794,6 +13794,19 @@ msgstr ""
 "dati del venditore nella conferma d'ordine (pagina ed e-mail) e nel riepilogo dell'ordine al "
 "momento dell'acquisto)"
 
+#: apps/accounts/forms.py
+msgid "Too many attempts. Please try again in %(minutes)s minute."
+msgid_plural "Too many attempts. Please try again in %(minutes)s minutes."
+msgstr[0] "Troppi tentativi. Riprova tra %(minutes)s minuto."
+msgstr[1] "Troppi tentativi. Riprova tra %(minutes)s minuti."
+
+#: apps/accounts/forms.py
+msgctxt "staff sign-in"
+msgid "Too many attempts. Please try again in %(minutes)s minute."
+msgid_plural "Too many attempts. Please try again in %(minutes)s minutes."
+msgstr[0] "Troppi tentativi. Riprovi tra %(minutes)s minuto."
+msgstr[1] "Troppi tentativi. Riprovi tra %(minutes)s minuti."
+
 #: apps/accounts/action_link_views.py apps/accounts/decorators.py apps/manager/stray_views.py
 #: apps/orders/customer_views.py apps/vendors/views.py
 msgid "Too many attempts. Please try again later."

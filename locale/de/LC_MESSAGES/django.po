@@ -13963,6 +13963,19 @@ msgstr ""
 "Angaben des Verkäufers in Ihrer Bestellbestätigung (Seite und E-Mail) und in der Bestellübersicht "
 "beim Bezahlvorgang)"
 
+#: apps/accounts/forms.py
+msgid "Too many attempts. Please try again in %(minutes)s minute."
+msgid_plural "Too many attempts. Please try again in %(minutes)s minutes."
+msgstr[0] "Zu viele Versuche. Bitte versuche es in %(minutes)s Minute erneut."
+msgstr[1] "Zu viele Versuche. Bitte versuche es in %(minutes)s Minuten erneut."
+
+#: apps/accounts/forms.py
+msgctxt "staff sign-in"
+msgid "Too many attempts. Please try again in %(minutes)s minute."
+msgid_plural "Too many attempts. Please try again in %(minutes)s minutes."
+msgstr[0] "Zu viele Versuche. Bitte versuchen Sie es in %(minutes)s Minute erneut."
+msgstr[1] "Zu viele Versuche. Bitte versuchen Sie es in %(minutes)s Minuten erneut."
+
 #: apps/accounts/action_link_views.py apps/accounts/decorators.py apps/manager/stray_views.py
 #: apps/orders/customer_views.py apps/vendors/views.py
 msgid "Too many attempts. Please try again later."

@@ -13919,6 +13919,19 @@ msgstr ""
 "électronique : voir les coordonnées du vendeur dans votre confirmation de commande (page et "
 "courrier électronique) et dans le récapitulatif de la commande avant de la passer)"
 
+#: apps/accounts/forms.py
+msgid "Too many attempts. Please try again in %(minutes)s minute."
+msgid_plural "Too many attempts. Please try again in %(minutes)s minutes."
+msgstr[0] "Trop de tentatives. Réessaie dans %(minutes)s minute."
+msgstr[1] "Trop de tentatives. Réessaie dans %(minutes)s minutes."
+
+#: apps/accounts/forms.py
+msgctxt "staff sign-in"
+msgid "Too many attempts. Please try again in %(minutes)s minute."
+msgid_plural "Too many attempts. Please try again in %(minutes)s minutes."
+msgstr[0] "Trop de tentatives. Veuillez réessayer dans %(minutes)s minute."
+msgstr[1] "Trop de tentatives. Veuillez réessayer dans %(minutes)s minutes."
+
 #: apps/accounts/action_link_views.py apps/accounts/decorators.py apps/manager/stray_views.py
 #: apps/orders/customer_views.py apps/vendors/views.py
 msgid "Too many attempts. Please try again later."
