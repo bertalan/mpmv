@@ -486,3 +486,22 @@ def test_add_many_refuses_an_existing_line_whose_total_goes_above_the_maximum() 
     assert caught.value.message_dict == {"quantity": ["Only 5 available."]}
     assert CartLine.objects.get(cart=cart, product=product).quantity == 3
     assert not AuditLog.objects.filter(action=services.BULK_ADD_ACTION).exists()
+
+
+def test_add_many_refuses_more_than_the_line_cap_even_with_plenty_of_stock() -> None:
+    from apps.cart import engine
+
+    cart = guest_cart()
+    product = sellable(stock_qty=engine.MAX_LINE_QUANTITY + 500)
+    expected = f"Only {engine.MAX_LINE_QUANTITY} available."
+    for items in (
+        [(product, None, engine.MAX_LINE_QUANTITY + 1)],
+        [(product, None, 600), (product, None, 600)],  # listed twice: the total counts
+    ):
+        with pytest.raises(ValidationError) as caught:
+            services.add_many_to_cart(cart, items, ctx=CTX)
+        assert caught.value.message_dict == {"quantity": [expected]}
+    assert not CartLine.objects.filter(cart=cart).exists()
+    assert not AuditLog.objects.filter(action=services.BULK_ADD_ACTION).exists()
+    services.add_many_to_cart(cart, [(product, None, engine.MAX_LINE_QUANTITY)], ctx=CTX)
+    assert CartLine.objects.get(cart=cart).quantity == engine.MAX_LINE_QUANTITY
