@@ -9,8 +9,9 @@ redirect, and asserts:
 
 - the answer is 200 and `<html lang>` is the target language;
 - the page is the same object in that language (the independently computed translation URL), or
-  the documented fallback: the target language's home with a one-time notice when the object has
-  no translation, or the page's own path translated when the page has no object;
+  the documented fallback (I18N.22): the same object under the new prefix with the "not yet
+  available" notice when it has no translation (an event or legal page stays on its own page, the
+  notice shown once), or the page's own path translated when the page has no object;
 - a page whose URL carries a secret never echoes it into the HTML, before or after the switch.
 
 Pages with no switcher on purpose (error pages, the Django admin, the editors' admin) are asserted
@@ -62,7 +63,7 @@ from apps.cms.tests.factories import (
     VendorLandingPageFactory,
     VendorRecruitmentPageFactory,
 )
-from apps.core.i18n import configured_languages, primary_language
+from apps.core.i18n import configured_languages, primary_language, translate_path
 from apps.core.models import TranslationStatus
 from apps.events.models import EventIndexPage
 from apps.events.tests.factories import EventPageFactory
@@ -78,7 +79,7 @@ pytestmark = pytest.mark.django_db
 
 PUBLISHED = TranslationStatus.PUBLISHED
 LANGUAGES = configured_languages()
-NOTICE_MSGID = "This content is not available in this language."
+NOTICE_MSGID = "Not yet available in this language; shown in %(endonym)s"
 
 
 def home_of(code: str) -> str:
@@ -155,7 +156,7 @@ def landing_path(response: Any, started: str) -> str:
 
 def notice_text(code: str) -> str:
     with translation.override(code):
-        return gettext(NOTICE_MSGID)
+        return gettext(NOTICE_MSGID).split("%(endonym)s")[0]  # the endonym depends on the page
 
 
 def client_for(case: Case) -> Client:
@@ -200,9 +201,11 @@ def sweep(case: Case, language: str) -> None:
         assert not leaks(response, case.secret), (
             "a secret is written into the page after the switch"
         )
-    if notice:  # shown once
+    if notice:
         again = client.get(path)
-        assert notice_text(language) not in again.content.decode()
+        shown_again = notice_text(language) in again.content.decode()
+        # A served fallback shows it on every load; a flash (no fallback) only once.
+        assert shown_again is (forms[language].get("notice") != "1"), (case.url, language)
 
 
 # --- Building the route classes. Each builder returns a Case.
@@ -221,11 +224,19 @@ def _translate(page: Page, *codes: str) -> None:
 
 
 def _expect_pages(page: Page, translated: dict[str, str]) -> dict[str, tuple[str, bool]]:
-    """Translation URL where `translated` has the language, else the home with a notice."""
-    return {
-        code: (translated[code], False) if code in translated else (home_of(code), True)
-        for code in LANGUAGES
-    }
+    """Translation URL where `translated` has the language. Else the page stays (I18N.22): the
+    primary-language object under the new prefix when the page falls back to it, otherwise the
+    page itself (an event, a legal page), with the notice."""
+    fallback = page is None or getattr(page.specific_class, "language_fallback", True)
+    expect: dict[str, tuple[str, bool]] = {}
+    for code in LANGUAGES:
+        if code in translated:
+            expect[code] = (translated[code], False)
+        elif fallback and primary_language() in translated:
+            expect[code] = (translate_path(translated[primary_language()], code), True)
+        else:
+            expect[code] = (page.url if page is not None else home_of(code), True)
+    return expect
 
 
 def home_en() -> Case:

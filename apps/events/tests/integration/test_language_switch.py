@@ -10,7 +10,7 @@ from django.test import Client
 from wagtail.models import Locale
 
 from apps.cms.services import seed_site, translate_page
-from apps.core.i18n import primary_language
+from apps.core.i18n import configured_languages, primary_language
 from apps.events.models import EventIndexPage, EventPage
 from apps.events.tests.factories import EventPageFactory
 from tests.i18n import fallback_notice, other_language
@@ -56,20 +56,23 @@ def test_an_event_with_a_translation_switches_to_it_and_matches_hreflang(client:
     html = client.get(page.url).content.decode()
     found = targets(html)
     assert found[primary_language()] == (english.url, False)
-    assert found["de"] == (page.url, True)
     alternates = {code: url for code, url in hreflang(html).items() if code != "x-default"}
     assert set(alternates) == {other_language(), primary_language()}
     for code, url in alternates.items():
         assert url.endswith(found[code][0])
     assert {code for code, (_u, notice) in found.items() if not notice} == set(alternates)
+    for code in configured_languages():  # no translation: the event's own page, with the notice
+        if code not in alternates:
+            assert found[code] == (page.url, True)
 
 
 def test_an_event_without_a_translation_has_no_alternate_and_a_notice(client: Client) -> None:
     page = _italian_event("solo-italiano")
     html = client.get(page.url).content.decode()
     found = targets(html)
-    assert found[primary_language()] == (page.url, True)
-    assert found["de"] == (page.url, True)
+    for code in configured_languages():
+        if code != other_language():
+            assert found[code] == (page.url, True)
     assert {code for code in hreflang(html) if code != "x-default"} == {other_language()}
 
 
