@@ -55,6 +55,12 @@ def test_schema_rejects_bad_shape(raw: dict[str, object], fragment: str) -> None
         ({"description": "An eco-friendly mug"}, "environmental claim"),
         ({"description": "Fits all models"}, "fitment claim"),
         ({"description": "Lorem ipsum dolor"}, "placeholder"),
+        ({"description": "Order at shop.example.com today"}, "contains a URL"),
+        ({"description": "Write to sales@example.org"}, "contains a URL"),
+        ({"description": "An ECO\u200b-friendly mug"}, "environmental claim"),
+        ({"description": "An \uff25\uff23\uff2f-friendly mug"}, "environmental claim"),
+        ({"title": "Mug\nSecond line"}, "line break"),
+        ({"description": "Price tbd"}, "placeholder"),
     ],
 )
 def test_out_of_policy_texts_are_flagged(changes: dict[str, object], fragment: str) -> None:
@@ -90,3 +96,14 @@ def test_fake_records_calls_and_can_fail() -> None:
     with pytest.raises(ProviderError):
         fake.describe(FACTS, "en", POLICY)
     assert fake.calls == [(FACTS, "en")]
+
+
+def test_a_word_containing_tbd_is_not_a_placeholder() -> None:
+    text, _ = eng.validate_schema(good(description="Matchbd rack for the kitchen"), "en")
+    assert text is not None
+    assert eng.check_policy(text, POLICY) == []
+
+
+def test_default_limits_cannot_be_changed_in_place() -> None:
+    with pytest.raises(TypeError):
+        POLICY.max_lengths["title"] = 1000  # type: ignore[index]
