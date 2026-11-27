@@ -850,7 +850,7 @@ def report_vendor_tax_profile(vendor: Vendor) -> ProfileInconsistency | None:
 
 
 def _vat_key(country: str, vat_number: str) -> tuple[str, str]:
-    return split_vat_number(vat_number, normalize_country(country))
+    return split_vat_number(vat_number, engine.vies_country(country))
 
 
 def record_vat_validation(
