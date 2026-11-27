@@ -9,6 +9,7 @@ from django.urls import include, path
 
 from . import (
     amendment_views,
+    closure_views,
     event_block_views,
     event_views,
     fitment_picker,
@@ -50,6 +51,18 @@ shop = (
         path("sales-terms/", sales_terms_views.SalesTermsView.as_view(), name="sales_terms"),
         path(
             "return-policy/", return_policy_views.ReturnPolicyView.as_view(), name="return_policy"
+        ),
+        # VEN.20: the shop's holidays and closures (list and add, edit, remove).
+        path("settings/closures/", closure_views.ClosuresView.as_view(), name="closures"),
+        path(
+            "settings/closures/<uuid:public_id>/",
+            closure_views.ClosureEditView.as_view(),
+            name="closure_edit",
+        ),
+        path(
+            "settings/closures/<uuid:public_id>/remove/",
+            closure_views.ClosureDeleteView.as_view(),
+            name="closure_remove",
         ),
         # EVT.4: the vendor's own events (list, form, submit, cancel).
         path("events/", event_views.EventsView.as_view(), name="events"),

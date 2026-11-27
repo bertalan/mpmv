@@ -462,6 +462,10 @@ msgid "A clear, short answer. It opens when the visitor clicks the question. Req
 msgstr ""
 "Eine klare, kurze Antwort. Sie wird geöffnet, wenn der Besucher auf die Frage klickt. Pflichtfeld."
 
+#: apps/manager/templates/manager/shop/closures.html
+msgid "A closure that has ended stays here as history and cannot be changed."
+msgstr "Eine beendete Schließung bleibt hier als Verlauf stehen und kann nicht geändert werden."
+
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
 #: apps/compliance/templates/email/compliance/termination_notice/body.html
@@ -1181,6 +1185,10 @@ msgstr "Block hinzufügen"
 msgid "Add a child"
 msgstr "Unterknoten hinzufügen"
 
+#: apps/manager/templates/manager/shop/closures.html
+msgid "Add a closure"
+msgstr "Schließung hinzufügen"
+
 #: apps/accounts/templates/accounts/mfa/overview.html
 #: themes/ride/templates/accounts/mfa/overview.html
 msgid "Add a factor"
@@ -1861,6 +1869,10 @@ msgstr "Zurück zum Warenkorb"
 msgid "Back to the change"
 msgstr "Zurück zur Änderung"
 
+#: apps/manager/templates/manager/shop/closure_form.html
+msgid "Back to the closures"
+msgstr "Zurück zu den Schließungen"
+
 #: apps/events/templates/events/admin/confirm.html apps/events/templates/events/admin/hide.html
 #: apps/manager/templates/manager/shop/event_block_form.html
 #: apps/manager/templates/manager/shop/event_block_types.html
@@ -2036,6 +2048,14 @@ msgstr "Link der Schaltfläche"
 #: apps/cms/blocks.py apps/manager/event_block_forms.py
 msgid "Button text"
 msgstr "Schaltflächentext"
+
+#: apps/manager/templates/manager/shop/closures.html
+msgid ""
+"Buyers can still order while the shop is closed. They are told the dates and when the package will"
+" leave. The notice has fixed wording and shows only these dates."
+msgstr ""
+"Käufer können auch bestellen, während der Shop geschlossen ist. Sie erfahren die Daten und wann "
+"das Paket versandt wird. Der Hinweis hat einen festen Wortlaut und zeigt nur diese Daten."
 
 #: apps/manager/trust_views.py
 msgid "Buyers needed per country"
@@ -3031,6 +3051,10 @@ msgstr "Quellenangabe"
 msgid "Credits"
 msgstr "Gutschriften"
 
+#: apps/manager/templates/manager/shop/closures.html
+msgid "Current and upcoming closures"
+msgstr "Laufende und kommende Schließungen"
+
 #: apps/manager/templates/manager/shop/money.html
 msgid "Current balance"
 msgstr "Aktueller Saldo"
@@ -3116,6 +3140,10 @@ msgid ""
 msgstr ""
 "Tage einer wiederkehrenden ganztägigen Veranstaltung, die übersprungen werden, zum Beispiel ein "
 "Feiertag. Wenn Sie das Feld leer lassen, wird kein Tag übersprungen."
+
+#: apps/manager/forms.py
+msgid "Days of notice"
+msgstr "Tage Vorlaufzeit"
 
 #: apps/manager/fitment_forms.py
 msgid "Days of notice before deletion"
@@ -3511,12 +3539,17 @@ msgstr "Erreicht bei höchstens"
 
 #: apps/manager/templates/manager/platform/trust_rule_preview.html
 #: apps/manager/templates/manager/shop/_event_blocks.html
+#: apps/manager/templates/manager/shop/closures.html
 msgid "Edit"
 msgstr "Bearbeiten"
 
 #: apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "Edit %(label)s"
 msgstr "%(label)s bearbeiten"
+
+#: apps/manager/closure_views.py
+msgid "Edit a closure"
+msgstr "Schließung bearbeiten"
 
 #: apps/manager/event_block_views.py
 msgid "Edit the block"
@@ -3799,6 +3832,10 @@ msgstr "Jede Woche an diesen Tagen"
 msgid "Every year, on the same dates"
 msgstr "Jedes Jahr an denselben Daten"
 
+#: apps/manager/templates/manager/shop/closures.html
+msgid "Every year."
+msgstr "Jedes Jahr."
+
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Exact location"
 msgstr "Genauer Standort"
@@ -3959,6 +3996,10 @@ msgstr "Bestellung suchen"
 msgid "Fingerprint %(hash)s."
 msgstr "Fingerabdruck %(hash)s."
 
+#: apps/manager/forms.py
+msgid "First closed day"
+msgstr "Erster Schließtag"
+
 #: apps/vendors/models.py
 msgid "First closed day."
 msgstr "Erster Tag der Schließung."
@@ -4085,6 +4126,14 @@ msgstr "Von"
 #: apps/catalog/templates/catalog/listing.html themes/ride/templates/catalog/listing.html
 msgid "From %(currency)s %(amount)s"
 msgstr "Ab %(currency)s %(amount)s"
+
+#: apps/manager/templates/manager/shop/closures.html
+msgid "From %(start)s to %(end)s, notice %(days)s days before."
+msgstr "Vom %(start)s bis %(end)s, Hinweis %(days)s Tage vorher."
+
+#: apps/manager/templates/manager/shop/closures.html
+msgid "From %(start)s to %(end)s."
+msgstr "Vom %(start)s bis %(end)s."
 
 #: apps/fitment/product_summary.py
 msgid "from %(year)s"
@@ -4400,6 +4449,11 @@ msgstr ""
 msgid "Highlights"
 msgstr "Highlights"
 
+#: apps/manager/sections.py apps/manager/site_map.py
+#: apps/manager/templates/manager/shop/closures.html
+msgid "Holidays and closures"
+msgstr "Urlaub und Schließungen"
+
 #: apps/cms/templatetags/cms_tags.py apps/manager/site_map.py apps/seo/page_builders.py
 #: apps/seo/product_jsonld.py
 msgid "Home"
@@ -4483,6 +4537,10 @@ msgstr ""
 "Wie viele Tage ein Verbraucher nach Erhalt Zeit hat, Waren zurückzusenden. Das Gesetz sieht für "
 "Verkäufe an Verbraucher mindestens 14 Tage vor, daher wird eine kleinere Zahl abgelehnt. "
 "Pflichtfeld."
+
+#: apps/manager/forms.py
+msgid "How many days before the closure buyers are told about it. From 0 to 60."
+msgstr "Wie viele Tage vor der Schließung die Käufer informiert werden. Von 0 bis 60."
 
 #: apps/vendors/models.py
 msgid "How many days before the closure the notice appears (0 to 60)."
@@ -5063,6 +5121,10 @@ msgstr "Beibehalten"
 msgid "keep submissions for (days)"
 msgstr "Einsendungen aufbewahren für (Tage)"
 
+#: apps/manager/templates/manager/shop/closure_remove.html
+msgid "Keep the closure"
+msgstr "Schließung behalten"
+
 #: apps/manager/templates/manager/shop/event_cancel.html
 msgid "Keep the event"
 msgstr "Veranstaltung beibehalten"
@@ -5120,6 +5182,10 @@ msgstr "Sprache: %(language)s. Originalsprache der Veranstaltung: %(original)s."
 #: themes/ride/templates/compliance/contact_points.html
 msgid "Languages:"
 msgstr "Sprachen:"
+
+#: apps/manager/forms.py
+msgid "Last closed day"
+msgstr "Letzter Schließtag"
 
 #: apps/vendors/models.py
 msgid "Last closed day."
@@ -5829,6 +5895,10 @@ msgstr "Für dieses Paar gibt es keine Grundfarbe zum Ändern."
 #: apps/manager/amendment_forms.py
 msgid "No change"
 msgstr "Keine Änderung"
+
+#: apps/manager/templates/manager/shop/closures.html
+msgid "No closure is planned."
+msgstr "Es ist keine Schließung geplant."
 
 #: apps/manager/event_block_forms.py
 msgid "No event"
@@ -7186,6 +7256,10 @@ msgstr "Passwort"
 msgid "Password again"
 msgstr "Passwort wiederholen"
 
+#: apps/manager/templates/manager/shop/closures.html
+msgid "Past closures"
+msgstr "Vergangene Schließungen"
+
 #: apps/events/templates/events/_links.html apps/events/templates/events/event_past.html
 msgid "Past events"
 msgstr "Vergangene Veranstaltungen"
@@ -8232,6 +8306,7 @@ msgstr "Erinnerung: Bestätigen Sie Ihre E-Mail-Adresse, um Ihre Bewerbung abzus
 #: apps/manager/templates/manager/platform/fitment_node.html
 #: apps/manager/templates/manager/shop/_event_blocks.html
 #: apps/manager/templates/manager/shop/_fitment_rows.html
+#: apps/manager/templates/manager/shop/closures.html
 #: apps/manager/templates/manager/shop/event_block_remove.html
 #: themes/base/templates/components/cart_line.html themes/ride/templates/accounts/mfa/overview.html
 #: themes/ride/templates/accounts/mfa/setup.html themes/ride/templates/components/cart_line.html
@@ -8246,9 +8321,25 @@ msgstr "%(name)s entfernen"
 msgid "Remove %(title)s"
 msgstr "%(title)s entfernen"
 
+#: apps/manager/closure_views.py
+msgid "Remove a closure"
+msgstr "Schließung entfernen"
+
 #: apps/catalog/templates/catalog/listing.html themes/ride/templates/catalog/listing.html
 msgid "remove filter"
 msgstr "Filter entfernen"
+
+#: apps/manager/templates/manager/shop/closure_remove.html
+msgid "Remove the closure"
+msgstr "Schließung entfernen"
+
+#: apps/manager/templates/manager/shop/closure_remove.html
+msgid ""
+"Remove the closure from %(start)s to %(end)s? Buyers stop seeing its notice and orders are no "
+"longer moved to a later dispatch date."
+msgstr ""
+"Die Schließung vom %(start)s bis %(end)s entfernen? Käufer sehen ihren Hinweis nicht mehr, und "
+"Bestellungen werden nicht mehr auf ein späteres Versanddatum verschoben."
 
 #: apps/manager/forms.py
 msgid "Remove the logo"
@@ -8291,6 +8382,10 @@ msgstr "wiederholten Verstößen gegen die Plattformbedingungen"
 #: apps/manager/event_forms.py
 msgid "Repeats"
 msgstr "Wiederholt sich"
+
+#: apps/manager/forms.py
+msgid "Repeats every year"
+msgstr "Wiederholt sich jedes Jahr"
 
 #: apps/manager/event_forms.py
 msgid "Repetition"
@@ -8628,6 +8723,11 @@ msgstr "Logo speichern"
 msgid "Save my choices"
 msgstr "Meine Auswahl speichern"
 
+#: apps/manager/templates/manager/shop/closure_form.html
+#: apps/manager/templates/manager/shop/closures.html
+msgid "Save the closure"
+msgstr "Schließung speichern"
+
 #: apps/manager/templates/manager/shop/event_form.html
 msgid "Save the event first: then you can add text, pictures and other blocks to its page."
 msgstr ""
@@ -8771,6 +8871,10 @@ msgstr "Auswählen"
 #: apps/manager/fitment_shop_views.py apps/manager/lists.py
 msgid "Select at least one row."
 msgstr "Wählen Sie mindestens eine Zeile aus."
+
+#: apps/manager/forms.py
+msgid "Select it if the shop closes on the same days every year."
+msgstr "Wählen Sie dies, wenn der Shop jedes Jahr an denselben Tagen schließt."
 
 #: apps/manager/site_map.py apps/vendors/templates/vendors/apply/form.html
 msgid "Sell with us"
@@ -9007,6 +9111,10 @@ msgstr "Shop"
 #: apps/cms/templates/cms/includes/term_landing_before.html
 msgid "Shop by category"
 msgstr "Nach Kategorie einkaufen"
+
+#: apps/shipping/templates/shipping/closure_notice.html
+msgid "Shop closure"
+msgstr "Schließung des Shops"
 
 #: apps/manager/amendment_views.py
 msgid "Shop frozen"
@@ -10140,6 +10248,14 @@ msgstr ""
 "(Art. 1341 Abs. 2 des italienischen Zivilgesetzbuchs), eine pro Zeile in der Form: Artikelnummer |"
 " Titel. Zum Beispiel: 7 | Haftungsbeschränkung. Pflichtfeld."
 
+#: apps/manager/closure_views.py
+msgid "The closure is removed."
+msgstr "Die Schließung wurde entfernt."
+
+#: apps/manager/closure_views.py
+msgid "The closure is saved. Buyers see the notice from now on."
+msgstr "Die Schließung wurde gespeichert. Käufer sehen den Hinweis ab sofort."
+
 #: apps/themes/models.py
 msgid ""
 "The colour palette of the whole site. Leave it empty for the theme's own colours (Red for ride)."
@@ -10603,6 +10719,10 @@ msgid "The first day of an all-day event. Required when 'All day' is ticked."
 msgstr ""
 "Der erste Tag einer ganztägigen Veranstaltung. Pflichtfeld, wenn 'Ganztägig' angekreuzt ist."
 
+#: apps/manager/forms.py
+msgid "The first day on which the shop is closed. Required."
+msgstr "Der erste Tag, an dem der Shop geschlossen ist. Pflichtangabe."
+
 #: apps/orders/amendment_engine.py
 msgid ""
 "The fiscal category of this line was not recorded when it was sold, so its tax cannot be decided "
@@ -10973,6 +11093,10 @@ msgid "The last day of the restriction. Leave it empty when the restriction has 
 msgstr ""
 "Der letzte Tag der Einschränkung. Lassen Sie das Feld leer, wenn die Einschränkung kein Enddatum "
 "hat."
+
+#: apps/manager/forms.py
+msgid "The last day on which the shop is closed. It can be the same day. Required."
+msgstr "Der letzte Tag, an dem der Shop geschlossen ist. Es kann derselbe Tag sein. Pflichtangabe."
 
 #: apps/catalog/taxonomy.py
 msgid ""
@@ -11449,6 +11573,14 @@ msgid ""
 msgstr ""
 "Die Nord-Süd-Position, von -90 bis 90, zum Beispiel 45.464200. Die Karte füllt sie aus. Geben Sie "
 "Breiten- und Längengrad an oder keinen von beiden."
+
+#: apps/manager/templates/manager/shop/closures.html
+msgid ""
+"The notice appears the chosen number of days before a closure and stays until it ends. If you see "
+"nothing above, no notice is shown today."
+msgstr ""
+"Der Hinweis erscheint die gewählte Anzahl Tage vor einer Schließung und bleibt bis zu ihrem Ende. "
+"Wenn oben nichts steht, wird heute kein Hinweis angezeigt."
 
 #: apps/manager/termination_views.py
 msgid "The notice is recorded and the vendor is told."
@@ -13516,6 +13648,20 @@ msgstr ""
 msgid "this session"
 msgstr "diese sitzung"
 
+#: apps/shipping/templates/shipping/closure_notice.html
+msgid ""
+"This shop is closed from %(start)s to %(end)s. Orders placed now will be dispatched from "
+"%(dispatch)s."
+msgstr ""
+"Dieser Shop ist vom %(start)s bis %(end)s geschlossen. Jetzt aufgegebene Bestellungen werden ab "
+"dem %(dispatch)s versandt."
+
+#: apps/shipping/templates/shipping/closure_notice.html
+msgid "This shop is closed on %(day)s. Orders placed now will be dispatched from %(dispatch)s."
+msgstr ""
+"Dieser Shop ist am %(day)s geschlossen. Jetzt aufgegebene Bestellungen werden ab dem %(dispatch)s "
+"versandt."
+
 #: apps/manager/notice_views.py
 msgid "This step is not possible for the notice in its status."
 msgstr "Dieser Schritt ist für die Meldung in ihrem aktuellen Status nicht möglich."
@@ -14821,6 +14967,7 @@ msgstr ""
 msgid "What buyers see for this version: in stock, out of stock or on backorder."
 msgstr "Was Käufer für diese Variante sehen: auf Lager, nicht auf Lager oder auf Nachbestellung."
 
+#: apps/manager/templates/manager/shop/closures.html
 #: apps/manager/templates/manager/shop/return_policy.html
 msgid "What buyers see now"
 msgstr "Was Käufer jetzt sehen"

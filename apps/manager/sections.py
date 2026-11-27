@@ -13,6 +13,7 @@ from apps.vendors.services import can_review_profiles
 
 from .amendment_views import PLATFORM_SECTION as ORDER_CHANGES_SECTION
 from .amendment_views import SETTINGS_SECTION as AMENDMENT_SETTINGS_SECTION
+from .closure_views import SECTION as CLOSURES_SECTION
 from .event_views import SECTION as EVENTS_SECTION
 from .fitment_shop_views import SECTION as SHOP_FITMENT_SECTION
 from .fitment_views import CATEGORIES_SECTION, NODES_SECTION, SCHEME_SECTION
@@ -73,6 +74,16 @@ BUILT_IN = (
         "manager:shop:return_policy",
         order=23,
         allowed=vendor_action("profile"),
+    ),
+    # The shop's holidays and closures (VEN.20): owners and staff, by the `orders` action: a
+    # closure moves the dispatch date, which is day-to-day operations (owner decision 2026-11-26).
+    Section(
+        CLOSURES_SECTION,
+        Space.SHOP,
+        _("Holidays and closures"),
+        "manager:shop:closures",
+        order=24,
+        allowed=vendor_action("orders"),
     ),
     # The vendor's own events (EVT.4): owners and staff, by the `events` action of the matrix.
     Section(

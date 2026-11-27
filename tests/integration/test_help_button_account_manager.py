@@ -37,7 +37,11 @@ from apps.orders.tests.factories import (
     paid_vendor_order,
 )
 from apps.trust.tests.factories import TrustRulesFactory
-from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
+from apps.vendors.tests.factories import (
+    VendorClosureFactory,
+    VendorFactory,
+    VendorMemberFactory,
+)
 from tests.help_routes import NOT_PAGES
 
 pytestmark = pytest.mark.django_db
@@ -158,6 +162,9 @@ def _manager_pages() -> dict[str, str]:
         "manager:shop:statements": "shop",
         "manager:shop:sales_terms": "shop",
         "manager:shop:return_policy": "shop",
+        "manager:shop:closures": "shop",  # VEN.20
+        "manager:shop:closure_edit": "shop",
+        "manager:shop:closure_remove": "shop",
         "manager:shop:events": "shop",  # EVT.4
         "manager:shop:event_new": "shop",
         "manager:shop:event_edit": "shop",
@@ -190,6 +197,8 @@ def _open(name: str) -> tuple[Client, str]:
             kwargs = {"public_id": paid_vendor_order(vendor).public_id}  # type: ignore[arg-type]
         if name == "manager:shop:fitment_product":
             kwargs = {"public_id": ProductFactory.create(vendor=vendor).public_id}
+        if name in ("manager:shop:closure_edit", "manager:shop:closure_remove"):
+            kwargs = {"public_id": VendorClosureFactory.create(vendor=vendor).public_id}
         if name in (
             "manager:shop:event_edit",
             "manager:shop:event_cancel",

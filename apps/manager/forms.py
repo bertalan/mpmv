@@ -375,3 +375,31 @@ class EndEverySessionForm(NFCForm):
         max_length=100,
         help_text=_("Type the words shown above, in capitals, to end every session."),
     )
+
+
+class ClosureForm(NFCForm):
+    """One closure range of the shop (VEN.20). Dates are calendar dates in the platform's time
+    zone; the services own the rules (a yearly range under one year, no 29 February)."""
+
+    start_date = forms.DateField(
+        label=_("First closed day"),
+        help_text=_("The first day on which the shop is closed. Required."),
+        widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+    )
+    end_date = forms.DateField(
+        label=_("Last closed day"),
+        help_text=_("The last day on which the shop is closed. It can be the same day. Required."),
+        widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+    )
+    repeats_yearly = forms.BooleanField(
+        label=_("Repeats every year"),
+        help_text=_("Select it if the shop closes on the same days every year."),
+        required=False,
+    )
+    notice_days = forms.IntegerField(
+        label=_("Days of notice"),
+        help_text=_("How many days before the closure buyers are told about it. From 0 to 60."),
+        min_value=0,
+        max_value=60,
+        initial=14,
+    )
