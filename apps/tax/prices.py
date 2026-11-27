@@ -43,7 +43,7 @@ from django.utils.translation import gettext_lazy as _
 
 from apps.core.countries import InvalidCountry, normalize_country
 from apps.core.services import current_operator
-from apps.core.validity import NoValidRow, OverlappingValidity
+from apps.core.validity import NoValidRow, OverlappingValidity, VatRateUnavailable
 from apps.vendors.models import Vendor
 
 from . import engine
@@ -314,13 +314,16 @@ def supplier_vat_rate(product: _SoldItem, at: dt.datetime) -> Decimal:
 
     The supplier prices in the vendor's own country: the rate is what the tax engine applies to the
     product's fiscal category and the vendor's tax position there (`consumer_price` with the
-    destination forced to that country). Raises `PriceUnavailable` when there is no rate, profile or
-    operator: never a guess."""
-    quote = consumer_price(
-        Decimal("100.00"),
-        product.fiscal_category,
-        vendor=product.vendor,
-        country=str(product.vendor.country),
-        at=at,
-    )
+    destination forced to that country). Raises `VatRateUnavailable` when there is no rate, profile
+    or operator: never a guess."""
+    try:
+        quote = consumer_price(
+            Decimal("100.00"),
+            product.fiscal_category,
+            vendor=product.vendor,
+            country=str(product.vendor.country),
+            at=at,
+        )
+    except PriceUnavailable as exc:
+        raise VatRateUnavailable(str(exc)) from exc
     return quote.rate / 100
