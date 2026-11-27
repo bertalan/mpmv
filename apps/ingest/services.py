@@ -6,6 +6,7 @@ what it applies. Rows are changed in place so the caller keeps using the instanc
 
 import datetime as dt
 import json
+import logging
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
@@ -42,6 +43,8 @@ from .models import (
     SourceVariation,
     SupplierSource,
 )
+
+logger = logging.getLogger(__name__)
 
 RUN_CREATED = "ingest.run.created"
 RUN_STATUS_CHANGED = "ingest.run.status_changed"
@@ -845,6 +848,7 @@ class PublishReport:
     published: list[str] = dataclass_field(default_factory=list)
     skipped: dict[str, str] = dataclass_field(default_factory=dict)
     refused: set[str] = dataclass_field(default_factory=set)  # skipped for good: needs a person
+    failed: set[str] = dataclass_field(default_factory=set)  # an unexpected error: logged, counted
 
 
 class _Refused(Exception):
@@ -891,6 +895,11 @@ def publish_drafts(
             continue
         except IntegrityError:  # a concurrent caller created the same SKU first
             report.skipped[sku] = "The SKU was created at the same time; try again."
+            continue
+        except Exception as exc:  # one odd draft must not stop the batch (job guard)
+            logger.exception("ingest.publish_drafts: draft %s failed", sku)
+            report.skipped[sku] = f"Unexpected error ({type(exc).__name__}); see the log."
+            report.failed.add(sku)
             continue
         if isinstance(outcome, str):
             report.skipped[sku] = outcome
@@ -992,7 +1001,8 @@ def publish_ready_drafts(
     allows writes (`write_enabled`) and whose vendor is active, oldest first, at most `limit`
     per call. A source without the flag is never touched; a rerun finds nothing new. A draft the
     catalog refuses for good (`report.refused`) is moved to `needs_review` with the reason in the
-    audit entry, and a person decides."""
+    audit entry, and a person decides. A draft that raises anything else is logged, counted in
+    `report.failed` and moved to `needs_review` the same way, so it cannot starve the queue."""
     drafts = list(
         ProductDraft.objects.filter(
             status=ProductDraft.Status.READY,
@@ -1006,8 +1016,14 @@ def publish_ready_drafts(
     report = publish_drafts(drafts, ctx=ctx, dry_run=dry_run)
     if not dry_run:
         for draft in drafts:
-            if draft.item.sku in report.refused:
-                _send_to_review(draft, report.skipped[draft.item.sku], ctx=ctx)
+            sku = draft.item.sku
+            if sku not in report.refused and sku not in report.failed:
+                continue
+            try:  # a failure here must not skip the drafts after this one
+                _send_to_review(draft, report.skipped[sku], ctx=ctx)
+            except Exception:
+                logger.exception("ingest.publish_ready_drafts: draft %s not moved aside", sku)
+                report.failed.add(sku)
     return report
 
 
