@@ -453,3 +453,17 @@ def test_add_many_writes_one_audit_entry_without_personal_data() -> None:
             {"product": str(second.public_id), "variant": None, "quantity": 1},
         ]
     }
+
+
+@pytest.mark.parametrize("quantity", [0, -1, 1.5, True, "2"])
+def test_add_many_refuses_what_count_error_refuses(quantity: Any) -> None:
+    from apps.cart import engine
+
+    cart = guest_cart()
+    expected = engine.count_error(quantity)
+    assert expected is not None
+    with pytest.raises(ValidationError) as caught:
+        services.add_many_to_cart(cart, [(sellable(), None, quantity)], ctx=CTX)
+    assert caught.value.message_dict == {"quantity": [expected]}
+    assert not CartLine.objects.filter(cart=cart).exists()
+    assert not AuditLog.objects.filter(action=services.BULK_ADD_ACTION).exists()
