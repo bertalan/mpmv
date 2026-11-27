@@ -3,6 +3,7 @@
 from typing import Any
 
 import pytest
+from django.db import IntegrityError
 
 from apps.catalog.tests.factories import ProductFactory, ProductTranslationFactory
 from apps.core.audit import AuditContext
@@ -14,6 +15,7 @@ from apps.ingest.tests.factories import (
     EnrichmentVersionFactory,
     ImportRunFactory,
     ProductDraftFactory,
+    ReviewItemFactory,
 )
 
 pytestmark = pytest.mark.django_db
@@ -129,3 +131,69 @@ def test_archive_lists_the_newest_version_first() -> None:
     older = EnrichmentVersionFactory.create(draft=draft, outcome="out_of_policy")
     newer = EnrichmentVersionFactory.create(draft=draft)
     assert list(draft.enrichment_versions.all()) == [newer, older]
+
+
+def test_a_translation_created_while_the_provider_runs_is_never_overwritten() -> None:
+    product = ProductFactory.create()
+    draft, run = make_draft(item__product=product, item__source__vendor=product.vendor)
+    language = TextPolicy().languages[0]
+
+    class Racing(FakeEnricher):
+        def describe(self, facts: Any, lang: str, policy: TextPolicy) -> Any:
+            ProductTranslationFactory.create(product=product, language=lang)  # appears mid-call
+            return super().describe(facts, lang, policy)
+
+    with pytest.raises(services.EnrichmentRefused):
+        services.enrich_draft(draft, Racing(), run=run, ctx=CTX, lang=language)
+    draft.refresh_from_db()
+    assert draft.enriched == {}
+    assert not EnrichmentVersion.objects.exists()
+
+
+def test_a_rerun_refreshes_the_open_review_instead_of_opening_another() -> None:
+    draft, run = make_draft()
+    services.enrich_draft(
+        draft, FakeEnricher({"description": "An eco-friendly mug"}), run=run, ctx=CTX
+    )
+    result = services.enrich_draft(
+        draft, FakeEnricher({"description": "A sustainable mug"}), run=run, ctx=CTX
+    )
+    review = ReviewItem.objects.get()
+    assert result.review == review
+    assert any("sustainable" in v for v in review.payload["violations"])
+    assert EnrichmentVersion.objects.count() == 2  # every output stays archived
+    assert AuditLog.objects.filter(action=services.REVIEW_REFRESHED).count() == 1
+
+
+def test_an_integrity_error_on_the_review_means_already_open(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    draft, run = make_draft()
+    existing = ReviewItemFactory.create(
+        run=run, item=draft.item, kind=ReviewItem.Kind.TEXT_POLICY, payload={"violations": []}
+    )
+    lookups = iter([None, existing])
+    monkeypatch.setattr(services, "_open_text_review", lambda item: next(lookups))
+
+    real_save = ReviewItem.save
+
+    def clash(self: ReviewItem, *args: Any, **kwargs: Any) -> None:
+        if self._state.adding:
+            raise IntegrityError("one open review per product and kind")
+        real_save(self, *args, **kwargs)
+
+    monkeypatch.setattr(ReviewItem, "save", clash)
+    result = services.enrich_draft(
+        draft, FakeEnricher({"description": "An eco-friendly mug"}), run=run, ctx=CTX
+    )
+    assert result.outcome == "out_of_policy"
+    assert result.review == existing
+    assert EnrichmentVersion.objects.count() == 1
+
+
+def test_an_oversized_provider_answer_is_truncated_in_the_archive() -> None:
+    draft, run = make_draft()
+    huge = "x" * (services.RAW_ARCHIVE_LIMIT + 10)
+    services.enrich_draft(draft, FakeEnricher({"description": huge}), run=run, ctx=CTX)
+    raw = EnrichmentVersion.objects.get().raw
+    assert raw["truncated"] is True
