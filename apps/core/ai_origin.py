@@ -29,3 +29,12 @@ def effective(*origins: str) -> str:
         if wanted in origins:
             return wanted
     return AI_NONE
+
+
+_RANK = {AI_NONE: 0, AI_EDITED: 1, AI_GENERATED: 2}
+
+
+def is_lowering(before: str, after: str) -> bool:
+    """Whether `after` says less about AI than `before` (none < edited < generated): any decrease
+    counts, so `generated` to `edited` is a lowering too. Editors may raise, only staff lower."""
+    return _RANK[after] < _RANK[before]

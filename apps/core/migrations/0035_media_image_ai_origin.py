@@ -20,9 +20,11 @@ class Migration(migrations.Migration):
                 ],
                 default="none",
                 help_text=(
-                    "Say so when AI made the image or changed what it shows (CMP.8). Every page "
-                    "that shows this image then shows an 'AI-generated image' or "
-                    "'AI-edited image' label."
+                    "Say so when AI made the image or changed what it shows (CMP.8). Product "
+                    "pages and the CMS image and gallery blocks then show an 'AI-generated "
+                    "image' or 'AI-edited image' label with it; hero, card, video poster and "
+                    "page header images do not yet. Editors may raise this value, only "
+                    "platform staff lower it."
                 ),
                 max_length=16,
                 verbose_name="AI origin",

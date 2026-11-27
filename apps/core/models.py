@@ -1080,8 +1080,10 @@ class MediaImage(AbstractImage):  # type: ignore[misc]  # Wagtail is untyped
             (ai.AI_EDITED, _("Edited with AI")),
         ],
         help_text=_(
-            "Say so when AI made the image or changed what it shows (CMP.8). Every page that "
-            "shows this image then shows an 'AI-generated image' or 'AI-edited image' label."
+            "Say so when AI made the image or changed what it shows (CMP.8). Product pages and "
+            "the CMS image and gallery blocks then show an 'AI-generated image' or 'AI-edited "
+            "image' label with it; hero, card, video poster and page header images do not yet. "
+            "Editors may raise this value, only platform staff lower it."
         ),
     )
 

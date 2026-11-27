@@ -122,12 +122,28 @@ def test_staff_sets_the_origin_with_an_audit_entry_and_a_dry_run_changes_nothing
     assert AuditLog.objects.filter(action=media.MEDIA_IMAGE_AI_ORIGIN_SET).count() == 1
 
 
-def test_an_unknown_origin_and_a_non_staff_actor_are_refused() -> None:
+def test_an_unknown_origin_and_an_anonymous_actor_are_refused() -> None:
     image = MediaImageFactory.create()
     with pytest.raises(ValidationError):
         media.set_media_ai_origin(image, "robot", ctx=CTX)
-    member = UserFactory.create()
     with pytest.raises(PermissionDenied):
-        media.set_media_ai_origin(image, ai_labels.AI_EDITED, ctx=user_context(member, None))
+        media.set_media_ai_origin(
+            image, ai_labels.AI_EDITED, ctx=AuditContext(actor_label="anon", source="web")
+        )
     image.refresh_from_db()
     assert image.ai_origin == ai_labels.AI_NONE
+
+
+def test_a_non_staff_member_raises_but_never_lowers_any_decrease_counts() -> None:
+    image = MediaImageFactory.create()
+    member = UserFactory.create()
+    ctx = user_context(member, None)
+    media.set_media_ai_origin(image, ai_labels.AI_EDITED, ctx=ctx)
+    media.set_media_ai_origin(image, ai_labels.AI_GENERATED, ctx=ctx)
+    assert AuditLog.objects.filter(action=media.MEDIA_IMAGE_AI_ORIGIN_SET).count() == 2
+    for lower in (ai_labels.AI_EDITED, ai_labels.AI_NONE):  # generated to edited is a lowering
+        with pytest.raises(PermissionDenied):
+            media.set_media_ai_origin(image, lower, ctx=ctx)
+    image.refresh_from_db()
+    assert image.ai_origin == ai_labels.AI_GENERATED
+    assert AuditLog.objects.filter(action=media.MEDIA_IMAGE_AI_ORIGIN_SET).count() == 2

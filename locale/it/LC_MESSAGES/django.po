@@ -6510,6 +6510,12 @@ msgstr ""
 "Solo su richiesta del cliente, nello stesso paese e nello stesso territorio fiscale. Registra come"
 " e quando lo ha chiesto il cliente e le sue parole."
 
+#: apps/core/forms.py
+msgid ""
+"Only platform staff may lower an image's AI origin. Please keep the current value or ask the "
+"platform team."
+msgstr "Solo il personale della piattaforma può abbassare l'origine IA di un'immagine. Mantenga il valore attuale oppure si rivolga al team della piattaforma."
+
 #: apps/payments/stray.py
 msgid "Only Support or the platform owner may check this refund."
 msgstr "Solo l'assistenza o il titolare della piattaforma possono verificare questo rimborso."
@@ -8602,18 +8608,18 @@ msgstr "Salvato."
 
 #: apps/core/models.py
 msgid ""
-"Say so when AI made the image or changed what it shows (CMP.8). Every page that shows this image "
-"then shows an 'AI-generated image' or 'AI-edited image' label."
-msgstr "Indica se l'IA ha creato l'immagine o ne ha cambiato il contenuto (CMP.8). Ogni pagina che mostra questa immagine mostra poi l'etichetta «Immagine generata con IA» o «Immagine modificata con IA»."
+"Say so when AI made the image or changed what it shows (CMP.8). Product pages and the CMS image "
+"and gallery blocks then show an 'AI-generated image' or 'AI-edited image' label with it; hero, "
+"card, video poster and page header images do not yet. Editors may raise this value, only platform "
+"staff lower it."
+msgstr "Indica se l'IA ha creato l'immagine o ne ha cambiato il contenuto (CMP.8). Le pagine prodotto e i blocchi CMS di immagine e galleria mostrano allora l'etichetta «Immagine generata con IA» o «Immagine modificata con IA»; le immagini di hero, schede, poster video e intestazioni di pagina non ancora. Gli editor possono alzare questo valore, solo il personale della piattaforma lo abbassa."
 
 #: apps/catalog/models.py
 msgid ""
 "Say so when AI made the image or changed what it shows. The product page then shows an 'AI-"
-"generated image' or 'AI-edited image' label next to it."
-msgstr ""
-"Indicalo quando l'IA ha creato l'immagine o ne ha cambiato il contenuto. La pagina del prodotto "
-"mostra allora accanto all'immagine l'etichetta «Immagine generata con IA» o «Immagine modificata "
-"con IA»."
+"generated image' or 'AI-edited image' label next to it. The library image's own flag counts too: "
+"'Not made with AI' here does not lower it."
+msgstr "Indicalo quando l'IA ha creato l'immagine o ne ha cambiato il contenuto. La pagina del prodotto mostra allora accanto all'immagine l'etichetta «Immagine generata con IA» o «Immagine modificata con IA». Conta anche il contrassegno dell'immagine in libreria: «Non realizzata con IA» qui non lo abbassa."
 
 #: apps/compliance/forms.py
 msgid "Say whether the content is illegal or only against the platform terms."

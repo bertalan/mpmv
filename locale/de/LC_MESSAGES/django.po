@@ -6579,6 +6579,12 @@ msgstr ""
 "Nur auf Wunsch des Kunden, innerhalb desselben Landes und Steuergebiets. Erfassen Sie, wie und "
 "wann der Kunde angefragt hat, und seine Worte."
 
+#: apps/core/forms.py
+msgid ""
+"Only platform staff may lower an image's AI origin. Please keep the current value or ask the "
+"platform team."
+msgstr "Nur das Plattform-Personal darf die KI-Herkunft eines Bildes herabsetzen. Bitte behalten Sie den aktuellen Wert bei oder wenden Sie sich an das Plattform-Team."
+
 #: apps/payments/stray.py
 msgid "Only Support or the platform owner may check this refund."
 msgstr "Nur der Support oder der Plattforminhaber dürfen diese Erstattung prüfen."
@@ -8684,17 +8690,18 @@ msgstr "Gespeichert."
 
 #: apps/core/models.py
 msgid ""
-"Say so when AI made the image or changed what it shows (CMP.8). Every page that shows this image "
-"then shows an 'AI-generated image' or 'AI-edited image' label."
-msgstr "Geben Sie an, wenn eine KI das Bild erzeugt oder verändert hat, was es zeigt (CMP.8). Jede Seite, die dieses Bild zeigt, zeigt dann den Hinweis „KI-generiertes Bild“ oder „Mit KI bearbeitetes Bild“."
+"Say so when AI made the image or changed what it shows (CMP.8). Product pages and the CMS image "
+"and gallery blocks then show an 'AI-generated image' or 'AI-edited image' label with it; hero, "
+"card, video poster and page header images do not yet. Editors may raise this value, only platform "
+"staff lower it."
+msgstr "Geben Sie an, wenn eine KI das Bild erzeugt oder verändert hat, was es zeigt (CMP.8). Produktseiten und die CMS-Bild- und Galerieblöcke zeigen dann den Hinweis „KI-generiertes Bild“ oder „Mit KI bearbeitetes Bild“; Hero-, Karten-, Video-Poster- und Seitenkopfbilder noch nicht. Redakteure dürfen diesen Wert erhöhen, nur das Plattform-Personal darf ihn herabsetzen."
 
 #: apps/catalog/models.py
 msgid ""
 "Say so when AI made the image or changed what it shows. The product page then shows an 'AI-"
-"generated image' or 'AI-edited image' label next to it."
-msgstr ""
-"Geben Sie das an, wenn KI das Bild erstellt oder seinen Inhalt verändert hat. Die Produktseite "
-"zeigt dann neben dem Bild den Hinweis „KI-generiertes Bild“ oder „Mit KI bearbeitetes Bild“."
+"generated image' or 'AI-edited image' label next to it. The library image's own flag counts too: "
+"'Not made with AI' here does not lower it."
+msgstr "Geben Sie an, wenn eine KI das Bild erzeugt oder verändert hat, was es zeigt. Die Produktseite zeigt dann neben dem Bild den Hinweis „KI-generiertes Bild“ oder „Mit KI bearbeitetes Bild“. Auch die Markierung des Bildes in der Bibliothek zählt: „Nicht mit KI erstellt“ setzt sie hier nicht herab."
 
 #: apps/compliance/forms.py
 msgid "Say whether the content is illegal or only against the platform terms."
