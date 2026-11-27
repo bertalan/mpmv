@@ -362,8 +362,8 @@ def set_media_ai_origin(
     """Say whether AI made or edited a library image (CMP.8): every CMS block and product page
     that shows it then labels it (the figure, gallery and product blocks). Raising the origin
     (none, then edited, then generated) is open to any signed-in editor or a pipeline; lowering it,
-    even from generated to edited, is for platform staff with the catalog write right. Every
-    change is audited."""
+    even from generated to edited, is for platform staff with the catalog write right, never a
+    pipeline. Every change is audited."""
     _check_ai_origin(ai_origin)
     require_catalog_editor(ctx)
     user = None
@@ -377,11 +377,9 @@ def set_media_ai_origin(
     changes = ChangeSet()
     with transaction.atomic():
         stored = MediaImage.objects.select_for_update().get(pk=image.pk)
-        if (
-            user is not None
-            and ai_origin_rules.is_lowering(stored.ai_origin, ai_origin)
-            and not may_lower_media_ai_origin(user)
-        ):
+        if ai_origin_rules.is_lowering(stored.ai_origin, ai_origin) and (
+            user is None or not may_lower_media_ai_origin(user)
+        ):  # a pipeline (no user) is raise-only too: a re-run never drops a label
             raise PermissionDenied("Only platform staff lower an image's AI origin.")
         changes.update(
             MEDIA_IMAGE_MODEL,

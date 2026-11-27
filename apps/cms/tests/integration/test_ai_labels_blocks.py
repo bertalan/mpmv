@@ -147,3 +147,15 @@ def test_a_non_staff_member_raises_but_never_lowers_any_decrease_counts() -> Non
     image.refresh_from_db()
     assert image.ai_origin == ai_labels.AI_GENERATED
     assert AuditLog.objects.filter(action=media.MEDIA_IMAGE_AI_ORIGIN_SET).count() == 2
+
+
+def test_a_pipeline_raises_but_never_lowers() -> None:
+    image = MediaImageFactory.create()
+    media.set_media_ai_origin(image, ai_labels.AI_GENERATED, ctx=CTX)
+    assert AuditLog.objects.filter(action=media.MEDIA_IMAGE_AI_ORIGIN_SET).count() == 1
+    for lower in (ai_labels.AI_EDITED, ai_labels.AI_NONE):
+        with pytest.raises(PermissionDenied):
+            media.set_media_ai_origin(image, lower, ctx=CTX)
+    image.refresh_from_db()
+    assert image.ai_origin == ai_labels.AI_GENERATED
+    assert AuditLog.objects.filter(action=media.MEDIA_IMAGE_AI_ORIGIN_SET).count() == 1
