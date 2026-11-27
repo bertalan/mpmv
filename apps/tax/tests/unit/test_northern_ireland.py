@@ -5,8 +5,10 @@ from decimal import Decimal
 from typing import Any
 
 import pytest
+from django.core.exceptions import ValidationError
 
-from apps.core.countries import InvalidCountry
+from apps.core.countries import EU_MEMBER_STATES, InvalidCountry, normalize_country
+from apps.core.fields import CountryField
 from apps.tax import engine
 from apps.tax.tests.unit.test_goods_tax import (
     DOMESTIC,
@@ -119,8 +121,53 @@ def test_an_exempt_vendor_is_still_exempt_in_northern_ireland() -> None:
     assert d.reason == "art74_publishing"
 
 
-def test_xi_is_not_a_vies_country_yet() -> None:
-    assert "XI" not in engine.VIES_COUNTRIES
+# --- TAX.19: XI VAT numbers are checked in VIES
+
+
+def test_xi_is_a_vies_country_and_gb_is_not() -> None:
+    assert "XI" in engine.VIES_COUNTRIES
     assert "GB" not in engine.VIES_COUNTRIES
-    with pytest.raises(engine.NotCheckable):
-        engine.vies_query("XI", "XI 123 4567 89")
+    assert engine.VIES_COUNTRIES - {"XI"} == EU_MEMBER_STATES
+
+
+@pytest.mark.parametrize(
+    ("country", "raw"),
+    [("XI", "XI 123 4567 89"), ("xi", "xi123456789"), (" XI ", "123.456.789")],
+)
+def test_an_xi_number_is_asked_with_the_xi_prefix(country: str, raw: str) -> None:
+    assert engine.vies_query(country, raw) == engine.ViesQuery("XI", "XI", "123456789")
+
+
+@pytest.mark.parametrize(
+    ("country", "raw", "reason"),
+    [
+        ("XI", "GB123456789", engine.VAT_REASON_PREFIX_MISMATCH),  # a GB-only number
+        ("XI", "XI", engine.VAT_REASON_MALFORMED),
+        ("GB", "XI123456789", engine.VAT_REASON_NOT_IN_VIES),  # the address country is no prefix
+    ],
+)
+def test_other_numbers_for_northern_ireland_are_not_checked(
+    country: str, raw: str, reason: str
+) -> None:
+    with pytest.raises(engine.NotCheckable) as caught:
+        engine.vies_query(country, raw)
+    assert caught.value.reason == reason
+
+
+@pytest.mark.parametrize(("raw", "expected"), [("xi", "XI"), (" XI ", "XI"), ("el", "GR")])
+def test_the_vies_country_is_iso_or_xi(raw: str, expected: str) -> None:
+    assert engine.vies_country(raw) == expected
+
+
+@pytest.mark.parametrize("raw", ["", "ZZ", "XJ", "EU"])
+def test_the_vies_country_refuses_other_codes(raw: str) -> None:
+    with pytest.raises(InvalidCountry):
+        engine.vies_country(raw)
+
+
+def test_xi_stays_out_of_the_address_countries() -> None:
+    # Northern Ireland's address country is GB with a BT postcode; XI names only VAT numbers.
+    with pytest.raises(InvalidCountry):
+        normalize_country("XI")
+    with pytest.raises(ValidationError):
+        CountryField().to_python("XI")

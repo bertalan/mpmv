@@ -33,6 +33,7 @@ from apps.vendors.models import FiscalRegime, Vendor
 from apps.vendors.scoping import VendorScopedManager
 
 from . import engine
+from .fields import ViesCountryField
 
 logger = logging.getLogger(__name__)
 
@@ -644,14 +645,16 @@ class VatValidation(BaseModel):
 
     Written by `apps.tax.services.record_vat_validation`; `verify_vat_number` (TAX.5) adds the
     VIES client, the cache policy and the fail-closed handling. The number is stored without
-    its country prefix; `country` is ISO (GR, never EL). Every row is a VIES answer:
-    staff-recorded answers are out of scope until a task gives them an actor and an audited
-    service.
+    its country prefix; `country` is ISO (GR, never EL) or `XI` (Northern Ireland, TAX.19).
+    Every row is a VIES answer: staff-recorded answers are out of scope until a task gives them
+    an actor and an audited service.
     """
 
     Result = VatResult
 
-    country = CountryField(help_text="ISO 3166-1 alpha-2 (GR for a VIES EL number).")
+    country = ViesCountryField(
+        help_text="ISO 3166-1 alpha-2 (GR for a VIES EL number), or XI for Northern Ireland."
+    )
     vat_number = models.CharField("VAT number", max_length=32, help_text="Without the prefix.")
     result = models.CharField(max_length=16, choices=Result.choices)
     name = models.CharField(max_length=200, blank=True)

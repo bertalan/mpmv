@@ -67,7 +67,7 @@ class VendorTaxProfile(Model):                 # versioned: new row on every app
     # for a manual review until the tax advisor gives its VAT mapping.
 
 class VatValidation(Model):                    # cache of VIES results, append-only
-    vat_number (without prefix); country (ISO, GR not EL)
+    vat_number (without prefix); country (ISO, GR not EL; or XI, TAX.19)
     result ("valid", "invalid", "unavailable")
     name; address; checked_at; request_id      # VIES answers only, no staff-recorded rows
 ```
