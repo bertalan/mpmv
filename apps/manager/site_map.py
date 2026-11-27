@@ -91,6 +91,7 @@ PLATFORM_PAGES: Final[Pages] = (
     (gettext_noop("Order changes"), "manager:platform:orders"),
     (gettext_noop("Order drafts"), "manager:platform:order_drafts"),
     (gettext_noop("Stray payments"), "manager:platform:stray_payments"),
+    (gettext_noop("Shop closures"), "manager:platform:shop_closures"),
     (gettext_noop("Order change settings"), "manager:platform:amendment_settings"),
     (gettext_noop("Trust rules"), "manager:platform:trust_rules"),
 )
@@ -111,6 +112,9 @@ NOT_LISTED: Final = frozenset(
         "manager:shop:closure_edit",  # VEN.20: needs a closure record
         "manager:shop:closure_remove",
         "manager:shop:order_invoice_issued",
+        "manager:platform:shop_closures_vendor",  # VEN.20: needs a shop record
+        "manager:platform:shop_closure_edit",
+        "manager:platform:shop_closure_remove",
         "manager:platform:order",
         "manager:platform:order_draft",  # ORD.32: needs a draft record
         "manager:platform:order_draft_new",  # ORD.32: POST only, makes a draft

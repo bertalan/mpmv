@@ -146,6 +146,8 @@ MATRIX: Final[Mapping[str, Mapping[str, Access]]] = {
     "platform.vendors": {CONFIG: R, CATALOG: R, FINANCE: R, SUPPORT: R, OWNER: E},
     "platform.vendor_approval": {CATALOG: E, OWNER: E},
     "platform.vendor_closure": {OWNER: E},
+    # VEN.20: any shop's holidays and closures (owner decision 2026-11-26): everyday support work.
+    "platform.shop_closures": {SUPPORT: E, OWNER: E},
     # VEN.40: approve or reject a vendor's return policy. Not the profile reopen right
     # (`vendors.change_vendor`): a moderation decision, like the vendor approval.
     "platform.return_policy": {CATALOG: E, OWNER: E},
@@ -185,6 +187,7 @@ SECTION_LABELS: Final[Mapping[str, str]] = {
     "platform.vendors": "Platform: vendors (applications, plans)",
     "platform.vendor_approval": "Platform: approve or suspend a vendor (step-up, reason)",
     "platform.vendor_closure": "Platform: close a vendor definitively",
+    "platform.shop_closures": "Platform: holidays and closures of any shop (VEN.20)",
     "platform.return_policy": "Platform: approve or reject a vendor's return policy (VEN.40)",
     "platform.orders_customers": "Platform: orders and customers",
     "platform.support_actions": "Platform: support actions (unlock, resend link)",
