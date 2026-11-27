@@ -59,6 +59,7 @@ class Filters:
     type: str = ""
     month: str = ""  # YYYY-MM
     translated_only: bool = False  # "Only events in <language>": real translations only
+    garage_only: bool = False  # "Only events for my garage" (FIT.11): the list view only
 
     @classmethod
     def parse(cls, query: Mapping[str, str]) -> "Filters":
@@ -69,10 +70,13 @@ class Filters:
             type=query.get("type", "") if query.get("type", "") in EVENT_TYPE_VALUES else "",
             month=month if engine.parse_month(month) else "",
             translated_only=query.get("translated", "") == "1",
+            garage_only=query.get("garage", "") == "1",
         )
 
     def active(self) -> bool:
-        return bool(self.vendor or self.type or self.month or self.translated_only)
+        return bool(
+            self.vendor or self.type or self.month or self.translated_only or self.garage_only
+        )
 
     def query(self, *, month: bool = True, **extra: object) -> str:
         pairs = [("vendor", self.vendor), ("type", self.type)]
@@ -80,6 +84,8 @@ class Filters:
             pairs.append(("month", self.month))
         if self.translated_only:
             pairs.append(("translated", "1"))
+        if self.garage_only:
+            pairs.append(("garage", "1"))
         pairs += [(key, str(value)) for key, value in extra.items()]
         return urlencode([(key, value) for key, value in pairs if value])
 
@@ -245,6 +251,11 @@ def render_list(index: "EventIndexPage", request: HttpRequest) -> HttpResponse:
         every = upcoming(events, now)
     options = filter_options(upcoming(events, now))
     shown = apply_filters(every, filters)
+    from apps.events import fitment  # events.fitment imports the models, which import this module
+
+    garage_label = fitment.garage_label(request)
+    if filters.garage_only and garage_label:  # without a garage the checkbox does nothing
+        shown = [item for item in shown if fitment.matches_garage(request, item.page)]
     paged = _paged(request, shown, index.url or "", filters)
     plotted = sum(1 for item in paged["items"] if item.page.latitude is not None)
     context = {
@@ -254,6 +265,7 @@ def render_list(index: "EventIndexPage", request: HttpRequest) -> HttpResponse:
         "map": map_settings() if plotted else None,
         "groups": _groups(paged["items"]),
         "options": options,
+        "garage_label": garage_label,
         "robots": NOINDEX if filters.active() or paged["page_number"] > 1 else "",
     }
     response: HttpResponse = index.render(request, context_overrides=context)

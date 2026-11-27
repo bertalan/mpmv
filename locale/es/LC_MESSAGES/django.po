@@ -6476,6 +6476,10 @@ msgstr ""
 "Para revisar una propuesta, use las acciones de aprobación, rechazo y fusión. Ejemplo: Aprobada."
 
 #: apps/events/templates/events/_filters.html
+msgid "Only events for my garage"
+msgstr "Solo eventos para mi garaje"
+
+#: apps/events/templates/events/_filters.html
 msgid "Only events in %(language)s"
 msgstr "Solo eventos en %(language)s"
 
@@ -9669,7 +9673,9 @@ msgstr "Cambiar los nombres por idioma"
 msgid ""
 "Tag the event with the vehicles it is for. Visitors whose garage matches see a badge. Leave it "
 "empty for an event for everyone."
-msgstr "Indique los vehículos a los que va dirigido el evento. Los visitantes cuyo garaje coincida verán una insignia. Déjela vacía para un evento abierto a todos."
+msgstr ""
+"Indique los vehículos a los que va dirigido el evento. Los visitantes cuyo garaje coincida verán "
+"una insignia. Déjela vacía para un evento abierto a todos."
 
 #: apps/manager/forms.py
 msgid "Tagline"

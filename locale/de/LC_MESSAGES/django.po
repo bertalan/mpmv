@@ -604,7 +604,9 @@ msgstr ""
 
 #: apps/events/models.py
 msgid "A make covers all its models. Leave the list empty for an event for everyone."
-msgstr "Eine Marke umfasst alle ihre Modelle. Lassen Sie die Liste leer, wenn die Veranstaltung für alle gilt."
+msgstr ""
+"Eine Marke umfasst alle ihre Modelle. Lassen Sie die Liste leer, wenn die Veranstaltung für alle "
+"gilt."
 
 #: apps/events/templates/email/events/event_changes_requested/body.html
 #: apps/events/templates/email/events/event_changes_requested/body.txt
@@ -6538,6 +6540,10 @@ msgstr ""
 "prüfen. Beispiel: Genehmigt."
 
 #: apps/events/templates/events/_filters.html
+msgid "Only events for my garage"
+msgstr "Nur Veranstaltungen für meine Garage"
+
+#: apps/events/templates/events/_filters.html
 msgid "Only events in %(language)s"
 msgstr "Nur Veranstaltungen auf %(language)s"
 
@@ -9751,7 +9757,9 @@ msgstr "Namen nach Sprache umschalten"
 msgid ""
 "Tag the event with the vehicles it is for. Visitors whose garage matches see a badge. Leave it "
 "empty for an event for everyone."
-msgstr "Ordnen Sie der Veranstaltung die passenden Fahrzeuge zu. Besucher, deren Garage passt, sehen ein Abzeichen. Lassen Sie das Feld leer, wenn die Veranstaltung für alle gilt."
+msgstr ""
+"Ordnen Sie der Veranstaltung die passenden Fahrzeuge zu. Besucher, deren Garage passt, sehen ein "
+"Abzeichen. Lassen Sie das Feld leer, wenn die Veranstaltung für alle gilt."
 
 #: apps/manager/forms.py
 msgid "Tagline"

@@ -6528,6 +6528,10 @@ msgstr ""
 " Exemple : Approuvée."
 
 #: apps/events/templates/events/_filters.html
+msgid "Only events for my garage"
+msgstr "Uniquement les événements pour mon garage"
+
+#: apps/events/templates/events/_filters.html
 msgid "Only events in %(language)s"
 msgstr "Seulement les événements en %(language)s"
 
@@ -9735,7 +9739,9 @@ msgstr "Nommer par langue"
 msgid ""
 "Tag the event with the vehicles it is for. Visitors whose garage matches see a badge. Leave it "
 "empty for an event for everyone."
-msgstr "Indiquez les véhicules concernés par l'événement. Les visiteurs dont le garage correspond voient un badge. Laissez vide pour un événement ouvert à tous."
+msgstr ""
+"Indiquez les véhicules concernés par l'événement. Les visiteurs dont le garage correspond voient "
+"un badge. Laissez vide pour un événement ouvert à tous."
 
 #: apps/manager/forms.py
 msgid "Tagline"
