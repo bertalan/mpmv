@@ -184,7 +184,7 @@ class OrderEventFactory(DjangoModelFactory[OrderEvent]):
     order = factory.SelfAttribute("vendor_order.order")
     kind = "orders.amendment_applied"
     audience = "customer"
-    language = "en"
+    language = factory.LazyFunction(primary_language)
     subject = "Order changed"
     text = "Hello,"
     wording_version = "sha256:" + "0" * 64

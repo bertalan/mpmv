@@ -21,11 +21,32 @@ pytestmark = pytest.mark.django_db
 # Factories of a table that holds one row by design (a database constraint): they return it.
 SINGLETON_FACTORIES = {"FitmentSchemeFactory", "FooterSettingsFactory"}
 
+# Page factories that take one free language each (a home page per locale, an events index under
+# a home page): a configured set of two languages and the home page the migration creates leave
+# room for one row of them, so the second is only asked for while a language is free (I18N.15).
+LANGUAGE_BOUND_FACTORIES = {"HomePageFactory", "EventIndexPageFactory"}
+
+
+def _free_languages(factory_name: str) -> int:
+    from apps.cms.models import HomePage
+    from apps.core.i18n import configured_languages
+    from apps.events.models import EventIndexPage
+
+    rows = HomePage if factory_name == "HomePageFactory" else EventIndexPage
+    return len(configured_languages()) - rows.objects.count()
+
 
 @pytest.mark.parametrize("factory_class", app_factories(), ids=lambda f: f.__name__)
 def test_every_factory_creates_valid_distinct_rows(factory_class: Factory) -> None:
-    first, second = factory_class.create_batch(2)
+    first = factory_class.create()
     assert first.pk is not None
+    if (
+        factory_class.__name__ in LANGUAGE_BOUND_FACTORIES
+        and _free_languages(factory_class.__name__) < 1
+    ):
+        first.full_clean()  # one row per language: a two-language set has no room for a second
+        return
+    second = factory_class.create()
     assert second.pk is not None
     if factory_class.__name__ in SINGLETON_FACTORIES:
         assert first.pk == second.pk
@@ -61,10 +82,9 @@ def test_platform_operator_batches_have_adjacent_non_overlapping_periods() -> No
 
 def test_vendor_factory_creates_translations_per_language() -> None:
     vendor = VendorFactory.create(languages=[primary_language(), other_language()])
-    assert sorted(vendor.translations.values_list("language", flat=True)) == [
-        primary_language(),
-        other_language(),
-    ]
+    assert sorted(vendor.translations.values_list("language", flat=True)) == sorted(
+        [primary_language(), other_language()]
+    )
     assert vendor.display_name.startswith("Vendor ")
     assert vendor.contact_email.endswith("@example.com")
 
