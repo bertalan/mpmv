@@ -194,7 +194,9 @@ def sweep(case: Case, language: str) -> None:
     assert landing_path(response, forms[language]["_action"]) == path, (
         f"{case.url} -> {language}: lands on {landing_path(response, '')}, expected {path}"
     )
-    assert html_lang(response) == language, f"{case.url} -> {language}: <html lang> is wrong"
+    # A page that stays on its own language (an event, a legal page) keeps that language.
+    shown = (translation.get_language_from_path(path) or primary_language()) if notice else language
+    assert html_lang(response) == shown, f"{case.url} -> {language}: <html lang> is wrong"
     html = response.content.decode()
     assert (notice_text(language) in html) is notice, f"{case.url} -> {language}: notice {notice}"
     if case.secret:
@@ -467,7 +469,11 @@ def category_listing_untranslated() -> Case:
     CategoryTranslationFactory.create(category=category, slug="hats", status=PUBLISHED)
     _listed(category=category)
     found = {primary_language(): localized("/product-category/hats/")}
-    return Case(localized("/product-category/hats/"), _expect_pages(None, found))
+    expect = _expect_pages(None, found)
+    for code in LANGUAGES:  # the fallback link is followed to the page's canonical segment
+        if code != primary_language():
+            expect[code] = (localized("/product-category/hats/", code), True)
+    return Case(localized("/product-category/hats/"), expect)
 
 
 def vendor_storefront() -> Case:
