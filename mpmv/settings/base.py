@@ -624,6 +624,12 @@ GEOCODING_ADAPTERS = {
     "locationiq": "apps.core.geocoding.adapters.LocationIQGeocoder",
     "opencage": "apps.core.geocoding.adapters.OpenCageGeocoder",
 }
+# ING.8: the VAT rate of a supplier gross price comes from the tax engine; ingest may not import
+# apps.tax, so it is named here.
+INGEST_VAT_RATE_RESOLVER = "apps.tax.prices.supplier_vat_rate"
+# Lane-a decision (ING.8): an observation older than this many hours is stale (default 48).
+INGEST_STALE_MAX_AGE_HOURS = 48
+
 GEOCODING_TRANSPORT = "apps.core.geocoding.adapters.http_get_json"
 GEOCODING_CONTACT = env_str("MPMV_GEOCODING_CONTACT", "")
 GEOCODING_LOCATIONIQ_KEY = env_str("MPMV_GEOCODING_LOCATIONIQ_KEY", "")

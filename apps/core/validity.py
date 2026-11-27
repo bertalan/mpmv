@@ -17,6 +17,11 @@ class Period(Protocol):
     def valid_to(self) -> dt.datetime | None: ...
 
 
+class VatRateUnavailable(Exception):
+    """The VAT rate of a price cannot be decided (no rate, tax profile or operator): the caller
+    reports it and writes nothing, never a guess. Raised by the resolver ingest is wired to."""
+
+
 class NoValidRow(LookupError):
     """No configuration row covers the requested instant."""
 
