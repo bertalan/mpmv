@@ -1990,8 +1990,8 @@ msgid "Blocked"
 msgstr "Bloqué"
 
 #: apps/themes/templates/themes/admin/palette_builder.html
-msgid "Body text with a"
-msgstr "Texte courant avec un"
+msgid "Body text with a <a class=\"pp-link\" href=\"#palette-preview\">link</a>."
+msgstr "Texte courant avec un <a class=\"pp-link\" href=\"#palette-preview\">lien</a>."
 
 #: apps/events/templates/events/event_page.html
 msgid "Booth %(booth)s"
@@ -2374,7 +2374,7 @@ msgstr "à vérifier"
 
 #: apps/themes/templates/themes/admin/palette_builder.html
 msgid "Check contrast"
-msgstr "Vérifier le contraste"
+msgstr "Vérifiez le contraste"
 
 #: apps/manager/templates/manager/platform/stray_payments.html
 msgid "Check now"
@@ -5421,10 +5421,6 @@ msgstr "Lignes"
 msgid "Link"
 msgstr "Lien"
 
-#: apps/themes/templates/themes/admin/palette_builder.html
-msgid "link"
-msgstr "lien"
-
 #: apps/cms/blocks.py
 msgid "Link after the launch"
 msgstr "Lien après le lancement"
@@ -5456,7 +5452,7 @@ msgstr "Contrôle de disponibilité"
 
 #: apps/themes/templates/themes/admin/palette_builder.html
 msgid "Load colours"
-msgstr "Charger les couleurs"
+msgstr "Chargez les couleurs"
 
 #: themes/base/templates/components/button.html
 msgid "Loading"
@@ -8812,7 +8808,7 @@ msgstr "Enregistrer mes choix"
 
 #: apps/themes/templates/themes/admin/palette_builder.html
 msgid "Save palette"
-msgstr "Enregistrer la palette"
+msgstr "Enregistrez la palette"
 
 #: apps/manager/templates/manager/shop/closure_form.html
 #: apps/manager/templates/manager/shop/closures.html

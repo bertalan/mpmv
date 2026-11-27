@@ -1974,8 +1974,8 @@ msgid "Blocked"
 msgstr "Bloqueado"
 
 #: apps/themes/templates/themes/admin/palette_builder.html
-msgid "Body text with a"
-msgstr "Texto del cuerpo con un"
+msgid "Body text with a <a class=\"pp-link\" href=\"#palette-preview\">link</a>."
+msgstr "Texto del cuerpo con un <a class=\"pp-link\" href=\"#palette-preview\">enlace</a>."
 
 #: apps/events/templates/events/event_page.html
 msgid "Booth %(booth)s"
@@ -2354,7 +2354,7 @@ msgstr "revisar"
 
 #: apps/themes/templates/themes/admin/palette_builder.html
 msgid "Check contrast"
-msgstr "Comprobar el contraste"
+msgstr "Compruebe el contraste"
 
 #: apps/manager/templates/manager/platform/stray_payments.html
 msgid "Check now"
@@ -5372,10 +5372,6 @@ msgstr "Líneas"
 msgid "Link"
 msgstr "Enlace"
 
-#: apps/themes/templates/themes/admin/palette_builder.html
-msgid "link"
-msgstr "enlace"
-
 #: apps/cms/blocks.py
 msgid "Link after the launch"
 msgstr "Enlace tras el lanzamiento"
@@ -5407,7 +5403,7 @@ msgstr "Comprobación de actividad"
 
 #: apps/themes/templates/themes/admin/palette_builder.html
 msgid "Load colours"
-msgstr "Cargar colores"
+msgstr "Cargue los colores"
 
 #: themes/base/templates/components/button.html
 msgid "Loading"
@@ -8080,7 +8076,7 @@ msgstr "Valorado con %(value)s sobre 5"
 
 #: apps/themes/templates/themes/admin/palette_builder.html
 msgid "Ratio"
-msgstr "Razón"
+msgstr "Relación de contraste"
 
 #: apps/seo/templates/seo/consent/banner.html themes/ride/templates/seo/consent/banner.html
 msgid "Read more and choose"
@@ -8749,7 +8745,7 @@ msgstr "Guardar mis elecciones"
 
 #: apps/themes/templates/themes/admin/palette_builder.html
 msgid "Save palette"
-msgstr "Guardar paleta"
+msgstr "Guarde la paleta"
 
 #: apps/manager/templates/manager/shop/closure_form.html
 #: apps/manager/templates/manager/shop/closures.html
