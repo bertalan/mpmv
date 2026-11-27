@@ -33,7 +33,8 @@ def _free_languages(factory_name: str) -> int:
     from apps.events.models import EventIndexPage
 
     rows = HomePage if factory_name == "HomePageFactory" else EventIndexPage
-    return len(configured_languages()) - rows.objects.count()
+    taken: int = rows.objects.count()
+    return len(configured_languages()) - taken
 
 
 @pytest.mark.parametrize("factory_class", app_factories(), ids=lambda f: f.__name__)
