@@ -24,6 +24,7 @@ from wagtail.images.fields import WagtailImageField
 from wagtail.images.forms import BaseImageForm
 from wagtail.models import UploadedFile
 
+from .ai_origin import AI_NONE
 from .models import MediaImage, check_svg, read_svg
 
 # The prefix Wagtail gives the step-2 form: `edit_upload_form_prefix` and the upload's id.
@@ -50,6 +51,9 @@ class MediaImageForm(BaseImageForm):  # type: ignore[misc]  # Wagtail is untyped
         if field is not None and type(field) is WagtailImageField:
             # Same field, safer parsing: keeps its widget, label, limits and messages (SEC.2).
             field.__class__ = SafeImageField
+        origin = self.fields.get("ai_origin")
+        if origin is not None:
+            origin.required = False  # CMP.8: a form that leaves it out keeps the stored value
 
     def _post_clean(self) -> None:
         super()._post_clean()
@@ -73,6 +77,8 @@ class MediaImageForm(BaseImageForm):  # type: ignore[misc]  # Wagtail is untyped
 
     def clean(self) -> dict[str, Any]:
         cleaned_data: dict[str, Any] = super().clean()
+        if "ai_origin" in self.fields and not cleaned_data.get("ai_origin"):
+            cleaned_data["ai_origin"] = self.instance.ai_origin or AI_NONE
         upload = self._pending_upload()
         if upload is None:
             return cleaned_data
