@@ -160,3 +160,10 @@ def test_a_negative_or_non_finite_vat_rate_is_refused() -> None:
     for bad in (Decimal("-0.5"), Decimal("NaN")):
         with pytest.raises(ValueError, match="VAT rate"):
             e.net_from_gross(Decimal("1.00"), vat_rate=bad)
+
+
+def test_an_unusable_sale_price_is_skipped_never_a_sale_review() -> None:
+    for bad in (Decimal("0"), Decimal("-5.00"), Decimal("NaN"), Decimal("Infinity")):
+        action = price(pobs("122.00", sale_price_gross=bad))
+        assert (action.kind, action.reason) == (e.SKIP, "invalid_sale_price")
+        assert action.price_net is None

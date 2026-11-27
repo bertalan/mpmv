@@ -7,7 +7,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Any, Final, Literal
+from typing import Any, Final, Literal, TypeIs
 from urllib.parse import urlsplit, urlunsplit
 
 from apps.catalog.engine import sku_match_key
@@ -302,6 +302,24 @@ UNCHANGED: Final = "unchanged"
 SKIP: Final = "skip"
 REVIEW: Final = "review"
 
+type StockKind = Literal["set_stock", "unchanged", "skip", "review"]
+type PriceKind = Literal["set_price", "unchanged", "skip", "review"]
+type StockReason = Literal[
+    "unlinked", "stale", "missing", "supplier", "unreliable_status", "incoherent_stock"
+]
+type PriceReason = Literal[
+    "unlinked",
+    "stale",
+    "invalid_price",
+    "invalid_sale_price",
+    "sale",
+    "same",
+    "first_price",
+    "price_jump",
+    "within_limit",
+]
+type ReviewKindName = Literal["stale", "price_jump", "sale"]
+
 MISSING_STATUSES: Final = frozenset({404})
 DEFAULT_MAX_CHANGE_PCT: Final = Decimal("15")
 _CENT: Final = Decimal("0.01")
@@ -333,10 +351,10 @@ class StockAction:
 
     ref: int
     product_id: int | None
-    kind: str
-    reason: str
+    kind: StockKind
+    reason: StockReason
     quantity: int | None = None
-    review_kind: str | None = None
+    review_kind: ReviewKindName | None = None
 
 
 def is_stale(observed_at: datetime, *, now: datetime, max_age: timedelta) -> bool:
@@ -376,7 +394,7 @@ def plan_stock_actions(
 
 
 def _stock_to(
-    obs: StockObservation, product: StockProduct, quantity: int, reason: str
+    obs: StockObservation, product: StockProduct, quantity: int, reason: StockReason
 ) -> StockAction:
     if product.stock_qty == quantity:
         return StockAction(obs.ref, product.product_id, UNCHANGED, reason, quantity)
@@ -406,12 +424,12 @@ class PriceAction:
 
     ref: int
     product_id: int | None
-    kind: str
-    reason: str
+    kind: PriceKind
+    reason: PriceReason
     price_net: Decimal | None = None
     old_net: Decimal | None = None
     change_pct: Decimal | None = None
-    review_kind: str | None = None
+    review_kind: ReviewKindName | None = None
 
 
 def net_from_gross(gross: Decimal, *, vat_rate: Decimal) -> Decimal:
@@ -436,7 +454,7 @@ def exceeds_change_limit(old: Decimal, new: Decimal, max_change_pct: Decimal) ->
     return abs(new - old) * 100 > max_change_pct * old
 
 
-def _usable_price(value: object) -> bool:
+def _usable_price(value: object) -> TypeIs[Decimal]:
     return isinstance(value, Decimal) and value.is_finite() and value > 0
 
 
@@ -462,8 +480,10 @@ def plan_price_actions(
             plan.append(PriceAction(obs.ref, pid, SKIP, "unlinked"))
         elif is_stale(obs.observed_at, now=now, max_age=max_age):
             plan.append(PriceAction(obs.ref, pid, REVIEW, "stale", review_kind="stale"))
-        elif not (isinstance(obs.price_gross, Decimal) and _usable_price(obs.price_gross)):
+        elif not _usable_price(obs.price_gross):
             plan.append(PriceAction(obs.ref, pid, SKIP, "invalid_price"))
+        elif obs.sale_price_gross is not None and not _usable_price(obs.sale_price_gross):
+            plan.append(PriceAction(obs.ref, pid, SKIP, "invalid_sale_price"))
         else:
             new = net_from_gross(obs.price_gross, vat_rate=vat_rate)
             old = product.price_net

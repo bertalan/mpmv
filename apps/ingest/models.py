@@ -704,6 +704,12 @@ class ReviewItem(BaseModel):
                 condition=models.Q(decision="pending") | models.Q(resolved_at__isnull=False),
                 name="ingest_review_decided_has_time",
             ),
+            # One open review per product and kind: a newer supplier value refreshes it (ING.8).
+            models.UniqueConstraint(
+                fields=["product", "kind"],
+                condition=models.Q(decision__in=["pending", "deferred"]),
+                name="ingest_review_one_open_per_product_kind",
+            ),
         ]
 
     def __str__(self) -> str:

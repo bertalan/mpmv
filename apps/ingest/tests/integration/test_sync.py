@@ -11,6 +11,7 @@ from apps.catalog.models import Product, StockStatus
 from apps.catalog.tests.factories import ProductFactory
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
+from apps.core.validity import VatRateUnavailable
 from apps.ingest import sync
 from apps.ingest.models import ImportRun, ReviewItem, SourceItem, SourceState
 from apps.ingest.tests.factories import (
@@ -166,7 +167,7 @@ def test_a_product_without_a_rate_is_an_error_not_a_guess() -> None:
     state(item, state={"price": "137.50"})
 
     def no_rate(product: Product, at: dt.datetime) -> Decimal:
-        raise LookupError("no tax rate")
+        raise VatRateUnavailable("no tax rate")
 
     result = sync.sync_prices(
         run, ctx=CTX, now=timezone.now(), max_age=MAX_AGE, vat_rate_for=no_rate
@@ -295,3 +296,62 @@ def test_two_rates_are_planned_together_and_keep_item_order() -> None:
     prod.refresh_from_db()
     other.refresh_from_db()
     assert (prod.price_net, other.price_net) == (Decimal("110.00"), Decimal("100.00"))
+
+
+def test_a_newer_supplier_value_refreshes_the_open_review() -> None:
+    run, item, _ = setup(price_net=Decimal("100.00"))
+    row = state(item, state={"price": "162.50"})  # 130.00 net
+    prices(run)
+    row.state = {**row.state, "price": "187.50"}  # 150.00 net
+    row.save()
+    result = prices(run)
+    review = ReviewItem.objects.get()
+    assert result.reviews == 0
+    assert review.payload["new_net"] == "150.00"
+    assert review.payload["change_pct"] == "50.00"
+    assert AuditLog.objects.filter(action=sync.REVIEW_REFRESHED).count() == 1
+
+
+def test_the_database_allows_one_open_review_per_product_and_kind() -> None:
+    from django.db import IntegrityError, transaction
+
+    run, item, prod = setup()
+    ReviewItem.objects.create(run=run, item=item, product=prod, kind="sale", payload={})
+    with pytest.raises(IntegrityError), transaction.atomic():
+        ReviewItem.objects.create(run=run, item=item, product=prod, kind="sale", payload={})
+    ReviewItem.objects.update(decision="rejected", resolved_at=timezone.now())
+    ReviewItem.objects.create(run=run, item=item, product=prod, kind="sale", payload={})
+
+
+def test_losing_the_race_to_open_a_review_is_read_as_already_open(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run, item, prod = setup()
+    ReviewItem.objects.create(run=run, item=item, product=prod, kind="stale", payload={})
+    # A concurrent run committed its open item after our lookup: hide it from the lookup.
+    monkeypatch.setattr(
+        "apps.ingest.sync.ReviewItem.objects.filter",
+        lambda *a, **k: ReviewItem.objects.none(),
+    )
+    state(item, stock_status=1, stock_quantity=9, observed_at=timezone.now() - dt.timedelta(days=5))
+    result = stock(run)
+    assert result.reviews == 0
+
+
+def test_the_dry_run_counts_the_would_be_reviews() -> None:
+    run, item, _ = setup(dry_run=True, price_net=Decimal("100.00"))
+    state(item, state={"price": "162.50"})
+    result = prices(run)
+    assert result.reviews == 1
+    assert not ReviewItem.objects.exists()
+
+
+def test_a_programming_error_in_the_resolver_is_not_hidden_as_an_error_row() -> None:
+    run, item, _ = setup(price_net=Decimal("100.00"))
+    state(item, state={"price": "137.50"})
+
+    def broken(product: Product, at: dt.datetime) -> Decimal:
+        raise TypeError("bug")
+
+    with pytest.raises(TypeError):
+        sync.sync_prices(run, ctx=CTX, now=timezone.now(), max_age=MAX_AGE, vat_rate_for=broken)
