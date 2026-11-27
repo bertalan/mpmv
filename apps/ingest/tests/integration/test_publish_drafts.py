@@ -191,5 +191,7 @@ def test_two_vendors_with_the_same_sku_each_run_publishes_only_its_own_draft() -
     }
     a_draft.item.refresh_from_db()
     b_draft.item.refresh_from_db()
+    assert a_draft.item.product is not None
+    assert b_draft.item.product is not None
     assert a_draft.item.product.vendor_id == a_draft.item.vendor_id
     assert b_draft.item.product.vendor_id == b_draft.item.vendor_id
