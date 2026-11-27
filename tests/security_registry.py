@@ -251,6 +251,30 @@ CSRF_EXEMPT: dict[str, str] = {
         "timestamp tolerance (PAY.2)."
     ),
 }
+# Hook-registered admin views (Wagtail, wagtail-localize) marked `csrf_exempt` by their packages
+# (SEC.11). Each is declared one by one; a new one fails `test_csrf_exempt_views_are_declared`.
+# `test_post_without_csrf_token_is_refused` proves each answers an unsigned POST with 403 (the
+# view checks the token itself) or 405 (it takes no POST), and writes nothing.
+ADMIN_CSRF_EXEMPT: dict[str, str] = {
+    "wagtailadmin_api:explorer": (
+        "Wagtail admin API (django-ninja), read-only page explorer: no POST handler, so an "
+        "unsigned POST gets 405."
+    ),
+    "wagtail_localize:edit_string_translation": (
+        "wagtail-localize DRF view: SessionAuthentication enforces the CSRF token on writes "
+        "itself, so an unsigned POST gets 403."
+    ),
+    "wagtail_localize:edit_override": (
+        "wagtail-localize DRF view: SessionAuthentication enforces the CSRF token on writes "
+        "itself, so an unsigned POST gets 403."
+    ),
+    "wagtail_localize:snippets_api_listing": (
+        "wagtail-localize DRF listing: read-only, no POST handler, so an unsigned POST gets 405."
+    ),
+    "wagtail_localize:snippets_api_detail": (
+        "wagtail-localize DRF detail: read-only, no POST handler, so an unsigned POST gets 405."
+    ),
+}
 # Every API v1 operation (django-ninja) is CSRF-exempt: it authenticates with a bearer API key
 # only (CORE.13), never with the session cookie, so a cross-site form cannot act through it.
 API_CSRF_REASON = "API v1: bearer API key only, the session cookie never authenticates."
