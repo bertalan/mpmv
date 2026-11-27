@@ -12,12 +12,19 @@ statement are separate, human steps.
 import json
 import re
 from collections.abc import Iterator
+from decimal import Decimal
 from pathlib import Path
+from typing import Any
 
 import pytest
-from playwright.sync_api import Page
+from django.conf import settings
+from django.contrib.sessions.backends.db import SessionStore
+from playwright.sync_api import Page, expect
 from pytest_django.live_server_helper import LiveServer
 
+from apps.cart.models import Cart
+from apps.cart.session import GUEST_CART_SESSION_KEY
+from apps.cart.tests.factories import CartFactory
 from apps.catalog.models import Product
 from apps.catalog.tests.factories import (
     CategoryFactory,
@@ -31,17 +38,25 @@ from apps.cms.tests.factories import (
 )
 from apps.core.i18n import configured_languages, primary_language
 from apps.core.models import TranslationStatus
+from apps.core.tests.factories import PlatformOperatorFactory, utc
+from apps.orders.tests.integration.test_checkout_views import add, vendor
+from apps.tax import engine as tax
+from apps.tax.tests.factories import TaxRateFactory
 from apps.vendors.models import Vendor
-from apps.vendors.tests.factories import VendorFactory, VendorTranslationFactory
+from apps.vendors.tests.factories import (
+    CommissionRuleFactory,
+    VendorFactory,
+    VendorTranslationFactory,
+)
 from tests.e2e.axe import format_violations, run_axe
-from tests.i18n import category_url, language_prefix, localized
+from tests.i18n import category_url, language_prefix, localized, translated
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
 REPORT_DIR = Path(__file__).resolve().parents[2] / "build" / "e2e" / "axe"
 # The key public pages: the seeded site (home, About, blog), the recruitment funnel, the legal
 # pages, the Manager sign-in, a vendor storefront and a public catalogue listing, in the primary
-# and a second language. Cart, checkout and the product page do not exist yet (see Follow-ups).
+# and a second language. The product page, cart and checkout steps have their own test below.
 PRIMARY = primary_language()
 SECOND = next((code for code in configured_languages() if code != PRIMARY), PRIMARY)
 KEY_PAGES = tuple(
@@ -137,3 +152,64 @@ def test_key_page_has_no_axe_violation(
         json.dumps({"path": path, "violations": violations}, indent=2), encoding="utf-8"
     )
     assert violations == [], format_violations(violations)
+
+
+def record(slug: str, path: str, violations: list[dict[str, object]]) -> None:
+    REPORT_DIR.mkdir(parents=True, exist_ok=True)
+    (REPORT_DIR / f"{slug}.json").write_text(
+        json.dumps({"path": path, "violations": violations}, indent=2), encoding="utf-8"
+    )
+
+
+@pytest.fixture
+def shop(settings: Any) -> Cart:
+    """A guest cart with one item, the tax rates and the default commission rule."""
+    PlatformOperatorFactory.create(open_ended=True, valid_from=utc(2026, 1, 1), country="IT")
+    TaxRateFactory.create(
+        country="IT", category=tax.STANDARD, rate=Decimal("22"), valid_from=utc(2026, 1, 1)
+    )
+    CommissionRuleFactory.create(valid_from=utc(2026, 1, 1), valid_to=None)
+    cart = CartFactory.create()
+    product = add(cart, vendor("Rossi Ceramics"), "100.00", "Blue vase")
+    product.translations.update(slug="blue-vase")  # the page the cart line links to
+    return cart
+
+
+def test_product_cart_and_checkout_pages_have_no_axe_violation(
+    page: Page, live_server: LiveServer, shop: Cart
+) -> None:
+    """The product page, the cart with an item and the checkout details and review steps."""
+    store = SessionStore()
+    store[GUEST_CART_SESSION_KEY] = shop.session_key
+    store.save()
+    page.context.add_cookies(
+        [{"name": settings.SESSION_COOKIE_NAME, "value": store.session_key or "",
+          "url": live_server.url}]
+    )  # fmt: skip
+
+    def audit(slug: str) -> None:
+        page.wait_for_load_state("load")
+        violations = run_axe(page)
+        record(slug, slug, violations)
+        assert violations == [], f"{slug}: {format_violations(violations)}"
+
+    page.goto(f"{live_server.url}{localized('/product/blue-vase/')}")
+    audit("product-detail")
+    page.goto(f"{live_server.url}{localized('/cart/')}")
+    audit("cart")
+    page.goto(f"{live_server.url}{localized('/checkout/')}")
+    audit("checkout-details")
+    # An empty submit (the form is novalidate) shows the error summary and the field errors.
+    page.get_by_role("button", name=translated("Continue to review")).click()
+    expect(page.get_by_role("heading", level=1)).to_have_text(translated("Your details"))
+    expect(page.locator("[aria-invalid='true']").first).to_be_visible()
+    audit("checkout-details-errors")
+    page.locator("#id_email").fill("buyer@example.com")
+    page.locator("#id_full_name").fill("Mario Rossi")
+    page.locator("#id_line1").fill("1 Via Test")
+    page.locator("#id_postcode").fill("00100")
+    page.locator("#id_city").fill("Roma")
+    page.locator("#id_country").select_option("IT")
+    page.locator("#id_city").press("Enter")
+    expect(page.get_by_role("heading", level=1)).to_have_text(translated("Review and pay"))
+    audit("checkout-review")
