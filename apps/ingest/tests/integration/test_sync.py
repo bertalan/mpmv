@@ -183,3 +183,32 @@ def test_price_dry_run_writes_nothing() -> None:
     prod.refresh_from_db()
     assert prod.price_net == Decimal("100.00")
     assert not result.changes.is_empty
+
+
+def test_run_sync_closes_a_stock_run_with_counters() -> None:
+    run, item, prod = setup(stock_qty=0)
+    state(item, stock_status=1, stock_quantity=3)
+    done = sync.run_sync(run.source, ImportRun.Kind.STOCK, ctx=CTX, now=timezone.now())
+    prod.refresh_from_db()
+    assert prod.stock_qty == 3
+    assert (done.status, done.seen, done.updated) == ("succeeded", 1, 1)
+    assert done.dry_run is False
+
+
+def test_run_sync_is_a_dry_run_without_the_source_write_flag() -> None:
+    run, item, prod = setup(dry_run=True, stock_qty=0)
+    state(item, stock_status=1, stock_quantity=3)
+    done = sync.run_sync(run.source, ImportRun.Kind.STOCK, ctx=CTX, now=timezone.now())
+    prod.refresh_from_db()
+    assert prod.stock_qty == 0
+    assert done.dry_run is True
+    assert done.status == "succeeded"
+
+
+def test_run_sync_reports_a_missing_tax_rate_as_an_error_row() -> None:
+    run, item, _ = setup(dry_run=True)
+    state(item, state={"price": "10.00"})
+    # No platform operator or tax rate exists here: every product is an error row, not a crash.
+    done = sync.run_sync(run.source, ImportRun.Kind.PRICE, ctx=CTX, now=timezone.now())
+    assert done.status == "succeeded"
+    assert done.errors == 1

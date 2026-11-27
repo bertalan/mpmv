@@ -26,8 +26,8 @@ from apps.core.changeset import ChangeSet
 from apps.core.services import run_mutation
 
 from . import engine
-from .models import ImportRun, ReviewItem, SourceItem
-from .services import REVIEW_OPENED, review_snapshot
+from .models import ImportRun, ReviewItem, SourceItem, SupplierSource
+from .services import REVIEW_OPENED, queue_run, review_snapshot, transition_run
 
 SYNC_RUN = "ingest.sync.run"
 
@@ -315,3 +315,46 @@ def _set_price(
     result.changes.changes.extend(part.changes)
     if not dry:
         result.applied += 1
+
+
+def run_sync(
+    source: SupplierSource, kind: str, *, ctx: AuditContext, now: dt.datetime
+) -> ImportRun:
+    """One scheduled stock or price run of `source`: queue it (a write run only when the source's
+    write flag is on, else a dry run), sync, and close it with its counters and a plain report.
+
+    Any failure marks the run failed and is logged in the run, never raised, so one source cannot
+    stop the others."""
+    run, _ = queue_run(source, kind, ctx=ctx, write=source.write_enabled)
+    transition_run(run, engine.RUNNING, ctx=ctx)
+    try:
+        if kind == ImportRun.Kind.STOCK:
+            result = sync_stock(run, ctx=ctx, now=now, max_age=stale_max_age())
+        else:
+            result = sync_prices(
+                run,
+                ctx=ctx,
+                now=now,
+                max_age=stale_max_age(),
+                vat_rate_for=vat_rate_resolver(),
+            )
+    except Exception as exc:
+        transition_run(run, engine.FAILED, ctx=ctx, counters={"errors": 1}, log=type(exc).__name__)
+        return run
+    kinds = [action.kind for action in result.actions]
+    counters = {
+        "seen": len(kinds),
+        "updated": result.applied,
+        "unchanged": kinds.count(engine.UNCHANGED),
+        "skipped": kinds.count(engine.SKIP),
+        "errors": len(result.errors),
+    }
+    log = "\n".join(
+        [
+            f"{kind} sync, dry run: {run.dry_run}",
+            f"reviews opened: {result.reviews}",
+            *result.errors,
+        ]
+    )
+    transition_run(run, engine.SUCCEEDED, ctx=ctx, counters=counters, log=log)
+    return run
