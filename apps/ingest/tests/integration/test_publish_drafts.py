@@ -10,9 +10,13 @@ from apps.catalog.tests.factories import ProductFactory, ProductTranslationFacto
 from apps.core.audit import AuditContext
 from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
-from apps.ingest import services
-from apps.ingest.models import ProductDraft
-from apps.ingest.tests.factories import ProductDraftFactory, SourceItemFactory
+from apps.ingest import services, tasks
+from apps.ingest.models import ProductDraft, SupplierSource
+from apps.ingest.tests.factories import (
+    ProductDraftFactory,
+    SourceItemFactory,
+    SupplierSourceFactory,
+)
 from apps.vendors.models import Vendor, VendorStatus
 from apps.vendors.tests.factories import VendorFactory
 from tests.i18n import other_language
@@ -120,9 +124,6 @@ def test_a_product_that_fails_the_publication_rules_stays_a_draft_and_the_ingest
 
 
 def test_the_schedule_publishes_only_ready_drafts_of_write_enabled_active_sources() -> None:
-    from apps.ingest import tasks
-    from apps.ingest.tests.factories import SupplierSourceFactory
-
     vendor = VendorFactory.create()
     Vendor.objects.filter(pk=vendor.pk).update(status=VendorStatus.ACTIVE)
     open_source = SupplierSourceFactory.create(vendor=vendor, write_enabled=True)
@@ -143,3 +144,116 @@ def test_the_schedule_publishes_only_ready_drafts_of_write_enabled_active_source
     assert Product.objects.get().sku == live.item.sku
     tasks.publish_ready_drafts(0)  # a rerun finds nothing new
     assert Product.objects.count() == 1
+
+
+# --- review fixes: dry-run parity, locking, retired products
+
+
+def _outcome(report: services.PublishReport) -> tuple[list[str], list[str]]:
+    return report.published, sorted(report.skipped)
+
+
+def _existing(status: str, language: str) -> ProductDraft:
+    vendor = VendorFactory.create()
+    item = SourceItemFactory.create(source__vendor=vendor)
+    product = ProductFactory.create(vendor=vendor, sku=item.sku, status=status)
+    ProductTranslationFactory.create(product=product, language=language, slug="kept-text")
+    return ready_draft(item=item)
+
+
+@pytest.mark.parametrize("status", ["draft", "published", "retired"])
+def test_a_dry_run_and_the_real_run_agree_for_an_existing_product(status: str) -> None:
+    draft = _existing(status, other_language())
+    dry = services.publish_drafts([draft], ctx=CTX, dry_run=True)
+    real = services.publish_drafts([draft], ctx=CTX, dry_run=False)
+    assert _outcome(dry) == _outcome(real)
+    assert (draft.item.sku in real.published) == (status != "retired")
+    if status == "retired":
+        assert draft.item.sku in real.refused
+        assert Product.objects.get(sku=draft.item.sku).status == "retired"
+
+
+def test_a_dry_run_and_the_real_run_agree_for_a_new_and_a_refused_draft() -> None:
+    good = ready_draft()
+    bad = ready_draft(extracted={"title": "Raw", "price": "10.00"})  # no weight
+    dry = services.publish_drafts([good, bad], ctx=CTX, dry_run=True)
+    real = services.publish_drafts([good, bad], ctx=CTX, dry_run=False)
+    assert _outcome(dry) == _outcome(real) == ([good.item.sku], [bad.item.sku])
+    assert real.refused == {bad.item.sku}
+
+
+def test_a_stale_draft_object_is_not_published_when_the_row_changed() -> None:
+    draft = ready_draft()
+    ProductDraft.objects.filter(pk=draft.pk).update(status="needs_review")
+    report = services.publish_drafts([draft], ctx=CTX, dry_run=False)  # still says ready
+    assert report.published == []
+    assert not Product.objects.exists()
+
+
+def test_a_concurrent_creation_is_a_skip_not_an_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    from django.db import IntegrityError
+
+    from apps.catalog import services as catalog_services
+
+    def clash(*args: object, **kwargs: object) -> None:
+        raise IntegrityError("duplicate key")
+
+    monkeypatch.setattr(catalog_services, "upsert_products", clash)
+    first, second = ready_draft(), ready_draft()
+    report = services.publish_drafts([first, second], ctx=CTX, dry_run=False)
+    assert report.published == []
+    assert set(report.skipped) == {first.item.sku, second.item.sku}  # the batch went on
+    assert report.refused == set()
+
+
+def _active_vendor_source() -> tuple[Vendor, SupplierSource]:
+    vendor = VendorFactory.create()
+    Vendor.objects.filter(pk=vendor.pk).update(status=VendorStatus.ACTIVE)
+    return vendor, SupplierSourceFactory.create(vendor=vendor, write_enabled=True)
+
+
+def _ready_in(source: SupplierSource, **overrides: object) -> ProductDraft:
+    return ready_draft(item=SourceItemFactory.create(source=source), **overrides)
+
+
+def test_a_draft_the_catalog_refuses_goes_to_review_and_does_not_block_the_batch() -> None:
+    _, source = _active_vendor_source()
+    stuck = _ready_in(source, extracted={"title": "Raw", "price": "10.00"})  # no weight
+    fine = _ready_in(source)
+    report = services.publish_ready_drafts(ctx=CTX, limit=1)
+    assert report.published == []
+    assert report.refused == {stuck.item.sku}
+    stuck.refresh_from_db()
+    assert stuck.status == "needs_review"
+    audit = AuditLog.objects.get(action=services.DRAFT_NEEDS_REVIEW)
+    assert "weight" in str(audit.after)
+    again = services.publish_ready_drafts(ctx=CTX, limit=1)  # the next draft is reached
+    assert again.published == [fine.item.sku]
+
+
+def test_the_schedule_does_not_touch_a_draft_changed_after_the_selection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, source = _active_vendor_source()
+    draft = _ready_in(source)
+    real = services.publish_drafts
+
+    def late(drafts: object, **kwargs: object) -> services.PublishReport:
+        ProductDraft.objects.filter(pk=draft.pk).update(status="rejected")
+        return real(drafts, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(services, "publish_drafts", late)
+    report = services.publish_ready_drafts(ctx=CTX)
+    assert report.published == []
+    assert report.refused == set()
+    assert not Product.objects.exists()
+
+
+def test_the_schedule_dry_run_writes_nothing_and_the_task_audits_as_the_task() -> None:
+    _, source = _active_vendor_source()
+    draft = _ready_in(source)
+    report = services.publish_ready_drafts(ctx=CTX, dry_run=True)
+    assert report.published == [draft.item.sku]
+    assert not Product.objects.exists()
+    tasks.publish_ready_drafts(0)
+    assert AuditLog.objects.get(action=services.DRAFT_PUBLISHED).source == AuditLog.Source.TASK

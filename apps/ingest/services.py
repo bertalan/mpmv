@@ -9,18 +9,18 @@ import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
-from typing import Any
+from typing import Any, Final
 
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
-from django.db import connection, transaction
+from django.db import IntegrityError, connection, transaction
 from django.db.models import Q
 from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.catalog import engine as catalog_engine
 from apps.catalog import services as catalog_services
-from apps.catalog.models import Product, SkuAlias, Variant
+from apps.catalog.models import Product, ProductStatus, SkuAlias, Variant
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
 from apps.core.i18n import primary_language
@@ -54,6 +54,7 @@ SOURCE_CREATED = "ingest.source.created"
 SOURCE_UPDATED = "ingest.source.updated"
 CATALOG_LOAD_RUN = "ingest.catalog_load.run"
 DRAFT_PUBLISHED = "ingest.draft.published"
+DRAFT_NEEDS_REVIEW = "ingest.draft.needs_review"
 
 
 class WriteNotEnabled(Exception):
@@ -843,6 +844,7 @@ class PublishReport:
     changes: ChangeSet = dataclass_field(default_factory=ChangeSet)
     published: list[str] = dataclass_field(default_factory=list)
     skipped: dict[str, str] = dataclass_field(default_factory=dict)
+    refused: set[str] = dataclass_field(default_factory=set)  # skipped for good: needs a person
 
 
 class _Refused(Exception):
@@ -869,54 +871,106 @@ def publish_drafts(
     refuses (a publishing rule, a row error) is skipped with its reason and writes nothing; the
     others go on. Written: the draft turns `published`, its item points to the product, and
     `ingest.draft.published` is audited. `dry_run` (the default, spec 08) returns the ChangeSet
-    of a real run and writes nothing; the catalog's registered publication checks only run on a
-    real run. Dry-run by default is deliberate: a caller that writes says so.
+    of a real run and writes nothing, and reports the same published and skipped SKUs. The draft
+    row is locked and its status read again inside its transaction, so a draft changed or
+    published meanwhile is skipped; a retired product is never republished (it is `refused`).
+    `refused` holds the SKUs the catalog or the plan turned down for good; `skipped` has every
+    SKU not published, with the reason. The per-source `write_enabled` flag, the active vendor
+    and the schedule belong to `publish_ready_drafts`, not to this low-level service.
     """
     report = PublishReport()
     language = primary_language()
     for draft in drafts:
         sku = draft.item.sku
-        if not engine.is_publishable_status(draft.status):
-            report.skipped[sku] = f"The draft is {draft.status}, not ready."
-            continue
-        payload = engine.plan_draft_product(sku, draft.extracted, draft.enriched, language=language)
-        if isinstance(payload, engine.DraftProblem):
-            report.skipped[sku] = payload.reason
-            continue
         try:
             with transaction.atomic():
-                changes = _publish_one(draft, payload, ctx=ctx, dry_run=dry_run)
+                outcome = _publish_locked(draft, language, ctx=ctx, dry_run=dry_run)
         except _Refused as refused:
             report.skipped[sku] = str(refused)
+            report.refused.add(sku)
             continue
-        report.changes.changes.extend(changes.changes)
+        except IntegrityError:  # a concurrent caller created the same SKU first
+            report.skipped[sku] = "The SKU was created at the same time; try again."
+            continue
+        if isinstance(outcome, str):
+            report.skipped[sku] = outcome
+            continue
+        report.changes.changes.extend(outcome.changes)
         report.published.append(sku)
     return report
 
 
+def _publish_locked(
+    draft: ProductDraft, language: str, *, ctx: AuditContext, dry_run: bool
+) -> ChangeSet | str:
+    """Publish one draft inside the caller's transaction. Returns the changes, or the reason
+    the draft was left alone (not ready any more, or no valid payload)."""
+    locked = (
+        ProductDraft.objects.select_for_update(of=("self",))
+        .select_related("item__vendor", "item__product")
+        .get(pk=draft.pk)
+    )
+    if not engine.is_publishable_status(locked.status):
+        return f"The draft is {locked.status}, not ready."
+    payload = engine.plan_draft_product(
+        locked.item.sku, locked.extracted, locked.enriched, language=language
+    )
+    if isinstance(payload, engine.DraftProblem):
+        raise _Refused(payload.reason)
+    changes = _publish_one(locked, payload, language, ctx=ctx, dry_run=dry_run)
+    if not dry_run:
+        draft.status = locked.status
+    return changes
+
+
 def _publish_one(
-    draft: ProductDraft, payload: catalog_engine.ProductIn, *, ctx: AuditContext, dry_run: bool
+    draft: ProductDraft,
+    payload: catalog_engine.ProductIn,
+    language: str,
+    *,
+    ctx: AuditContext,
+    dry_run: bool,
 ) -> ChangeSet:
     vendor = draft.item.vendor
+    match = catalog_services.match_skus(vendor, [payload.sku])[payload.sku]
+    if isinstance(match, Product) and match.status == ProductStatus.RETIRED:
+        # Staff retired it; a late draft must not bring it back (spec 03 allows it by hand).
+        raise _Refused("The product is retired; a draft does not republish it.")
     upserted = catalog_services.upsert_products(vendor, [payload], ctx=ctx, dry_run=dry_run)
     if upserted.errors:
         raise _Refused("; ".join(m for e in upserted.errors for v in e.errors.values() for m in v))
     changes = upserted.changes
-    match = catalog_services.match_skus(vendor, [payload.sku])[payload.sku]
-    if isinstance(match, Product):
-        status = catalog_services.publish([match], ctx=ctx, dry_run=dry_run)
-        if status.refused:
-            reasons = [m for r in status.refused.values() for v in r.values() for m in v]
-            raise _Refused("; ".join(reasons))
+    product = match if isinstance(match, Product) else None
+    if product is None and not dry_run:
+        found = catalog_services.match_skus(vendor, [payload.sku])[payload.sku]
+        product = found if isinstance(found, Product) else None
+    if product is not None:
+        status = catalog_services.publish([product], ctx=ctx, dry_run=dry_run)
+        refused = {k: v for r in status.refused.values() for k, v in r.items()}
+        if dry_run and refused:
+            # The EN text is not stored yet on a dry run, so the catalog sees a missing one that
+            # the real run will have written: leave that rule out so both runs agree.
+            missing = set(
+                catalog_engine.publication_errors("catalog_only", None, None, [], language)
+            )
+            refused = {k: [m for m in v if m not in missing] for k, v in refused.items()}
+            refused = {k: v for k, v in refused.items() if v}
+            if not refused:
+                status = catalog_services.StatusReport()
+                status.changes.update(
+                    catalog_services.PRODUCT_MODEL,
+                    str(product.public_id),
+                    {"status": product.status},
+                    {"status": ProductStatus.PUBLISHED},
+                )
+        if refused:
+            raise _Refused("; ".join(m for v in refused.values() for m in v))
         changes.changes.extend(status.changes.changes)
-        product = match
-    else:
-        product = None  # a dry run of a new SKU: nothing is stored yet
     before = draft_snapshot(draft)
-    item_change = ChangeSet()
     after = {**before, "status": ProductDraft.Status.PUBLISHED}
     if product is not None:
         after["product"] = str(product.public_id)
+    item_change = ChangeSet()
     item_change.update("ingest.productdraft", str(draft.public_id), before, after)
     changes.changes.extend(item_change.changes)
     if not dry_run:
@@ -928,7 +982,7 @@ def _publish_one(
     return changes
 
 
-PUBLISH_BATCH: int = 200
+PUBLISH_BATCH: Final = 200
 
 
 def publish_ready_drafts(
@@ -936,7 +990,9 @@ def publish_ready_drafts(
 ) -> PublishReport:
     """Scheduled publication (ING.7): publish the `ready` drafts of every active source that
     allows writes (`write_enabled`) and whose vendor is active, oldest first, at most `limit`
-    per call. A source without the flag is never touched; a rerun finds nothing new."""
+    per call. A source without the flag is never touched; a rerun finds nothing new. A draft the
+    catalog refuses for good (`report.refused`) is moved to `needs_review` with the reason in the
+    audit entry, and a person decides."""
     drafts = list(
         ProductDraft.objects.filter(
             status=ProductDraft.Status.READY,
@@ -947,4 +1003,30 @@ def publish_ready_drafts(
         .select_related("item__vendor", "item__product")
         .order_by("pk")[:limit]
     )
-    return publish_drafts(drafts, ctx=ctx, dry_run=dry_run)
+    report = publish_drafts(drafts, ctx=ctx, dry_run=dry_run)
+    if not dry_run:
+        for draft in drafts:
+            if draft.item.sku in report.refused:
+                _send_to_review(draft, report.skipped[draft.item.sku], ctx=ctx)
+    return report
+
+
+def _send_to_review(draft: ProductDraft, reason: str, *, ctx: AuditContext) -> None:
+    """A draft the catalog refuses for good leaves the queue (`needs_review`) with its reason in
+    the audit entry, so it is not retried every run and does not starve the batch."""
+    with transaction.atomic():
+        locked = ProductDraft.objects.select_for_update(of=("self",)).get(pk=draft.pk)
+        if not engine.is_publishable_status(locked.status):
+            return
+        before = draft_snapshot(draft)
+        locked.status = ProductDraft.Status.NEEDS_REVIEW
+        locked.save(update_fields=["status", "updated_at"])
+        draft.status = locked.status
+        changes = ChangeSet()
+        changes.update(
+            "ingest.productdraft",
+            str(draft.public_id),
+            before,
+            {**before, "status": locked.status, "reason": reason},
+        )
+        audit_changes(changes, ctx=ctx, action=DRAFT_NEEDS_REVIEW)
