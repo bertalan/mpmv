@@ -274,7 +274,7 @@ def render_list(index: "EventIndexPage", request: HttpRequest) -> HttpResponse:
 
 def render_past(index: "EventIndexPage", request: HttpRequest) -> HttpResponse:
     now = timezone.now()
-    filters = Filters.parse(request.GET)
+    filters = replace(Filters.parse(request.GET), garage_only=False)  # the list only (FIT.11)
     items = apply_filters(past(_events(index, filters), now), filters)
     paged = _paged(request, items, (index.url or "") + "past/", filters)
     context = {
@@ -301,7 +301,7 @@ def render_calendar(
 ) -> HttpResponse:
     if engine.parse_month(f"{year:04d}-{month:02d}") is None:
         raise Http404("No such month")
-    filters = Filters.parse(request.GET)
+    filters = replace(Filters.parse(request.GET), garage_only=False)  # the list only (FIT.11)
     items = apply_filters(month_items(_events(index, filters), year, month), filters)
     by_day: dict[dt.date, list[Item]] = defaultdict(list)
     for item in items:

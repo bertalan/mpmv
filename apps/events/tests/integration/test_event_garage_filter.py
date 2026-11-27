@@ -4,13 +4,15 @@ the list to the events tagged for the vehicle; the RSS and ICS feeds are byte-id
 without a garage, and with `?garage=1`."""
 
 import datetime as dt
+import re
 
 import pytest
 from django.apps import apps
 from django.test import Client
 from django.urls import reverse
-from django.utils import timezone
+from django.utils import timezone, translation
 
+from apps.core.i18n import primary_language
 from apps.events.models import EventPage
 from apps.events.tests.factories import EventFitmentFactory, EventPageFactory, primary_index
 from apps.fitment.tests.factories import FitmentNodeFactory
@@ -112,3 +114,35 @@ def test_a_feed_is_identical_with_and_without_a_garage(
     assert filtered.content == plain.content
     for title in ("Roadster meet", "Tourer meet", "Open meet"):
         assert title.encode() in plain.content
+
+
+@pytest.mark.parametrize("path", ["past/", "calendar/2027-05/"])
+def test_the_garage_parameter_is_ignored_outside_the_list(
+    events: dict[str, EventPage], path: str
+) -> None:
+    client = Client()
+    _garage(client, "Roadster")
+    base = str(primary_index().url) + path
+
+    def body(url: str) -> str:
+        # The language form differs per response (CSRF token, the request's own query).
+        html = client.get(url).content.decode()
+        html = re.sub(r'name="csrfmiddlewaretoken" value="[^"]*"', "", html)
+        return html.replace("?garage=1", "")
+
+    assert body(base + "?garage=1") == body(base)
+
+
+def test_a_garage_page_is_private_to_the_cache(events: dict[str, EventPage]) -> None:
+    client = Client()
+    _garage(client, "Roadster")
+    assert "private" in client.get(str(primary_index().url) + "?garage=1").get("Cache-Control", "")
+    assert "private" not in Client().get(str(primary_index().url)).get("Cache-Control", "")
+
+
+def test_the_checkbox_label_is_translated(events: dict[str, EventPage]) -> None:
+    client = Client()
+    _garage(client, "Roadster")
+    with translation.override(primary_language()):
+        label = translation.gettext("Only events for my garage")
+    assert label in _list(client)
