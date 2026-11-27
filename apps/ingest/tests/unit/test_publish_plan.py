@@ -1,13 +1,17 @@
 """ING.7: the pure plan that turns an ingest draft into a catalog payload (EN only, D-18 bis)."""
 
 from decimal import Decimal
+from typing import Any
 
+from apps.catalog.engine import ProductIn
 from apps.ingest import engine
 
 LANG = "en"
 
 
-def plan(extracted: dict, enriched: dict | None = None, sku: str = "SUP-1"):  # type: ignore[no-untyped-def]
+def plan(
+    extracted: dict[str, Any], enriched: dict[str, Any] | None = None, sku: str = "SUP-1"
+) -> ProductIn | engine.DraftProblem:
     return engine.plan_draft_product(sku, extracted, enriched or {}, language=LANG)
 
 
@@ -27,7 +31,7 @@ def test_the_payload_takes_the_enriched_text_of_the_publish_language() -> None:
 
 def test_other_languages_in_the_draft_are_never_published() -> None:
     result = plan(
-        {"title": "Raw", "price": "1"},
+        {"title": "Raw", "price": "1", "weight_kg": "1"},
         {LANG: {"title": "Nice"}, "it": {"title": "Bello"}, "de": {"title": "Schoen"}},
     )
     assert not isinstance(result, engine.DraftProblem)
@@ -35,7 +39,7 @@ def test_other_languages_in_the_draft_are_never_published() -> None:
 
 
 def test_without_enriched_text_the_extracted_title_and_description_are_used() -> None:
-    result = plan({"title": "Raw", "description": "Plain", "price": "3"})
+    result = plan({"title": "Raw", "description": "Plain", "price": "3", "weight_kg": "1"})
     assert not isinstance(result, engine.DraftProblem)
     assert (result.translations[0].title, result.translations[0].description) == ("Raw", "Plain")
 
@@ -45,6 +49,7 @@ def test_the_cat22_fields_are_carried() -> None:
         {
             "title": "Raw",
             "price": "3",
+            "weight_kg": "1",
             "length_mm": 10,
             "width_mm": 20,
             "height_mm": 30,

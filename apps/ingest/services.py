@@ -7,6 +7,8 @@ what it applies. Rows are changed in place so the caller keeps using the instanc
 import datetime as dt
 import json
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 from typing import Any
 
 from django.contrib.contenttypes.models import ContentType
@@ -16,10 +18,13 @@ from django.db.models import Q
 from django.utils import timezone
 
 from apps.accounts.models import User
+from apps.catalog import engine as catalog_engine
+from apps.catalog import services as catalog_services
 from apps.catalog.models import Product, SkuAlias, Variant
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
-from apps.core.services import run_mutation, save_audited
+from apps.core.i18n import primary_language
+from apps.core.services import audit_changes, run_mutation, save_audited
 from apps.vendors.models import Vendor
 
 from . import engine, extraction
@@ -28,6 +33,7 @@ from .models import (
     ImportRun,
     ItemChange,
     MappingTable,
+    ProductDraft,
     ReviewItem,
     SourceItem,
     SourceMissing,
@@ -47,6 +53,7 @@ MAPPING_DELETED = "ingest.mapping.deleted"
 SOURCE_CREATED = "ingest.source.created"
 SOURCE_UPDATED = "ingest.source.updated"
 CATALOG_LOAD_RUN = "ingest.catalog_load.run"
+DRAFT_PUBLISHED = "ingest.draft.published"
 
 
 class WriteNotEnabled(Exception):
@@ -823,3 +830,99 @@ def latest_item_fields(item_id: int, fields: Sequence[str] | None = None) -> dic
     with connection.cursor() as cursor:
         cursor.execute(sql, params)
         return {key: json.loads(value) for key, value in cursor.fetchall()}
+
+
+# --- Publishing drafts (ING.7)
+
+
+@dataclass
+class PublishReport:
+    """The outcome of `publish_drafts`: what changed (or would, on a dry run), the SKUs of the
+    drafts published, and the SKUs skipped with the reason. A skipped draft writes nothing."""
+
+    changes: ChangeSet = dataclass_field(default_factory=ChangeSet)
+    published: list[str] = dataclass_field(default_factory=list)
+    skipped: dict[str, str] = dataclass_field(default_factory=dict)
+
+
+class _Refused(Exception):
+    """Rolls back the writes of one draft whose product the catalog refused to publish."""
+
+
+def draft_snapshot(draft: ProductDraft) -> dict[str, Any]:
+    return {
+        "vendor": _vendor_key(draft.item.vendor),
+        "status": draft.status,
+        "product": str(draft.item.product.public_id) if draft.item.product else None,
+    }
+
+
+def publish_drafts(
+    drafts: Sequence[ProductDraft], *, ctx: AuditContext, dry_run: bool = True
+) -> PublishReport:
+    """Turn `ready` drafts into published products in the primary language, in one step each.
+
+    Everything goes through `catalog.services` (`upsert_products`, then `publish`): a new SKU
+    becomes a product with the EN text only (D-18 bis); a SKU that matches an existing product
+    updates its EN text and leaves the other languages, for example the Italian texts migrated
+    by MIG.3, published and untouched. Each draft is its own transaction: one the catalog
+    refuses (a publishing rule, a row error) is skipped with its reason and writes nothing; the
+    others go on. Written: the draft turns `published`, its item points to the product, and
+    `ingest.draft.published` is audited. `dry_run` (the default, spec 08) returns the ChangeSet
+    of a real run and writes nothing; the catalog's registered publication checks only run on a
+    real run. Dry-run by default is deliberate: a caller that writes says so.
+    """
+    report = PublishReport()
+    language = primary_language()
+    for draft in drafts:
+        sku = draft.item.sku
+        if not engine.is_publishable_status(draft.status):
+            report.skipped[sku] = f"The draft is {draft.status}, not ready."
+            continue
+        payload = engine.plan_draft_product(sku, draft.extracted, draft.enriched, language=language)
+        if isinstance(payload, engine.DraftProblem):
+            report.skipped[sku] = payload.reason
+            continue
+        try:
+            with transaction.atomic():
+                changes = _publish_one(draft, payload, ctx=ctx, dry_run=dry_run)
+        except _Refused as refused:
+            report.skipped[sku] = str(refused)
+            continue
+        report.changes.changes.extend(changes.changes)
+        report.published.append(sku)
+    return report
+
+
+def _publish_one(
+    draft: ProductDraft, payload: catalog_engine.ProductIn, *, ctx: AuditContext, dry_run: bool
+) -> ChangeSet:
+    vendor = draft.item.vendor
+    upserted = catalog_services.upsert_products(vendor, [payload], ctx=ctx, dry_run=dry_run)
+    if upserted.errors:
+        raise _Refused("; ".join(m for e in upserted.errors for v in e.errors.values() for m in v))
+    changes = upserted.changes
+    match = catalog_services.match_skus(vendor, [payload.sku])[payload.sku]
+    if isinstance(match, Product):
+        status = catalog_services.publish([match], ctx=ctx, dry_run=dry_run)
+        if status.refused:
+            reasons = [m for r in status.refused.values() for v in r.values() for m in v]
+            raise _Refused("; ".join(reasons))
+        changes.changes.extend(status.changes.changes)
+        product = match
+    else:
+        product = None  # a dry run of a new SKU: nothing is stored yet
+    before = draft_snapshot(draft)
+    item_change = ChangeSet()
+    after = {**before, "status": ProductDraft.Status.PUBLISHED}
+    if product is not None:
+        after["product"] = str(product.public_id)
+    item_change.update("ingest.productdraft", str(draft.public_id), before, after)
+    changes.changes.extend(item_change.changes)
+    if not dry_run:
+        draft.status = ProductDraft.Status.PUBLISHED
+        draft.save(update_fields=["status", "updated_at"])
+        draft.item.product = product
+        draft.item.save(update_fields=["product", "updated_at"])
+        audit_changes(item_change, ctx=ctx, action=DRAFT_PUBLISHED)
+    return changes
