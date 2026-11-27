@@ -162,7 +162,7 @@ def test_failing_to_start_or_to_close_a_run_ends_it_failed_and_the_next_source_g
 ) -> None:
     first = SupplierSourceFactory.create()
     second = SupplierSourceFactory.create()
-    real = sync.transition_run
+    real = services.transition_run
 
     def flaky(run: ImportRun, target: str, **kwargs: Any) -> Any:
         if run.source_id == first.pk and target == "succeeded":
