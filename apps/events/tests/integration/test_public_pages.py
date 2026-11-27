@@ -4,6 +4,7 @@ download. Dates are relative to now so the tests do not age."""
 
 import datetime as dt
 import re
+import zoneinfo
 from urllib.parse import parse_qs, urlparse
 
 import pytest
@@ -189,9 +190,17 @@ def test_the_ics_of_a_non_live_or_hidden_event_is_404_without_a_public_cache(
 
 
 def test_the_calendar_is_an_accessible_table_with_event_links(client: Client) -> None:
-    page = _event(3, title="Calendar fair")
-    when = timezone.now() + dt.timedelta(days=3)
-    html = _get(client, f"{_index_url()}calendar/{when:%Y-%m}/")
+    # Noon on a local date three days ahead, in the event's own zone: the event day and the
+    # requested month agree whatever the hour (a late "+3 days" used to cross a month edge).
+    zone = zoneinfo.ZoneInfo(EventPageFactory.build().timezone)
+    day = timezone.now().astimezone(zone).date() + dt.timedelta(days=3)
+    start = dt.datetime.combine(day, dt.time(12), tzinfo=zone)
+    page = EventPageFactory.create(
+        title="Calendar fair", starts_at=start, ends_at=start + dt.timedelta(hours=2)
+    )
+    page.save_revision().publish()
+    page.refresh_from_db()
+    html = _get(client, f"{_index_url()}calendar/{day:%Y-%m}/")
     assert "<table" in html
     assert "<caption>" in html
     assert html.count('<th scope="col">') == 7
