@@ -52,6 +52,11 @@ class VariantChoice:
     mpn: str = ""
     image: MediaImage | None = None  # the variant's own cover, an existing rendition set
     image_alt: str = ""
+    ai_origin: str = ai_labels.AI_NONE  # CMP.8: the cover's origin, none, generated or edited
+
+    @property
+    def ai_source_type(self) -> str:
+        return ai_labels.iptc_source_type(self.ai_origin)
 
 
 @dataclass(frozen=True)
@@ -220,6 +225,7 @@ def _variants(product: Product, language: str, *, on_request: bool) -> list[Vari
                 mpn=row.mpn,
                 image=cover.image if cover is not None else None,
                 image_alt=((cover_text.alt_text if cover_text is not None else "") or label),
+                ai_origin=cover.ai_origin if cover is not None else ai_labels.AI_NONE,
             )
         )
     return choices
