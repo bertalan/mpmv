@@ -1,0 +1,30 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+Shop closures for staff (VEN.20): pick the shop whose holidays and closures you manage.
+No inline script or style.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{% translate "Shop closures" %}</h1>
+  <p class="manager-lead">{% translate "Choose a shop to see, add, change or remove its holidays and closures. A closure that has ended cannot be changed." %}</p>
+  <form method="get" class="manager-form" role="search">
+    <label for="shop-search">{% translate "Search by shop name" %}</label>
+    <input type="search" id="shop-search" name="q" value="{{ query }}" maxlength="100">
+    {% include "components/button.html" with label=_("Search") type="submit" only %}
+  </form>
+  {% if shops %}
+    <ul class="manager-list">
+      {% for shop, url in shops %}
+        <li><a href="{{ url }}">{{ shop.display_name }}</a></li>
+      {% endfor %}
+    </ul>
+    {% if page_obj.has_other_pages %}
+      <p>
+        {% if page_obj.has_previous %}<a href="?q={{ query|urlencode }}&amp;page={{ page_obj.previous_page_number }}">{% translate "Previous page" %}</a>{% endif %}
+        {% if page_obj.has_next %}<a href="?q={{ query|urlencode }}&amp;page={{ page_obj.next_page_number }}">{% translate "Next page" %}</a>{% endif %}
+      </p>
+    {% endif %}
+  {% else %}
+    <p>{% translate "No shop matches." %}</p>
+  {% endif %}
+{% endblock %}
