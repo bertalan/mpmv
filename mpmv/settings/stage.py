@@ -8,3 +8,6 @@ STAGE = True
 
 # STAGE is never indexed (SEO.8, D-35); Caddy sends the header too, as defence in depth.
 FORCE_NOINDEX = True
+
+# STAGE shows the API documentation to everybody, like local (CORE.29).
+API_DOCS_PUBLIC = True

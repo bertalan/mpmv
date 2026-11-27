@@ -2,14 +2,16 @@
 it answers 404 to anybody but a valid API key or a signed-in staff member."""
 
 import datetime as dt
+from collections.abc import Callable
 
 import pytest
 from django.test import Client, override_settings
 from django.utils import timezone
 
+from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
+from apps.api.models import ApiRefusedKey
 from apps.api.tests.factories import ApiClientFactory
-from apps.core.models import Throttle
 
 pytestmark = pytest.mark.django_db
 
@@ -53,8 +55,10 @@ def test_live_answers_404_to_a_refused_key(client: Client, url: str) -> None:
 
 @pytest.mark.parametrize("url", [DOCS, SCHEMA])
 @override_settings(**LIVE)
-def test_live_answers_200_to_signed_in_staff(client: Client, url: str) -> None:
-    client.force_login(UserFactory.create(staff=True))
+def test_live_answers_200_to_signed_in_staff(
+    client: Client, mfa_login: Callable[[Client, User], Client], url: str
+) -> None:
+    mfa_login(client, UserFactory.create(staff=True))
     assert client.get(url).status_code == 200
 
 
@@ -68,4 +72,4 @@ def test_live_answers_404_to_a_signed_in_customer(client: Client) -> None:
 def test_a_refused_key_on_the_docs_counts_against_the_ip_limit(client: Client) -> None:
     """Guessing keys at the docs URL is as costly as guessing them at the API (CORE.20)."""
     client.get(DOCS, headers=_bearer("mpmv_bad_key"))
-    assert Throttle.objects.exists()
+    assert ApiRefusedKey.objects.exists()
