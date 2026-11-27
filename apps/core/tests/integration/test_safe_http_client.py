@@ -1,10 +1,10 @@
 """MIG.12: `safe_get` end to end with a fake resolver and a fake transport (no real network)."""
 
+import socket
 from collections.abc import Callable, Iterator, Mapping, Sequence
 
 import pytest
 
-from apps.core import safe_http
 from apps.core.safe_http import (
     BlockedAddress,
     RawResponse,
@@ -240,7 +240,7 @@ def test_transport_failures_are_typed() -> None:
             "https://feed.example/",
             max_bytes=10,
             resolver=resolver_for({"feed.example": [PUBLIC]}),
-            transport=Broken(),  # type: ignore[arg-type]
+            transport=Broken(),
         )
 
 
@@ -272,7 +272,7 @@ def test_the_default_transport_pins_the_connection_to_the_vetted_ip(
         dialled.append(address)
         raise OSError("stop here")
 
-    monkeypatch.setattr(safe_http.socket, "create_connection", fake_create_connection)
+    monkeypatch.setattr(socket, "create_connection", fake_create_connection)
     with pytest.raises(TransportFailure):
         safe_get(
             "https://feed.example/",
