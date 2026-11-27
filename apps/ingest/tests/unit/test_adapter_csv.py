@@ -126,3 +126,16 @@ def test_ambiguous_column_mapping_is_a_file_error() -> None:
 def test_column_cap() -> None:
     with pytest.raises(base.AdapterError):
         _adapter(max_columns=2).parse(b"Code,Name,Price\nA-1,Pan,1\n")
+
+
+def test_real_numbers_need_no_separator_guess() -> None:
+    from decimal import Decimal
+
+    row = base.build_row(
+        1, {"sku": "a", "title": "b", "price": 1.234, "stock_quantity": Decimal("3")}
+    )
+    assert isinstance(row, base.ParsedRow)
+    assert row.product.price == "1.23"
+    assert row.product.stock_quantity == 3
+    bad = base.build_row(1, {"sku": "a", "title": "b", "price": True})
+    assert isinstance(bad, base.RowError)
