@@ -113,3 +113,63 @@ def test_a_product_that_fails_the_publication_rules_stays_a_draft_and_the_ingest
     draft.refresh_from_db()
     assert draft.status == "ready"
     assert not Product.objects.filter(status="published").exists()
+
+
+# --- review fixes: dry-run parity, locking, retired products
+
+
+def _outcome(report: services.PublishReport) -> tuple[list[str], list[str]]:
+    return report.published, sorted(report.skipped)
+
+
+def _existing(status: str, language: str) -> ProductDraft:
+    vendor = VendorFactory.create()
+    item = SourceItemFactory.create(source__vendor=vendor)
+    product = ProductFactory.create(vendor=vendor, sku=item.sku, status=status)
+    ProductTranslationFactory.create(product=product, language=language, slug="kept-text")
+    return ready_draft(item=item)
+
+
+@pytest.mark.parametrize("status", ["draft", "published", "retired"])
+def test_a_dry_run_and_the_real_run_agree_for_an_existing_product(status: str) -> None:
+    draft = _existing(status, other_language())
+    dry = services.publish_drafts([draft], ctx=CTX, dry_run=True)
+    real = services.publish_drafts([draft], ctx=CTX, dry_run=False)
+    assert _outcome(dry) == _outcome(real)
+    assert (draft.item.sku in real.published) == (status != "retired")
+    if status == "retired":
+        assert draft.item.sku in real.refused
+        assert Product.objects.get(sku=draft.item.sku).status == "retired"
+
+
+def test_a_dry_run_and_the_real_run_agree_for_a_new_and_a_refused_draft() -> None:
+    good = ready_draft()
+    bad = ready_draft(extracted={"title": "Raw", "price": "10.00"})  # no weight
+    dry = services.publish_drafts([good, bad], ctx=CTX, dry_run=True)
+    real = services.publish_drafts([good, bad], ctx=CTX, dry_run=False)
+    assert _outcome(dry) == _outcome(real) == ([good.item.sku], [bad.item.sku])
+    assert real.refused == {bad.item.sku}
+
+
+def test_a_stale_draft_object_is_not_published_when_the_row_changed() -> None:
+    draft = ready_draft()
+    ProductDraft.objects.filter(pk=draft.pk).update(status="needs_review")
+    report = services.publish_drafts([draft], ctx=CTX, dry_run=False)  # still says ready
+    assert report.published == []
+    assert not Product.objects.exists()
+
+
+def test_a_concurrent_creation_is_a_skip_not_an_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    from django.db import IntegrityError
+
+    from apps.catalog import services as catalog_services
+
+    def clash(*args: object, **kwargs: object) -> None:
+        raise IntegrityError("duplicate key")
+
+    monkeypatch.setattr(catalog_services, "upsert_products", clash)
+    first, second = ready_draft(), ready_draft()
+    report = services.publish_drafts([first, second], ctx=CTX, dry_run=False)
+    assert report.published == []
+    assert set(report.skipped) == {first.item.sku, second.item.sku}  # the batch went on
+    assert report.refused == set()

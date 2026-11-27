@@ -94,7 +94,7 @@ class TextEnricher(Protocol):                                   # interchangeabl
 
 def plan_stock_actions(observations, products) -> list[StockAction]   # pure function (from StockSyncer)
 def plan_price_actions(observations, products, max_change_pct=15) -> list[PriceAction]  # from compute_price_actions
-def publish_drafts(drafts, *, dry_run=True) -> ChangeSet                 # calls catalog.services
+def publish_drafts(drafts, *, ctx, dry_run=True) -> PublishReport         # calls catalog.services; EN only (D-18 bis); report.changes is the ChangeSet
 ```
 
 Rules: dry-run by default; switching to write mode requires a per-source flag (replacing the
