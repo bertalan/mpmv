@@ -6,6 +6,7 @@ from django.utils import translation
 from wagtail.models import Page
 from wagtail.views import serve
 
+from apps.catalog import services as catalog_services
 from apps.core.i18n import FALLBACK_ATTR, primary_language
 
 
@@ -22,13 +23,16 @@ def serve_page(request: HttpRequest, path: str) -> HttpResponseBase:
     tree and served in place, the interface staying in the requested language. Wagtail's own
     `serve` still runs, so view restrictions and the page hooks apply to the page shown; a draft
     or private page is never found (routing only returns live pages). A page type that sets
-    `language_fallback = False` (events, legal pages) keeps its 404.
+    `language_fallback = False` (events, legal pages) keeps its 404. A redirect rule for the
+    requested path wins over the fallback: the 404 lets the redirect middleware apply it.
     """
     language = translation.get_language()
     primary = primary_language()
     if language == primary or Page.route_for_request(request, path) is not None:
         response: HttpResponseBase = serve(request, path)
         return response
+    if catalog_services.resolve_legacy_path(request.path_info) is not None:
+        raise Http404
     del request._wagtail_route_for_request  # type: ignore[attr-defined]  # Wagtail's cache
     with translation.override(primary):
         route = Page.route_for_request(request, path)

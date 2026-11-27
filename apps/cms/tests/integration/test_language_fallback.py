@@ -8,17 +8,25 @@ primary language's endonym; no sitemap lists a fallback URL.
 """
 
 import re
+import secrets
 from typing import Any
 
 import pytest
 from django.apps import apps
+from django.contrib.auth.models import Group
 from django.core.cache import cache
 from django.test import Client
 from django.utils import translation
 from wagtail.models import PageViewRestriction, Site
 
+from apps.catalog.tests.factories import RedirectFactory
 from apps.cms.models import LegalPage
-from apps.cms.tests.factories import LegalPageFactory, StandardPageFactory
+from apps.cms.tests.factories import (
+    BlogAuthorFactory,
+    BlogIndexPageFactory,
+    LegalPageFactory,
+    StandardPageFactory,
+)
 from apps.core.i18n import configured_languages, primary_language
 from tests.i18n import language_prefix, other_language
 
@@ -112,13 +120,60 @@ def test_a_draft_page_is_not_served_as_a_fallback(client: Client, seeded: Any) -
     assert client.get(f"{language_prefix(other_language())}/draft-only/").status_code == 404
 
 
-def test_a_restricted_page_is_not_served_as_a_fallback(client: Client, primary_only: Any) -> None:
-    PageViewRestriction.objects.create(
-        page=primary_only, restriction_type=PageViewRestriction.LOGIN
-    )
-    response = client.get(f"{language_prefix(other_language())}/primary-only/")
+def _restricted_get(primary_only: Any, **restriction: Any) -> Any:
+    PageViewRestriction.objects.create(page=primary_only, **restriction)
+    return Client().get(f"{language_prefix(other_language())}/primary-only/")
+
+
+def test_a_login_restricted_page_sends_the_visitor_to_the_login_page(
+    primary_only: Any,
+) -> None:
+    response = _restricted_get(primary_only, restriction_type=PageViewRestriction.LOGIN)
     assert response.status_code == 302
+    assert "login" in response["Location"]
     assert "Sample text." not in response.content.decode()
+
+
+def test_a_password_restricted_page_asks_for_the_password(primary_only: Any) -> None:
+    response = _restricted_get(
+        primary_only,
+        restriction_type=PageViewRestriction.PASSWORD,
+        password=secrets.token_urlsafe(12),
+    )
+    html = response.content.decode()
+    assert 'name="password"' in html
+    assert "Sample text." not in html
+
+
+def test_a_group_restricted_page_is_not_shown_to_an_anonymous_visitor(
+    primary_only: Any,
+) -> None:
+    restriction = PageViewRestriction.objects.create(
+        page=primary_only, restriction_type=PageViewRestriction.GROUPS
+    )
+    restriction.groups.add(Group.objects.create(name="Fallback readers"))
+    response = Client().get(f"{language_prefix(other_language())}/primary-only/")
+    assert response.status_code == 302
+    assert "login" in response["Location"]
+    assert "Sample text." not in response.content.decode()
+
+
+def test_a_redirect_rule_wins_over_the_fallback(client: Client, primary_only: Any) -> None:
+    source = f"{language_prefix(other_language())}/primary-only/"
+    RedirectFactory.create(source_path=source, target_path="/elsewhere/")
+    response = client.get(source)
+    assert response.status_code == 301
+    assert response["Location"].endswith("/elsewhere/")
+
+
+def test_a_routable_sub_route_is_served_through_the_fallback(client: Client, seeded: Any) -> None:
+    """The blog index routes `author/<slug>/`; under a language with no blog it falls back."""
+    home = Site.objects.get(is_default_site=True).root_page
+    blog = BlogIndexPageFactory.create(parent=home)
+    author = BlogAuthorFactory.create()
+    response = client.get(f"{language_prefix(other_language())}/{blog.slug}/author/{author.slug}/")
+    assert response.status_code == 200
+    assert author.name in response.content.decode()
 
 
 def test_a_legal_page_never_falls_back(client: Client, seeded: Any) -> None:
