@@ -415,9 +415,11 @@ def test_the_vendor_page_switch_targets_equal_its_hreflang_set(seeded: SeedRepor
                                        form.find("input", attrs={"name": "notice"})["value"])
         for form in html.select("nav.language-switcher form")
     }  # fmt: skip
-    assert {code for code, (_url, notice) in forms.items() if notice == "0"} == set(alternates)
     for code, url in alternates.items():
         assert url.endswith(forms[code][0])
+    for code, (target, _notice) in forms.items():  # no translation: the page stays (I18N.22)
+        if code not in alternates:
+            assert target != f"{language_prefix(code)}/"
 
 
 def test_the_page_of_a_vendor_no_longer_active_is_gone(seeded: SeedReport) -> None:
