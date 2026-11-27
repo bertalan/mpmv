@@ -13999,13 +13999,6 @@ msgstr ""
 #: apps/accounts/forms.py
 msgid "Too many attempts. Please try again in %(minutes)s minute."
 msgid_plural "Too many attempts. Please try again in %(minutes)s minutes."
-msgstr[0] "Troppi tentativi. Riprova tra %(minutes)s minuto."
-msgstr[1] "Troppi tentativi. Riprova tra %(minutes)s minuti."
-
-#: apps/accounts/forms.py
-msgctxt "staff sign-in"
-msgid "Too many attempts. Please try again in %(minutes)s minute."
-msgid_plural "Too many attempts. Please try again in %(minutes)s minutes."
 msgstr[0] "Troppi tentativi. Riprovi tra %(minutes)s minuto."
 msgstr[1] "Troppi tentativi. Riprovi tra %(minutes)s minuti."
 

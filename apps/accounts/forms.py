@@ -14,7 +14,7 @@ from django.contrib.admin.forms import AdminAuthenticationForm
 from django.contrib.auth.forms import AuthenticationForm
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
-from django.utils.translation import ngettext, npgettext
+from django.utils.translation import ngettext
 
 from apps.core.http import client_ip
 
@@ -44,6 +44,7 @@ class AccessibleLoginMixin(forms.Form):
         difference either.
         """
         username = self.cleaned_data.get("username")
+        # Only a complete attempt reaches `authenticate()`, so only it is checked against the lock.
         if username and self.cleaned_data.get("password"):
             request = getattr(self, "request", None)
             ip = client_ip(request) if request is not None else None
@@ -56,7 +57,7 @@ class AccessibleLoginMixin(forms.Form):
 
     @staticmethod
     def wait_text(minutes: int) -> str:
-        """The Manager login is shared with customers: informal register. Staff override it."""
+        """Formal register: the Manager login is shared by customers, vendors and staff."""
         return ngettext(
             "Too many attempts. Please try again in %(minutes)s minute.",
             "Too many attempts. Please try again in %(minutes)s minutes.",
@@ -74,16 +75,6 @@ class AccessibleLoginMixin(forms.Form):
 
 class StaffLoginForm(AccessibleLoginMixin, AdminAuthenticationForm):
     """The Django admin login (`admin.site.login_form`)."""
-
-    @staticmethod
-    def wait_text(minutes: int) -> str:
-        """Formal register (staff), with its own gettext context."""
-        return npgettext(
-            "staff sign-in",
-            "Too many attempts. Please try again in %(minutes)s minute.",
-            "Too many attempts. Please try again in %(minutes)s minutes.",
-            minutes,
-        ) % {"minutes": minutes}
 
 
 class ManagerLoginForm(AccessibleLoginMixin, AuthenticationForm):
