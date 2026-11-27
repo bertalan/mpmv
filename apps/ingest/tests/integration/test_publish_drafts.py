@@ -173,3 +173,23 @@ def test_a_concurrent_creation_is_a_skip_not_an_error(monkeypatch: pytest.Monkey
     assert report.published == []
     assert set(report.skipped) == {first.item.sku, second.item.sku}  # the batch went on
     assert report.refused == set()
+
+
+def test_two_vendors_with_the_same_sku_each_run_publishes_only_its_own_draft() -> None:
+    a_draft = ready_draft(item=SourceItemFactory.create(sku="SAME-1"))
+    b_draft = ready_draft(item=SourceItemFactory.create(sku="SAME-1"))
+    report = services.publish_drafts([a_draft], ctx=CTX, dry_run=False)
+    assert report.published == ["SAME-1"]
+    a_draft.refresh_from_db()
+    b_draft.refresh_from_db()
+    assert (a_draft.status, b_draft.status) == ("published", "ready")
+    assert Product.objects.get().vendor_id == a_draft.item.vendor_id
+    services.publish_drafts([b_draft], ctx=CTX, dry_run=False)
+    assert {p.vendor_id for p in Product.objects.all()} == {
+        a_draft.item.vendor_id,
+        b_draft.item.vendor_id,
+    }
+    a_draft.item.refresh_from_db()
+    b_draft.item.refresh_from_db()
+    assert a_draft.item.product.vendor_id == a_draft.item.vendor_id
+    assert b_draft.item.product.vendor_id == b_draft.item.vendor_id
