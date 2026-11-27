@@ -169,6 +169,7 @@ def test_a_replayed_webhook_inside_the_window_has_no_second_effect(
 # redirects but does not choose the host, so each caller still needs its own reason.
 OUTBOUND_CALL_SITES = {
     "apps/core/outbound.py": "the no-redirect opener; the host is always the caller's",
+    "apps/core/safe_http.py": "MIG.12 SSRF-guarded client: public IP vetted and pinned",
     "apps/core/geocoding/adapters.py": "fixed provider URLs; the address only in the query",
     "apps/accounts/captcha.py": "the fixed Turnstile siteverify URL",
     "apps/accounts/breach.py": "settings.BREACH_CHECK_URL (https check); only a 5-char hash prefix",
