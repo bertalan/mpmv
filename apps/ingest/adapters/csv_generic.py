@@ -9,7 +9,7 @@ never evaluated.
 
 import csv
 import io
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from typing import Final
 
 from apps.ingest.adapters import base
@@ -71,6 +71,11 @@ class CsvAdapter:
             raise base.AdapterError("The file is empty.")
         reader = csv.reader(io.StringIO(text), delimiter=detect_delimiter(text))
         header = next(reader)
+        return self._parse_rows(header, reader, encoding=encoding)
+
+    def _parse_rows(
+        self, header: Sequence[str], rows: Iterable[Sequence[object]], *, encoding: str
+    ) -> base.AdapterResult:
         fields = [self._field_for(h) for h in header]
         result = base.AdapterResult(encoding=encoding)
         result.unmapped_columns = [
@@ -80,10 +85,10 @@ class CsvAdapter:
         if missing:
             raise base.AdapterError(f"No column is mapped to: {', '.join(missing)}.")
         seen: set[str] = set()
-        for row_no, cells in enumerate(reader, start=1):
+        for row_no, cells in enumerate(rows, start=1):
             if row_no > self.max_rows:
                 raise base.AdapterError("The file has more rows than allowed.")
-            if not any(c.strip() for c in cells):
+            if not any(c is not None and str(c).strip() for c in cells):
                 continue
             values = {f: c for f, c in zip(fields, cells, strict=False) if f is not None}
             built = base.build_row(row_no, values)
