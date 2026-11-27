@@ -20,7 +20,7 @@ are not legal wording yet.
 | --- | --- | --- |
 | Product text written by a machine | `origin = machine`. It stays a draft until a person confirms it: in the admin tick "I have read and checked this text" and set the status to reviewed or published. The system records who and when. A database constraint also refuses a machine text that is reviewed or published without that record. | `ProductTranslation.origin`, `services.review_translation` |
 | Text that changed at the source | Goes back to draft, and needs a new confirmation. | `TranslationModel.mark_stale_translations` |
-| Product image made or changed by AI | Set "AI origin" to generated or edited. The product page shows "AI-generated image" or "AI-edited image" next to the image and in the zoom view, and the product data (JSON-LD `ImageObject`) carries the IPTC digital source type. | `ProductImage.ai_origin`, `media.set_ai_origin` |
+| Product image made or changed by AI | Set "AI origin" to generated or edited. The product page shows "AI-generated image" or "AI-edited image" next to the image, in the zoom view and under the variant chip of a variant whose cover image is AI, and the product data (JSON-LD `ImageObject`) carries the IPTC digital source type. | `ProductImage.ai_origin`, `media.set_ai_origin` |
 
 Editing a machine text that is already reviewed or published needs no new confirmation: whoever edits it answers for it, as its reviewer.
 
