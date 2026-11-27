@@ -993,6 +993,24 @@ ENDPOINTS: dict[str, Access] = {
         "Finance answers 403, other roles and a vendor member 404 (test_stray_payments). The "
         "alerts span shops by design and show references and amounts only."
     ),
+    # VEN.20 slice 3b: Support and the platform owner manage any shop's closures.
+    "manager:platform:shop_closures": StaffOnly(
+        "Shop picker (VEN.20): Support and the platform owner; a vendor member gets the platform "
+        "gate's 403 and other roles 404. It lists shop names only."
+    ),
+    "manager:platform:shop_closures_vendor": StaffOnly(
+        "One shop's closures, named by the URL (VEN.20): staff span shops by design; an unknown "
+        "shop is a 404.",
+        kwargs={"vendor_id": NIL_UUID},
+    ),
+    "manager:platform:shop_closure_edit": StaffOnly(
+        "Edit a closure (VEN.20): the closure must belong to the shop in the URL, else 404.",
+        kwargs={"vendor_id": NIL_UUID, "public_id": NIL_UUID},
+    ),
+    "manager:platform:shop_closure_remove": StaffOnly(
+        "Remove a closure (VEN.20): the closure must belong to the shop in the URL, else 404.",
+        kwargs={"vendor_id": NIL_UUID, "public_id": NIL_UUID},
+    ),
     "manager:platform:order_drafts": StaffOnly(
         "Prepared carts (ORD.32): Support and the platform owner only; a vendor member gets the "
         "platform gate's refusal and other roles 404 (test_staff_drafts)."

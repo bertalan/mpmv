@@ -13,6 +13,7 @@ from apps.vendors.services import can_review_profiles
 
 from .amendment_views import PLATFORM_SECTION as ORDER_CHANGES_SECTION
 from .amendment_views import SETTINGS_SECTION as AMENDMENT_SETTINGS_SECTION
+from .closure_staff_views import SECTION as STAFF_CLOSURES_SECTION
 from .closure_views import SECTION as CLOSURES_SECTION
 from .event_views import SECTION as EVENTS_SECTION
 from .fitment_shop_views import SECTION as SHOP_FITMENT_SECTION
@@ -309,6 +310,15 @@ BUILT_IN = (
         "manager:platform:stray_payments",
         order=52,
         allowed=platform_role(STRAY_SECTION),
+    ),
+    # VEN.20: staff manage the closures of any shop (Support and the platform owner).
+    Section(
+        STAFF_CLOSURES_SECTION,
+        Space.PLATFORM,
+        _("Shop closures"),
+        "manager:platform:shop_closures",
+        order=53,
+        allowed=platform_role(STAFF_CLOSURES_SECTION),
     ),
     # CORE.24: the platform owner's panic button, last in the menu.
     Section(
