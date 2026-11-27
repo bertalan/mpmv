@@ -29,9 +29,11 @@ from apps.catalog.tests.factories import (
     VariantFactory,
     VariantTranslationFactory,
 )
+from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorTranslationFactory
+from tests.i18n import product_url, translated, vendor_url
 
 pytestmark = pytest.mark.django_db
 
@@ -76,7 +78,7 @@ def mug(ride: None) -> str:
             price_net_override=Decimal("20.00"),
         )
         VariantTranslationFactory.create(
-            variant=variant, language="en", label=label, status=PUBLISHED
+            variant=variant, language=primary_language(), label=label, status=PUBLISHED
         )
     for index in range(2):
         other = ProductFactory.create(
@@ -86,7 +88,7 @@ def mug(ride: None) -> str:
             product=other, title=f"Cup {index}", slug=f"cup-{index}", status=PUBLISHED
         )
         other.terms.add(term)
-    return "/product/hand-made-mug/"
+    return product_url(primary_language(), "hand-made-mug")
 
 
 def page(client: Client, path: str) -> Any:
@@ -141,7 +143,9 @@ def test_the_buy_box_keeps_the_hooks_and_the_form_behaviour(client: Client, mug:
     assert "btn" in submit["class"]
     assert form.select_one("#add-to-cart-result")
     assert soup.select_one(".product-sku-value").get_text(strip=True)
-    assert soup.select_one(".product-vendor a")["href"].endswith("/shop/acme/")
+    assert soup.select_one(".product-vendor a")["href"].endswith(
+        vendor_url(primary_language(), "acme")
+    )
 
 
 def test_each_variant_keeps_its_stock_and_sku_hooks(client: Client, mug: str) -> None:
@@ -177,7 +181,7 @@ def test_a_product_without_description_has_no_description_tab(client: Client, mu
     ProductTranslation.objects.filter(slug="hand-made-mug").update(description="")
     soup = page(client, mug)
     tabs = soup.select("ul.nav-tabs button[role=tab]")
-    assert [t.get_text(strip=True) for t in tabs] == ["Details"]
+    assert [t.get_text(strip=True) for t in tabs] == [translated("Details")]
     assert tabs[0]["aria-selected"] == "true"
 
 
@@ -206,7 +210,7 @@ def test_the_storefront_policies_are_a_bootstrap_accordion(client: Client, ride:
     )
     VendorTranslationFactory.create(
         vendor=vendor,
-        language="en",
+        language=primary_language(),
         status=PUBLISHED,
         tagline="Copper since 1950",
         description="Our story.",
@@ -218,7 +222,7 @@ def test_the_storefront_policies_are_a_bootstrap_accordion(client: Client, ride:
     ProductTranslationFactory.create(
         product=product, title="Kettle", slug="kettle", status=PUBLISHED
     )
-    soup = page(client, "/shop/acme/")
+    soup = page(client, vendor_url(primary_language(), "acme"))
     profile = soup.select_one("section.vendor-profile")
     assert profile is not None
     assert (
@@ -245,7 +249,11 @@ def test_the_store_categories_are_a_pill_navigation(client: Client, ride: None) 
     )
     category = CategoryFactory.create()
     CategoryTranslationFactory.create(
-        category=category, language="en", name="Kettles", slug="kettles", status=PUBLISHED
+        category=category,
+        language=primary_language(),
+        name="Kettles",
+        slug="kettles",
+        status=PUBLISHED,
     )
     product = ProductFactory.create(
         vendor=vendor, status=Product.Status.PUBLISHED, category=category
@@ -253,11 +261,11 @@ def test_the_store_categories_are_a_pill_navigation(client: Client, ride: None) 
     ProductTranslationFactory.create(
         product=product, title="Kettle", slug="kettle", status=PUBLISHED
     )
-    soup = page(client, "/shop/acme/")
+    soup = page(client, vendor_url(primary_language(), "acme"))
     nav = soup.select_one("nav.store-categories")
     assert nav is not None
     assert nav["aria-labelledby"] == nav.find("h2")["id"]
     links = nav.select("ul.nav-pills a.nav-link")
-    assert [a.get_text(strip=True) for a in links] == ["All products", "Kettles"]
+    assert [a.get_text(strip=True) for a in links] == [translated("All products"), "Kettles"]
     assert links[0]["aria-current"] == "page"
     assert "active" in links[0]["class"]
