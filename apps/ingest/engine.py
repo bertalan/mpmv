@@ -419,12 +419,21 @@ def net_from_gross(gross: Decimal, *, vat_rate: Decimal) -> Decimal:
 
     The rate is never a literal here: the caller (the service) derives it from `apps.tax` for the
     product's tax category and the vendor's tax position at the observation time."""
+    if not vat_rate.is_finite() or vat_rate < 0:
+        raise ValueError("The VAT rate must be a finite fraction of at least 0.")
     return (gross / (1 + vat_rate)).quantize(_CENT, rounding=ROUND_HALF_UP)
 
 
 def change_pct(old: Decimal, new: Decimal) -> Decimal:
-    """Absolute change of `new` against `old`, in percent (2 places, half up)."""
+    """Absolute change of `new` against `old`, in percent (2 places, half up): for display only,
+    never compare it with a limit (see `exceeds_change_limit`)."""
     return (abs(new - old) / old * 100).quantize(_CENT, rounding=ROUND_HALF_UP)
+
+
+def exceeds_change_limit(old: Decimal, new: Decimal, max_change_pct: Decimal) -> bool:
+    """Whether `new` is strictly more than `max_change_pct` percent away from `old`, compared on the
+    exact ratio (a true 15.004 percent is above 15, whatever it rounds to)."""
+    return abs(new - old) * 100 > max_change_pct * old
 
 
 def _usable_price(value: object) -> bool:
@@ -466,7 +475,7 @@ def plan_price_actions(
                 plan.append(PriceAction(obs.ref, pid, SET_PRICE, "first_price", new, old))
             else:
                 pct = change_pct(old, new)
-                if pct > max_change_pct:
+                if exceeds_change_limit(old, new, max_change_pct):
                     plan.append(
                         PriceAction(obs.ref, pid, REVIEW, "price_jump", new, old, pct, "price_jump")
                     )
