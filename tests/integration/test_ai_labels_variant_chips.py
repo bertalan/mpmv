@@ -96,12 +96,12 @@ def test_a_variant_chip_labels_its_ai_image_and_only_that_one(client: Client, th
         html = client.get(url).content.decode()
     generated, edited, plain = _chips(html)
     assert 'data-ai-origin="generated"' in generated
-    assert "AI-generated image" in generated
+    assert "gallery__ai-label" in generated
     assert "trainedAlgorithmicMedia" in generated
     assert 'data-ai-origin="edited"' in edited
-    assert "AI-edited image" in edited
+    assert "gallery__ai-label" in edited
     assert "data-ai-origin" not in plain
-    assert "AI-" not in plain
+    assert "gallery__ai-label" not in plain
 
 
 @pytest.mark.parametrize("theme", ["base", "ride"])
