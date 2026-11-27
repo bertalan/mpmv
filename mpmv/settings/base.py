@@ -638,6 +638,14 @@ GEOCODING_CHAIN_BUDGET = 10.0  # seconds for the whole chain
 GEOCODING_BREAKER_THRESHOLD = 5  # consecutive failures or rate limits that open the circuit
 GEOCODING_BREAKER_COOLDOWN = 300  # seconds before an open circuit lets one try through
 GEOCODING_CACHE_DAYS = 180
+
+# AI text enrichment (ING.5, D-13): which `TextEnricher` runs. "fake" (the default, also in tests
+# and local runs) never leaves the machine; "gemini" calls the API with the key from the
+# environment only. Other providers are ING.14.
+INGEST_ENRICHER = env_str("MPMV_INGEST_ENRICHER", "fake")
+INGEST_GEMINI_API_KEY = env_str("MPMV_INGEST_GEMINI_API_KEY", "")
+INGEST_GEMINI_MODEL = env_str("MPMV_INGEST_GEMINI_MODEL", "gemini-2.0-flash")
+INGEST_ENRICH_TIMEOUT = 20.0  # seconds per provider call
 GEOCODING_USER_LIMIT = 10  # "Find coordinates" lookups per user and window
 GEOCODING_USER_WINDOW = 60  # seconds
 # Who may use "Find coordinates" besides staff: dotted `check(user) -> bool` paths, so that core
