@@ -1,5 +1,6 @@
-"""I18N.6 (owner bug): on a CMS page the language switch leads to the page's translation, or to
-the language's home with a notice when the page has none (see the catalog tests for listings)."""
+"""I18N.6 (owner bug), I18N.22: on a CMS page the language switch leads to the page's translation.
+A page with none stays the same page under the new prefix, the I18N.21 primary-language fallback
+with its notice (the catalog tests cover listings and products); never the language's home."""
 
 import re
 from typing import Any
@@ -12,14 +13,9 @@ from wagtail.models import Site
 from apps.cms.seed import seed_text
 from apps.cms.tests.factories import StandardPageFactory
 from apps.core.i18n import configured_languages, primary_language
-from tests.i18n import language_prefix, other_language, translated
+from tests.i18n import fallback_notice, language_prefix, other_language
 
 pytestmark = pytest.mark.django_db
-
-
-def switched_notice() -> str:
-    """The notice, in the language the visitor switched to."""
-    return translated("This content is not available in this language.", other_language())
 
 
 FORM = re.compile(
@@ -34,7 +30,7 @@ def switch_targets(html: str) -> dict[str, tuple[str, bool]]:
     return {m["code"]: (m["next"], m["notice"] == "1") for m in FORM.finditer(html)}
 
 
-def test_a_cms_page_switches_to_its_translation_and_the_untranslated_to_home(
+def test_a_cms_page_switches_to_its_translation_and_the_untranslated_stays(
     client: Client, seeded: Any
 ) -> None:
     html = client.get("/").content.decode()
@@ -45,7 +41,10 @@ def test_a_cms_page_switches_to_its_translation_and_the_untranslated_to_home(
     home = Site.objects.get(is_default_site=True).root_page
     StandardPageFactory.create(title="Only in English", parent=home)
     targets = switch_targets(client.get("/only-in-english/").content.decode())
-    assert targets[other_language()] == (f"{language_prefix(other_language())}/", True)
+    assert targets[other_language()] == (
+        f"{language_prefix(other_language())}/only-in-english/",
+        False,
+    )
     assert targets[primary_language()][0] == "/only-in-english/"
 
 
@@ -60,20 +59,22 @@ def test_a_translated_slug_is_the_switch_target(client: Client, seeded: Any) -> 
         ), code
 
 
-def test_the_notice_is_shown_after_switching_to_a_missing_translation(
+def test_switching_to_an_untranslated_page_shows_the_fallback_with_the_notice(
     client: Client, seeded: Any
 ) -> None:
+    home = Site.objects.get(is_default_site=True).root_page
+    StandardPageFactory.create(title="Only in English", slug="only-in-english", parent=home)
+    lang = other_language()
+    html = client.get("/only-in-english/").content.decode()
+    target, flash = switch_targets(html)[lang]
     response = client.post(
         reverse("switch_language"),
-        {
-            "language": other_language(),
-            "next": f"{language_prefix(other_language())}/",
-            "exact": "1",
-            "notice": "1",
-        },
+        {"language": lang, "next": target, "exact": "1", "notice": "1" if flash else "0"},
         follow=True,
     )
-    assert switched_notice() in response.content.decode()
+    assert response.redirect_chain[-1][0] == f"{language_prefix(lang)}/only-in-english/"
+    body = response.content.decode()
+    assert body.count(fallback_notice(primary_language(), lang)) == 1  # the layout's, not twice
 
 
 def test_a_page_without_an_object_stays_on_its_path_with_no_notice(
@@ -94,7 +95,8 @@ def test_switch_ignores_the_notice_flag_without_exact(client: Client, seeded: An
         {"language": other_language(), "next": "/", "notice": "1"},
         follow=True,
     )
-    assert switched_notice() not in response.content.decode()
+    assert fallback_notice(primary_language(), other_language()) not in response.content.decode()
+    assert fallback_notice(other_language(), other_language()) not in response.content.decode()
 
 
 def test_an_off_site_next_is_refused_even_with_exact(client: Client) -> None:
@@ -108,3 +110,27 @@ def test_an_off_site_next_is_refused_even_with_exact(client: Client) -> None:
         },
     )
     assert response["Location"] == "/"
+
+
+def test_the_switch_target_of_an_untranslated_page_is_canonical_to_the_primary_page(
+    client: Client, seeded: Any
+) -> None:
+    """The notice names the primary language's endonym (whatever the primary language is), the
+    canonical link points to the primary page and the `hreflang` set has no entry for the new
+    language."""
+    from django.apps import apps
+
+    apps.get_model("seo", "SeoSettings").objects.create(
+        site=Site.objects.get(is_default_site=True), allow_indexing=True
+    )
+    home = Site.objects.get(is_default_site=True).root_page
+    StandardPageFactory.create(title="Only in English", slug="only-in-english", parent=home)
+    lang = other_language()
+    primary_url = switch_targets(client.get("/only-in-english/").content.decode())[
+        primary_language()
+    ][0]
+    target, _flash = switch_targets(client.get("/only-in-english/").content.decode())[lang]
+    body = client.get(target).content.decode()
+    assert fallback_notice(primary_language(), lang) in body
+    assert re.search(r'<link rel="canonical" href="[^"]*' + re.escape(primary_url), body)
+    assert f'hreflang="{lang}"' not in body

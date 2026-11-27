@@ -1,8 +1,9 @@
 """I18N.6 (owner bug): the language switch stays on the same object.
 
 On a listing, storefront or CMS page the switch leads to the object's translation, the same
-targets as the `hreflang` alternates (one source). A language without a translation leads to
-the language's home with a notice that the content is not available in it.
+targets as the `hreflang` alternates (one source). A language without a translation stays on the
+same object under the new prefix (I18N.22, owner decision 2026-11-21): the primary-language
+fallback, with its notice, no `hreflang` for that language and a canonical to the primary page.
 """
 
 import re
@@ -11,9 +12,6 @@ from typing import Any
 import pytest
 from django.test import Client
 from django.urls import reverse
-from django.utils import translation
-from django.utils.html import escape
-from django.utils.translation import gettext
 
 from apps.catalog.tests.factories import BrandFactory, BrandTranslationFactory
 from apps.catalog.tests.integration.test_listing_views import compat, listed  # noqa: F401
@@ -21,17 +19,11 @@ from apps.core.i18n import configured_languages, primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorTranslationFactory
-from tests.i18n import language_prefix, localized, other_language, third_language
+from tests.i18n import fallback_notice, language_prefix, localized, other_language, third_language
 
 pytestmark = pytest.mark.django_db
 
 PUBLISHED = TranslationStatus.PUBLISHED
-
-
-def notice(language: str) -> str:
-    """The switch notice as the page shows it in `language` (translated, HTML-escaped)."""
-    with translation.override(language):
-        return escape(gettext("This content is not available in this language."))
 
 
 FORM = re.compile(
@@ -64,9 +56,29 @@ def same_as_hreflang(html: str) -> None:
     for code, url in alternates.items():
         assert url.endswith(targets[code][0]), (code, url, targets[code])
         assert targets[code][1] is False
-    for code, (_url, notice) in targets.items():
-        if code not in alternates:
-            assert notice is True, code
+    for code, (url, _flash) in targets.items():
+        if code not in alternates:  # the same object under the new prefix, never the home
+            assert url.startswith(f"{language_prefix(code)}/")
+            assert url != f"{language_prefix(code)}/"
+
+
+def assert_stays_on_the_object(client: Client, html: str, code: str) -> None:
+    """The switch to `code` (no translation) leads to the primary-language object under its
+    prefix: fallback content, the notice, no `hreflang` for `code`, canonical to the primary."""
+    targets = switch_targets(html)
+    primary_url = targets[primary_language()][0]
+    target, flash = targets[code]
+    assert flash is False  # the fallback page shows the notice itself
+    assert target.startswith(f"{language_prefix(code)}/")
+    assert target != f"{language_prefix(code)}/"
+    page = client.get(target)
+    assert page.status_code == 200
+    body = page.content.decode()
+    assert fallback_notice(primary_language(), code) in body
+    assert code not in hreflang(body)
+    found = re.search(r'<link rel="canonical" href="([^"]+)"', body)
+    assert found
+    assert found.group(1).endswith(primary_url)
 
 
 def test_a_term_page_switches_to_its_translation(client: Client, compat: dict[str, Any]) -> None:  # noqa: F811
@@ -77,9 +89,9 @@ def test_a_term_page_switches_to_its_translation(client: Client, compat: dict[st
         False,
     )
     assert targets[primary_language()][0] == "/compatibility/maker/"
-    for code in untranslated_languages():
-        assert targets[code] == (f"{language_prefix(code)}/", True)
     same_as_hreflang(html)
+    for code in untranslated_languages():
+        assert_stays_on_the_object(client, html, code)
 
 
 def test_a_brand_page_switches_to_its_translation(client: Client) -> None:
@@ -95,9 +107,9 @@ def test_a_brand_page_switches_to_its_translation(client: Client) -> None:
         localized("/brand/acme-it/", other_language()),
         False,
     )
-    for code in untranslated_languages():
-        assert targets[code] == (f"{language_prefix(code)}/", True)
     same_as_hreflang(html)
+    for code in untranslated_languages():
+        assert_stays_on_the_object(client, html, code)
 
 
 def test_a_vendor_storefront_switches_to_its_translation(client: Client) -> None:
@@ -110,12 +122,12 @@ def test_a_vendor_storefront_switches_to_its_translation(client: Client) -> None
     assert targets[other_language()][0].startswith(f"{language_prefix(other_language())}/")
     assert vendor.slug in targets[other_language()][0]
     assert targets[other_language()][1] is False
-    for code in untranslated_languages():
-        assert targets[code] == (f"{language_prefix(code)}/", True)
     same_as_hreflang(html)
+    for code in untranslated_languages():
+        assert_stays_on_the_object(client, html, code)
 
 
-def test_a_vendor_storefront_in_the_fallback_language_offers_the_other_languages_home(
+def test_a_vendor_storefront_in_the_fallback_language_stays_on_the_storefront(
     client: Client,
 ) -> None:
     vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
@@ -124,7 +136,7 @@ def test_a_vendor_storefront_in_the_fallback_language_offers_the_other_languages
         client.get(localized(f"/shop/{vendor.slug}/", other_language())).content.decode()
     )
     for code in untranslated_languages():
-        assert targets[code] == (f"{language_prefix(code)}/", True)
+        assert targets[code][0] != f"{language_prefix(code)}/"
 
 
 def test_switching_to_a_translation_goes_there_without_a_notice(
@@ -145,29 +157,39 @@ def test_switching_to_a_translation_goes_there_without_a_notice(
         response.redirect_chain[-1][0]
         == f"{language_prefix(other_language())}/compatibilita/marca/"
     )
-    assert notice(other_language()) not in response.content.decode()
+    assert fallback_notice(primary_language(), other_language()) not in response.content.decode()
+    assert fallback_notice(other_language(), other_language()) not in response.content.decode()
 
 
-def test_switching_to_a_language_without_translation_shows_the_notice_once(
+def test_a_switch_to_a_page_in_another_language_flashes_the_notice_once(
     client: Client,
     compat: dict[str, Any],  # noqa: F811
 ) -> None:
+    """An event (no fallback) stays on its original-language page: the switch flashes the notice,
+    with the endonym of the language of that page, in the language the visitor chose."""
+    shown, chosen = other_language(), third_language()
+    page = f"{language_prefix(shown)}/"
+    response = client.post(
+        reverse("switch_language"),
+        {"language": chosen, "next": page, "exact": "1", "notice": "1"},
+        follow=True,
+    )
+    assert response.redirect_chain[-1][0] == page
+    assert fallback_notice(shown, chosen) in response.content.decode()
+    assert fallback_notice(shown, chosen) not in client.get(page).content.decode()
+
+
+def test_a_hostile_next_still_goes_to_the_home_with_the_flash(client: Client) -> None:
     response = client.post(
         reverse("switch_language"),
         {
-            "language": "de",
-            "next": f"{language_prefix(third_language())}/",
+            "language": other_language(),
+            "next": "https://evil.example/",
             "exact": "1",
             "notice": "1",
         },
-        follow=True,
     )
-    assert response.redirect_chain[-1][0] == f"{language_prefix(third_language())}/"
-    assert notice(third_language()) in response.content.decode()
-    assert (
-        notice(third_language())
-        not in client.get(f"{language_prefix(third_language())}/").content.decode()
-    )
+    assert response["Location"] == "/"
 
 
 def test_every_configured_language_has_a_switch_target(client: Client) -> None:
@@ -177,13 +199,13 @@ def test_every_configured_language_has_a_switch_target(client: Client) -> None:
     assert set(switch_targets(html)) == set(configured_languages())
 
 
-def test_a_listing_never_carries_its_query_to_a_home_page(
+def test_a_listing_switch_stays_on_the_listing_not_on_a_home_page(
     client: Client,
     compat: dict[str, Any],  # noqa: F811
 ) -> None:
     targets = switch_targets(client.get("/compatibility/maker/?utm_source=x").content.decode())
     for code in untranslated_languages():
-        assert targets[code] == (f"{language_prefix(code)}/", True)
+        assert targets[code][0] != f"{language_prefix(code)}/"
 
 
 @pytest.fixture(autouse=True)

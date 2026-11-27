@@ -1,6 +1,6 @@
-"""I18N.11: the language switch on an event page leads to the event's translation, from the same
-`{language: URL}` map as its `hreflang` links; a language without one leads to the home with a
-notice."""
+"""I18N.11, I18N.22: the language switch on an event page leads to the event's translation, from
+the same `{language: URL}` map as its `hreflang` links; a language without one stays on the
+event's own page (an event never falls back), with the notice naming that page's language."""
 
 import datetime as dt
 import re
@@ -13,7 +13,7 @@ from apps.cms.services import seed_site, translate_page
 from apps.core.i18n import primary_language
 from apps.events.models import EventIndexPage, EventPage
 from apps.events.tests.factories import EventPageFactory
-from tests.i18n import language_prefix, other_language, third_language
+from tests.i18n import fallback_notice, other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -56,7 +56,7 @@ def test_an_event_with_a_translation_switches_to_it_and_matches_hreflang(client:
     html = client.get(page.url).content.decode()
     found = targets(html)
     assert found[primary_language()] == (english.url, False)
-    assert found["de"] == (f"{language_prefix(third_language())}/", True)
+    assert found["de"] == (page.url, True)
     alternates = {code: url for code, url in hreflang(html).items() if code != "x-default"}
     assert set(alternates) == {other_language(), primary_language()}
     for code, url in alternates.items():
@@ -68,9 +68,28 @@ def test_an_event_without_a_translation_has_no_alternate_and_a_notice(client: Cl
     page = _italian_event("solo-italiano")
     html = client.get(page.url).content.decode()
     found = targets(html)
-    assert found[primary_language()] == ("/", True)
-    assert found["de"] == (f"{language_prefix(third_language())}/", True)
+    assert found[primary_language()] == (page.url, True)
+    assert found["de"] == (page.url, True)
     assert {code for code in hreflang(html) if code != "x-default"} == {other_language()}
+
+
+def test_switching_to_a_language_without_the_event_stays_with_the_original_language_notice(
+    client: Client,
+) -> None:
+    from django.urls import reverse
+
+    page = _italian_event("solo-italiano")
+    lang = primary_language()
+    found = targets(client.get(page.url).content.decode())
+    target, flash = found[lang]
+    assert flash is True
+    response = client.post(
+        reverse("switch_language"),
+        {"language": lang, "next": target, "exact": "1", "notice": "1"},
+        follow=True,
+    )
+    assert response.redirect_chain[-1][0] == page.url
+    assert fallback_notice(other_language(), lang) in response.content.decode()
 
 
 def test_a_hidden_translation_is_not_offered(client: Client) -> None:
