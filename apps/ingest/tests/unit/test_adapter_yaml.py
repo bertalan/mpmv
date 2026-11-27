@@ -9,11 +9,17 @@ def _col(header: str, target: str) -> MappingEntry:
     return MappingEntry(1, "other", header, (), "", None, target)
 
 
-COLUMNS = [_col("code", "sku"), _col("name", "title"), _col("text", "description")]
+COLUMNS = [
+    _col("code", "sku"),
+    _col("name", "title"),
+    _col("text", "description"),
+    _col("ean", "ean"),
+    _col("price", "price"),
+]
 
 
 def _adapter(**kw: object) -> YamlAdapter:
-    return YamlAdapter(COLUMNS, vendor_id=1, **kw)  # type: ignore[arg-type]
+    return YamlAdapter(COLUMNS, vendor_id=1, **kw)
 
 
 def test_dry_run_single_document() -> None:
@@ -57,3 +63,43 @@ def test_depth_size_and_shape_caps() -> None:
         _adapter().parse(b"a: [unclosed")
     with pytest.raises(base.AdapterError):
         _adapter(max_rows=1).parse(b"- {code: a, name: b}\n- {code: c, name: d}\n")
+
+
+def test_leading_zero_codes_stay_text() -> None:
+    res = _adapter().parse(b"code: 0123\nname: Lamp\nean: 0012345678905\nprice: 1_0\n")
+    product = res.rows[0].product
+    assert product.sku == "0123"
+    assert product.ean == "0012345678905"
+    assert [e.code for e in res.errors] == []
+
+
+def test_scalars_are_not_yaml_1_1_typed() -> None:
+    res = _adapter().parse(b"code: 0o17\nname: yes\nean: 2024-01-02\n")
+    product = res.rows[0].product
+    assert (product.sku, product.title, product.ean) == ("0o17", "yes", "2024-01-02")
+
+
+def test_price_text_goes_through_explicit_parsing() -> None:
+    res = _adapter().parse(
+        b"- {code: a, name: b, price: '12,50'}\n- {code: c, name: d, price: x}\n"
+    )
+    assert [r.product.price for r in res.rows] == ["12.50"]
+    assert [e.code for e in res.errors] == ["bad_price"]
+
+
+def test_unique_keys_cannot_blow_up() -> None:
+    doc = "".join(f"- {{code: s{n}, name: n, k{n}: 1}}\n" for n in range(300))
+    with pytest.raises(base.AdapterError):
+        _adapter().parse(doc.encode())
+
+
+def test_nested_value_in_a_mapped_key_is_a_row_error() -> None:
+    res = _adapter().parse(b"- {code: a, name: [x]}\n- {code: b, name: ok}\n")
+    assert [e.code for e in res.errors] == ["unsupported_value"]
+    assert len(res.rows) == 1
+
+
+def test_event_cap_follows_the_row_and_column_caps() -> None:
+    doc = "".join(f"- {{code: s{n}, name: n}}\n" for n in range(50))
+    with pytest.raises(base.AdapterError):
+        _adapter(max_rows=5, max_columns=2).parse(doc.encode())
