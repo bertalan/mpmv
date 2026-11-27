@@ -22,6 +22,7 @@ from django.utils import timezone, translation
 from apps.catalog import slugs
 from apps.cms import services as cms_services
 from apps.core.i18n import configured_languages, primary_language
+from apps.core.services import business_tz
 from apps.events import engine, services
 from apps.events.panels import map_settings
 from apps.vendors.seller_name import public_name
@@ -212,7 +213,7 @@ def _common(index: "EventIndexPage", filters: Filters) -> dict[str, Any]:
         "filters": filters,
         "list_url": base,
         "past_url": base + "past/",
-        "calendar_url": f"{base}calendar/{timezone.localdate():%Y-%m}/",
+        "calendar_url": f"{base}calendar/{timezone.localdate(timezone=business_tz()):%Y-%m}/",
         "event_types": list(EVENT_TYPE_CHOICES()),
         "language_name": str(
             translation.get_language_info(index.locale.language_code)["name_translated"]

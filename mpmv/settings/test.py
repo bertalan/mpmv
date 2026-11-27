@@ -13,6 +13,8 @@ os.environ.setdefault("DJANGO_ALLOWED_HOSTS", "testserver")
 # A field encryption key generated for this process only (SEC.3): never written anywhere.
 os.environ.setdefault("MPMV_PRIVACY_PEPPER", secrets.token_urlsafe(32))
 os.environ.setdefault("MPMV_FIELD_ENCRYPTION_KEYS", generate_key("test"))
+# ARC.27: the tests run in the configured platform zone, the one the order triggers use.
+os.environ.setdefault("MPMV_BUSINESS_TIME_ZONE", "Europe/Rome")
 
 # I18N.19: production serves only en,it until the DE/FR/ES review; the suite tests all five unless
 # a CI job exports its own MPMV_LANGUAGES. The default itself is tested in test_language_settings.

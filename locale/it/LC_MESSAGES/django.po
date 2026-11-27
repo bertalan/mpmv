@@ -3613,6 +3613,10 @@ msgstr "Finisce alle"
 msgid "Enlarge"
 msgstr "Ingrandisci"
 
+#: apps/core/models.py
+msgid "Enter a time zone name such as Europe/Rome."
+msgstr "Inserisca il nome di un fuso orario, per esempio Europe/Rome."
+
 #: apps/manager/forms.py
 msgid "Enter a valid carrier name."
 msgstr "Inserisci un nome di corriere valido."
@@ -11607,6 +11611,14 @@ msgstr ""
 "L'ordine delle versioni: i numeri più bassi vengono prima, per esempio 1, 2, 3. Lascia 0 per "
 "mantenere l'ordine in cui sono state aggiunte."
 
+#: apps/orders/tz.py
+msgid ""
+"The order records still compute their retention dates in %(zone)s, so the business time zone must "
+"stay %(zone)s until a developer updates them (ORD.41)."
+msgstr ""
+"I dati degli ordini calcolano ancora le date di conservazione in %(zone)s, quindi il fuso orario "
+"aziendale deve restare %(zone)s finché uno sviluppatore non li aggiorna (ORD.41)."
+
 #: apps/manager/views.py
 msgid "The order was updated."
 msgstr "L'ordine è stato aggiornato."
@@ -12648,6 +12660,17 @@ msgid ""
 msgstr ""
 "Le soglie dei badge di fiducia dei venditori. Una modifica è una nuova versione da una data; una "
 "versione vecchia non si modifica mai, così ogni risultato salvato resta spiegabile."
+
+#: apps/core/models.py
+msgid ""
+"The time zone of the platform's calendar: when a day, a month or a year starts for order numbers, "
+"deadlines and retention. For example Europe/Rome. Change it only with your developer, and only "
+"from 1 January: scheduled jobs, order records and tax periods depend on it."
+msgstr ""
+"Il fuso orario del calendario della piattaforma: quando inizia un giorno, un mese o un anno per i "
+"numeri d’ordine, le scadenze e la conservazione. Per esempio Europe/Rome. Lo cambi solo insieme al"
+" suo sviluppatore, e solo a partire dal 1° gennaio: ne dipendono i processi pianificati, i dati "
+"degli ordini e i periodi fiscali."
 
 #: apps/events/models.py
 msgid ""

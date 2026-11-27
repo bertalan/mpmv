@@ -49,7 +49,7 @@ def tax_date(sub: VendorOrder) -> dt.date:
     rates stay the ones the checkout snapshotted, never re-rated. The creation day is a fallback
     for rows without a recorded payment (legacy orders in the backfill)."""
     paid_or_created = sub.order.paid_at or sub.order.created_at
-    return paid_or_created.astimezone(business_tz()).date()
+    return paid_or_created.astimezone(business_tz(paid_or_created)).date()
 
 
 def version_one_snapshot(sub: VendorOrder, lines: Sequence[OrderLine]) -> am.VersionSnapshot:
