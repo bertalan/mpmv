@@ -1045,6 +1045,7 @@ def _term_editorial(
         title=page.seo_title,
         description=page.search_description,
         faq=tuple(engine.faq_questions(page)),
+        related=tuple((card.label, card.href) for card in context["related"] if card.href),
     )
 
 
