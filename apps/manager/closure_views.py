@@ -18,6 +18,7 @@ from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from django.utils.translation import gettext as _
 
+from apps.accounts.decorators import requires_level_method
 from apps.core.audit import AuditContext, audit_context
 from apps.core.models import AuditLog
 from apps.vendors import services
@@ -28,6 +29,7 @@ from .views import ManagerView
 
 SECTION = "shop.closures"
 LIST_URL = "manager:shop:closures"
+GATE_ACTION = "content_edit"  # group 1: any session, CORE.26 can tighten it (CORE.25)
 
 
 class _ClosureView(ManagerView):
@@ -84,6 +86,7 @@ class ClosuresView(_ClosureView):
         context.setdefault("form", ClosureForm())
         return context
 
+    @requires_level_method(GATE_ACTION, shop=lambda view, request: view.manager.vendor)
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         vendor = self.vendor()
         form = ClosureForm(request.POST)
@@ -125,6 +128,7 @@ class ClosureEditView(_ClosureView):
         )
         return context
 
+    @requires_level_method(GATE_ACTION, shop=lambda view, request: view.manager.vendor)
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         closure = self.closure()
         form = ClosureForm(request.POST)
@@ -156,6 +160,7 @@ class ClosureDeleteView(_ClosureView):
         context["list_url"] = self.list_url()
         return context
 
+    @requires_level_method(GATE_ACTION, shop=lambda view, request: view.manager.vendor)
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         closure = self.closure()
         try:

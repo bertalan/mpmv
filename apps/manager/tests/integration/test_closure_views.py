@@ -1,14 +1,17 @@
 """VEN.20 slice 2: the Manager shop page for closures (owner and staff, tenant scoped)."""
 
 import datetime as dt
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
 from django.test import Client
 
+from apps.accounts import levels
 from apps.accounts.models import User
 from apps.accounts.tests.mfa import verified_login
 from apps.core.models import AuditLog
+from apps.core.tests.factories import PlatformOperatorFactory
 from apps.vendors.models import Vendor, VendorClosure
 from apps.vendors.tests.factories import VendorClosureFactory, VendorMemberFactory
 
@@ -30,8 +33,8 @@ def _data(**changes: Any) -> dict[str, Any]:
     return data
 
 
-def _login(client: Client, user: User, vendor: Vendor) -> None:
-    verified_login(client, user)
+def _login(client: Client, user: User, vendor: Vendor, **kwargs: Any) -> None:
+    verified_login(client, user, **kwargs)
     assert client.post(PICKER, {"vendor": str(vendor.public_id)}).status_code == 302
 
 
@@ -162,3 +165,23 @@ def test_the_page_shows_the_notice_buyers_see_now(
     )
     _login(client, owner, vendor)
     assert b"closure-notice" in client.get(URL).content
+
+
+def test_a_closure_write_needs_the_session_level(
+    client: Client, owner: User, vendor: Vendor
+) -> None:
+    """`content_edit` is an everyday action by default; once the operator makes it sensitive, a
+    session with no passkey window is refused on add, edit and remove, and nothing changes."""
+    PlatformOperatorFactory.create(
+        open_ended=True,
+        valid_from=datetime(2020, 1, 1, tzinfo=UTC),
+        session_policy={"actions": {"sensitive": ["content_edit"]}},
+    )
+    mine = VendorClosureFactory.create(vendor=vendor, notice_days=14)
+    _login(client, owner, vendor, level=levels.NO_WINDOW)
+    assert client.post(URL, _data()).status_code == 403
+    assert client.post(_edit(mine), _data(notice_days="30")).status_code == 403
+    assert client.post(f"{_edit(mine)}remove/").status_code == 403
+    assert VendorClosure.objects.filter(vendor=vendor).count() == 1
+    mine.refresh_from_db()
+    assert mine.notice_days == 14
