@@ -46,6 +46,8 @@ IMAGE_COVER_LOCK_CHANGED = "catalog.product_image.cover_lock_changed"
 IMAGE_LANGUAGE_SET = "catalog.product_image.language_set"
 IMAGE_REORDERED = "catalog.product_image.reordered"
 IMAGE_AI_ORIGIN_SET = "catalog.product_image.ai_origin_set"
+MEDIA_IMAGE_MODEL = "core.mediaimage"
+MEDIA_IMAGE_AI_ORIGIN_SET = "catalog.media_image.ai_origin_set"
 IMAGE_DELETED = "catalog.product_image.deleted"
 IMAGE_TEXT_SET = "catalog.product_image.text_set"
 
@@ -345,6 +347,37 @@ def set_ai_origin(
             return changes
         ProductImage.objects.filter(pk=stored.pk).update(ai_origin=ai_origin)
         audit_changes(changes, ctx=ctx, action=IMAGE_AI_ORIGIN_SET)
+    return changes
+
+
+def set_media_ai_origin(
+    image: MediaImage, ai_origin: str, *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Say whether AI made or edited a library image (CMP.8): every CMS block and product page
+    that shows it then labels it. Platform staff with the catalog write right, or a pipeline."""
+    _check_ai_origin(ai_origin)
+    require_catalog_editor(ctx)
+    if ctx.actor_id is None:
+        if ctx.source not in PIPELINE_SOURCES:
+            raise PermissionDenied("An image's AI origin is changed by a signed-in staff member.")
+    else:
+        user = get_user_model().objects.filter(pk=ctx.actor_id).first()
+        if user is None or not is_platform_staff(user):
+            raise PermissionDenied("Only platform staff change an image's AI origin.")
+    changes = ChangeSet()
+    with transaction.atomic():
+        stored = MediaImage.objects.select_for_update().get(pk=image.pk)
+        changes.update(
+            MEDIA_IMAGE_MODEL,
+            str(stored.pk),
+            {"ai_origin": stored.ai_origin},
+            {"ai_origin": ai_origin},
+        )
+        if dry_run or changes.is_empty:
+            return changes
+        MediaImage.objects.filter(pk=stored.pk).update(ai_origin=ai_origin)
+        audit_changes(changes, ctx=ctx, action=MEDIA_IMAGE_AI_ORIGIN_SET)
+    image.ai_origin = ai_origin
     return changes
 
 

@@ -6,6 +6,7 @@
       <figure>
         {% responsive_image item.image "gallery" alt=item.alt_text %}
         {% if item.caption or credit %}<figcaption>{{ item.caption }}{% if credit %} {% include "core/components/image_credit.html" %}{% endif %}</figcaption>{% endif %}
+        {% include "components/ai_image_label.html" with image=item.image only %}
       </figure>
     </li>
   {% endfor %}

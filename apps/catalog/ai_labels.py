@@ -7,26 +7,33 @@ Text: `ProductTranslation.origin` is `human` or `machine`; machine text is never
 reviewed without a human review (`may_leave_draft`).
 """
 
-AI_NONE = "none"
-AI_GENERATED = "generated"
-AI_EDITED = "edited"
-AI_ORIGINS = (AI_NONE, AI_GENERATED, AI_EDITED)
+from apps.core.ai_origin import (
+    AI_EDITED,
+    AI_GENERATED,
+    AI_NONE,
+    AI_ORIGINS,
+    IPTC_SOURCE_TYPES,
+    effective,
+    iptc_source_type,
+)
 
-# IPTC NewsCodes "digital source type" terms (the vocabulary of the IPTC photo metadata and C2PA
-# standards): an image made by AI, and a real image altered with AI.
-IPTC_SOURCE_TYPES = {
-    AI_GENERATED: "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia",
-    AI_EDITED: "http://cv.iptc.org/newscodes/digitalsourcetype/compositeWithTrainedAlgorithmicMedia",
-}
+__all__ = [
+    "AI_EDITED",
+    "AI_GENERATED",
+    "AI_NONE",
+    "AI_ORIGINS",
+    "IPTC_SOURCE_TYPES",
+    "ORIGIN_HUMAN",
+    "ORIGIN_MACHINE",
+    "TEXT_ORIGINS",
+    "effective",
+    "iptc_source_type",
+    "may_leave_draft",
+]
 
 ORIGIN_HUMAN = "human"
 ORIGIN_MACHINE = "machine"
 TEXT_ORIGINS = (ORIGIN_HUMAN, ORIGIN_MACHINE)
-
-
-def iptc_source_type(ai_origin: str) -> str:
-    """The IPTC digital source type URI of an AI image; empty for an image with no AI origin."""
-    return IPTC_SOURCE_TYPES.get(ai_origin, "")
 
 
 def may_leave_draft(origin: str, *, reviewed_by_person: bool) -> bool:

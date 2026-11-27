@@ -135,7 +135,7 @@ def _gallery_image(row: ProductImage, language: str, fallback: str) -> GalleryIm
         alt=(text.alt_text if text is not None else "") or fallback,
         caption=text.caption if text is not None else "",
         is_cover=row.is_cover,
-        ai_origin=row.ai_origin,
+        ai_origin=ai_labels.effective(row.ai_origin, row.image.ai_origin),
     )
 
 
@@ -225,7 +225,11 @@ def _variants(product: Product, language: str, *, on_request: bool) -> list[Vari
                 mpn=row.mpn,
                 image=cover.image if cover is not None else None,
                 image_alt=((cover_text.alt_text if cover_text is not None else "") or label),
-                ai_origin=cover.ai_origin if cover is not None else ai_labels.AI_NONE,
+                ai_origin=(
+                    ai_labels.effective(cover.ai_origin, cover.image.ai_origin)
+                    if cover is not None
+                    else ai_labels.AI_NONE
+                ),
             )
         )
     return choices

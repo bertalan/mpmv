@@ -175,6 +175,8 @@ def _gallery_slide(item: Mapping[str, Any]) -> dict[str, Any]:
         "large_url": large_url,
         "alt": item.get("alt_text") or "",
         "caption": item.get("caption") or "",
+        "ai_origin": image.ai_origin,
+        "ai_source_type": image.ai_source_type,
         "width": width,
         "height": height,
     }
