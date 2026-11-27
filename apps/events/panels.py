@@ -167,7 +167,8 @@ def event_content_panels() -> list[Any]:
             label=_("Vehicle"),
             help_text=_(
                 "Tag the event with the vehicles it is for. Visitors whose garage matches see a "
-                "badge. Leave it empty for an event for everyone."
+                "badge. Leave it empty for an event for everyone. Edit the tags on the page in the "
+                "original language: translations follow it."
             ),
             panels=[FieldPanel("node")],
         ),

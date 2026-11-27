@@ -10,11 +10,14 @@ import datetime as dt
 
 import pytest
 from django.apps import apps
+from django.db import connection
 from django.db.models import ProtectedError
 from django.test import Client
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
-from django.utils import timezone
+from django.utils import timezone, translation
 
+from apps.core.i18n import primary_language
 from apps.events.models import EventFitment, EventPage
 from apps.events.tests.factories import EventFitmentFactory, EventPageFactory, primary_index
 from apps.fitment.tests.factories import FitmentNodeFactory
@@ -137,3 +140,44 @@ def test_a_node_with_an_event_cannot_be_deleted_and_merge_moves_the_rows(
     from apps.fitment.references import reference_counts
 
     assert reference_counts(tree["roadster"])["events.eventfitment.node"] == 1  # type: ignore[arg-type]
+
+
+def test_a_page_built_with_an_active_garage_is_private_to_the_cache(
+    tree: dict[str, object],
+) -> None:
+    event = _event()
+    EventFitmentFactory.create(page=event, node=tree["roadster"])
+    anonymous = Client()
+    assert "private" not in anonymous.get(event.url).get("Cache-Control", "")
+    client = Client()
+    _garage(client, "Roadster")
+    assert "private" in client.get(event.url).get("Cache-Control", "")
+    assert "private" in client.get(str(primary_index().url)).get("Cache-Control", "")
+
+
+def test_the_badge_costs_a_constant_number_of_queries(
+    tree: dict[str, object],
+) -> None:
+    for days in range(10, 15):
+        EventFitmentFactory.create(page=_event(days, title=f"Meet {days}"), node=tree["roadster"])
+    client = Client()
+    _garage(client, "Roadster")
+    index = str(primary_index().url)
+    client.get(index)  # warm caches
+    with CaptureQueriesContext(connection) as many:
+        assert _list(client).count(BADGE) >= 5
+    for days in range(15, 25):
+        EventFitmentFactory.create(page=_event(days, title=f"Meet {days}"), node=tree["roadster"])
+    with CaptureQueriesContext(connection) as more:
+        assert _list(client).count(BADGE) >= 10
+    assert len(more) <= len(many) + 10  # events themselves cost a little; the badge adds none
+
+
+def test_the_badge_is_translated_in_the_page_language(tree: dict[str, object]) -> None:
+    event = _event()
+    EventFitmentFactory.create(page=event, node=tree["roadster"])
+    client = Client()
+    _garage(client, "Roadster")
+    with translation.override(primary_language()):
+        expected = translation.gettext("For %(name)s owners") % {"name": "Acme, Roadster"}
+    assert expected in client.get(event.url).content.decode()
