@@ -10,8 +10,9 @@ from django.template.loader import render_to_string
 from django.test import RequestFactory
 
 from apps.themes.services import use_theme
+from tests.i18n import translated
 
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("english_interface")]
+pytestmark = pytest.mark.django_db
 
 
 @pytest.fixture(autouse=True)
@@ -67,7 +68,7 @@ def test_the_summary_sits_beside_the_packages_and_the_actions_follow_the_row() -
     assert re.search(r'class="[^"]*\bcheckout-layout\b[^"]*\brow\b', html)
     assert re.search(
         r'<aside id="review-summary" class="cart-summary[^"]*\bcol-lg-4\b[^"]*"'
-        r' aria-label="Order summary"',
+        rf' aria-label="{translated("Order summary")}"',
         html,
     )
     assert html.index("review-body") < html.index('<aside id="review-summary')

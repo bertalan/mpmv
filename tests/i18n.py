@@ -35,6 +35,12 @@ def translated(msgid: str, lang: str | None = None) -> str:
         return translation.gettext(msgid)
 
 
+def translated_plural(singular: str, plural: str, count: int, lang: str | None = None) -> str:
+    """The plural form of a message for `count`, in `lang` (default: the primary language)."""
+    with translation.override(lang or primary_language()):
+        return translation.ngettext(singular, plural, count)
+
+
 def language_prefix(code: str) -> str:
     """The URL prefix of a language: empty for the primary one, `/<code>` for the others."""
     return "" if code == settings.LANGUAGE_CODE else f"/{code}"
