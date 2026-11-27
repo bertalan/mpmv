@@ -199,6 +199,11 @@ def test_product_cart_and_checkout_pages_have_no_axe_violation(
     audit("cart")
     page.goto(f"{live_server.url}{localized('/checkout/')}")
     audit("checkout-details")
+    # An empty submit (the form is novalidate) shows the error summary and the field errors.
+    page.get_by_role("button", name=translated("Continue to review")).click()
+    expect(page.get_by_role("heading", level=1)).to_have_text(translated("Your details"))
+    expect(page.locator("[aria-invalid='true']").first).to_be_visible()
+    audit("checkout-details-errors")
     page.locator("#id_email").fill("buyer@example.com")
     page.locator("#id_full_name").fill("Mario Rossi")
     page.locator("#id_line1").fill("1 Via Test")
