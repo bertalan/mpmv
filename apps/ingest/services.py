@@ -949,10 +949,8 @@ def enrich_draft(
             raise EnrichmentRefused(f"Language {lang!r} got texts while the provider ran.")
         # The catalogue check is repeated under the lock, right before the write (Q-71): a
         # translation created while the provider ran (for example by the MIG.3 load) wins.
-        if (
-            locked.item.product_id is not None
-            and locked.item.product.translations.filter(language=lang).exists()
-        ):
+        locked_product = locked.item.product
+        if locked_product and locked_product.translations.filter(language=lang).exists():
             raise EnrichmentRefused(f"The product got {lang!r} texts while the provider ran.")
         before = _draft_snapshot(locked)
         if text is not None and not violations:
