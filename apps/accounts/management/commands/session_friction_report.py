@@ -13,6 +13,7 @@ from django.utils import timezone
 
 from apps.accounts import levels
 from apps.core.models import AuditLog
+from apps.core.services import business_tz
 
 
 class Command(BaseCommand):
@@ -29,8 +30,9 @@ class Command(BaseCommand):
         ).values_list("created_at", "actor_label", "action")
         prompts: Counter[tuple[dt.date, str]] = Counter()
         elevations: Counter[tuple[dt.date, str]] = Counter()
+        zone = business_tz()  # the days of the business calendar (ARC.27)
         for created_at, label, action in rows:
-            key = (timezone.localdate(created_at), label)
+            key = (timezone.localdate(created_at, zone), label)
             (prompts if action == levels.PROMPT else elevations)[key] += 1
         self.stdout.write("day  user  prompts  elevations")
         for day, label in sorted(prompts.keys() | elevations.keys()):

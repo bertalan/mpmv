@@ -26,7 +26,6 @@ from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Final
 from urllib.parse import urlsplit, urlunsplit
-from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.contrib.auth.models import Permission
@@ -51,6 +50,7 @@ from apps.core.privacy import keyed_hash, normalise_email, suppression_digest
 from apps.core.services import (
     NoPlatformOperator,
     audit_changes,
+    business_tz,
     consume_rate_limit,
     current_operator,
     email_language,
@@ -484,8 +484,8 @@ def public_holidays() -> frozenset[dt.date]:
 
 
 def _business_date(moment: dt.datetime) -> dt.date:
-    """The calendar day of `moment` in business time (settings.BUSINESS_TIME_ZONE)."""
-    return timezone.localtime(moment, ZoneInfo(settings.BUSINESS_TIME_ZONE)).date()
+    """The calendar day of `moment` in business time (`business_tz(moment)`, ARC.27)."""
+    return timezone.localtime(moment, business_tz(moment)).date()
 
 
 #: How far in the future a receipt time may be (clocks of different machines).
@@ -1502,7 +1502,7 @@ def issue_statement(
                 based_on_notice=notice is not None,
                 automated_detection=automated_detection,
                 automated_decision=automated_decision,
-                applied_on=timezone.localdate(now),
+                applied_on=_business_date(now),
                 valid_until=valid_until,
                 reference=str(statement.public_id),
             ),
@@ -1830,7 +1830,7 @@ def issue_termination_notice(
                 based_on_notice=False,
                 automated_detection=False,
                 automated_decision=False,
-                applied_on=timezone.localdate(effective_at),
+                applied_on=_business_date(effective_at),
                 valid_until=None,
                 reference=str(statement.public_id),
             ),

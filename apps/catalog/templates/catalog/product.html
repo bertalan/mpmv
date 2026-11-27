@@ -1,5 +1,5 @@
 {% extends "layouts/base.html" %}
-{% load i18n l10n static responsive_images wagtailcore_tags consumer_prices seo_seller %}
+{% load i18n l10n static responsive_images wagtailcore_tags consumer_prices seo_seller dispatch %}
 {% comment %}
   Product page (CAT.7). Semantic and unstyled beyond catalog/product.css; THM.7 restyles it. No
   inline script or style (the CSP has no 'unsafe-inline'). Shows published data only: the
@@ -52,6 +52,7 @@
         {% if not buyable %}
         <p class="product-unpriced" role="note">{% translate "This item has no price yet, so you can't buy it online." %}</p>
         {% else %}
+        {% closure_notice page_data.vendor.pk %}
         <form class="product-form" method="post" action="{% url 'orders:cart_add' %}" hx-post="{% url 'orders:cart_add' %}" hx-target="#add-to-cart-result" hx-swap="innerHTML">
           {% csrf_token %}
           <input type="hidden" name="product" value="{{ page_data.product.public_id }}">

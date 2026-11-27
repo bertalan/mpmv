@@ -87,6 +87,7 @@ from apps.core.geocoding import GeocodeResult
 from apps.core.models import BaseModel
 from apps.core.money import CURRENCY
 from apps.core.nfc_forms import NFCPageForm
+from apps.core.services import business_tz
 from apps.vendors.models import Vendor
 from apps.vendors.scoping import VendorScopedManager, VendorScopedQuerySet
 
@@ -125,8 +126,8 @@ class EventStatus(models.TextChoices):
 
 
 def default_timezone() -> str:
-    """The platform's local time zone (spec 01 "Time")."""
-    return str(settings.BUSINESS_TIME_ZONE)
+    """The platform's local time zone (spec 01 "Time"; the operator's, ARC.27)."""
+    return business_tz().key
 
 
 def event_blocks() -> list[tuple[str, blocks.Block]]:

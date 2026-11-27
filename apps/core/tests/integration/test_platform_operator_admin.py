@@ -30,6 +30,7 @@ def _form(**overrides: str | list[str]) -> dict[str, str | list[str]]:
         "tax_regime": "small_business",
         "commission_vat_mode": "none",
         "dac7_authority_country": "AT",
+        "business_time_zone": "Europe/Rome",
         "vendors_may_refund_outside": "on",
         "reverse_fees_on_vendor_refund": "on",
         "refund_fee_surcharge": "2.00",
@@ -98,6 +99,17 @@ def test_add_form_reports_a_start_that_is_not_after_the_current_one(
     assert response.status_code == 200
     assert "valid_from" in response.context["adminform"].form.errors
     assert PlatformOperator.objects.count() == 1
+
+
+def test_add_form_refuses_a_zone_the_order_triggers_cannot_follow(staff_client: Client) -> None:
+    """ARC.27 until ORD.41: the order triggers compute in Europe/Rome; another zone would split
+    the tax retention dates, so the form says why and nothing is saved."""
+    data = _form(business_time_zone="UTC")
+    response = staff_client.post(reverse("admin:core_platformoperator_add"), data)
+    assert response.status_code == 200
+    errors = response.context["adminform"].form.errors["business_time_zone"]
+    assert "ORD.41" in " ".join(errors)
+    assert not PlatformOperator.objects.exists()
 
 
 def test_existing_rows_cannot_be_changed_from_the_admin(staff_client: Client) -> None:

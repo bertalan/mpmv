@@ -1,5 +1,5 @@
 {% extends "layouts/base.html" %}
-{% load i18n l10n static responsive_images wagtailcore_tags consumer_prices seo_seller %}
+{% load i18n l10n static responsive_images wagtailcore_tags consumer_prices seo_seller dispatch %}
 {% comment %}
   Product page of `ride` (THM.7 part 2): the app template's structure (copied from
   catalog/product.html, CAT.7: same ids, hooks, i18n, consumer-price rules, add-to-cart form with
@@ -58,6 +58,7 @@
                 <div class="h3"><p class="product-price">{% if page_data.price is not None %}{% consumer_price page_data.price page_data.product.fiscal_category page_data.vendor as shown %}{% if shown %}<data value="{{ shown.amount|unlocalize }}">{{ currency }} {{ shown.amount }}</data> <small class="price-note text-body-secondary">{{ shown.note }}</small>{% else %}{% translate "Price at checkout" %}{% endif %}{% endif %}</p></div>
                 <p class="product-stock">{% include "catalog/includes/stock_status.html" with status=page_data.stock_status %}</p>
               {% endif %}
+              {% closure_notice page_data.vendor.pk %}
               <form class="product-form" method="post" action="{% url 'orders:cart_add' %}" hx-post="{% url 'orders:cart_add' %}" hx-target="#add-to-cart-result" hx-swap="innerHTML">
                 {% csrf_token %}
                 <input type="hidden" name="product" value="{{ page_data.product.public_id }}">

@@ -275,7 +275,9 @@ class Order(_StateGuarded):
                     "ORD.17: what the buyer accepted at checkout is never changed afterwards."
                 )
         if adding:
-            self.tax_retention_until = engine.tax_retention_until(self.created_at, business_tz())
+            self.tax_retention_until = engine.tax_retention_until(
+                self.created_at, business_tz(self.created_at)
+            )
         super().save(*args, **kwargs)
         if fresh:  # the trigger stamped the database's own times: read them back
             self.created_at, self.tax_retention_until = Order.objects.values_list(

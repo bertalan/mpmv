@@ -9,9 +9,7 @@ which audits (no second entry here). The POST needs the session level of `operat
 
 import datetime as dt
 from typing import Any
-from zoneinfo import ZoneInfo
 
-from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
@@ -23,6 +21,7 @@ from django.utils.translation import gettext as _
 
 from apps.accounts.decorators import requires_level_method
 from apps.core.audit import audit_context
+from apps.core.services import business_tz
 from apps.trust import engine, services
 from apps.trust.models import TrustRules
 
@@ -64,7 +63,7 @@ class TrustRuleNewView(ManagerView):
     def dispatch(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponseBase:
         """Staff-entered dates are read and shown in the business time zone (VEN.9 rule); the
         service compares the converted, aware value in UTC."""
-        with timezone.override(ZoneInfo(settings.BUSINESS_TIME_ZONE)):
+        with timezone.override(business_tz()):
             response = super().dispatch(request, *args, **kwargs)
             if isinstance(response, TemplateResponse):
                 response.render()  # the template renders lazily: do it inside the zone
