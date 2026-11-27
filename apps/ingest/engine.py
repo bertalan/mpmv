@@ -5,6 +5,8 @@ import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime, timedelta
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Final, Literal
 from urllib.parse import urlsplit, urlunsplit
 
@@ -290,3 +292,181 @@ def latest_field_values(
             if flagged.get(field) is True and (fields is None or field in fields):
                 latest[field] = value
     return latest
+
+
+# --- Stock and price plans (ING.8)
+
+SET_STOCK: Final = "set_stock"
+SET_PRICE: Final = "set_price"
+UNCHANGED: Final = "unchanged"
+SKIP: Final = "skip"
+REVIEW: Final = "review"
+
+MISSING_STATUSES: Final = frozenset({404})
+DEFAULT_MAX_AGE: Final = timedelta(hours=48)
+DEFAULT_MAX_CHANGE_PCT: Final = Decimal("15")
+DEFAULT_VAT_RATE: Final = Decimal("0.22")
+_CENT: Final = Decimal("0.01")
+
+
+@dataclass(frozen=True)
+class StockObservation:
+    """What the supplier said about one item. `missing_status` is the HTTP status of a page that
+    no longer answers (404); then no availability is known."""
+
+    ref: int  # the caller's handle (the source item), handed back untouched
+    product_id: int | None
+    observed_at: datetime
+    stock_status: object = None
+    stock_quantity: object = None
+    missing_status: int | None = None
+
+
+@dataclass(frozen=True)
+class StockProduct:
+    product_id: int
+    stock_qty: int
+
+
+@dataclass(frozen=True)
+class StockAction:
+    """`kind` is set_stock (write `quantity`), unchanged, skip (nothing written) or review.
+    A 404 is a `set_stock` of 0 and never an unpublish: the page stays published (SEO)."""
+
+    ref: int
+    product_id: int | None
+    kind: str
+    reason: str
+    quantity: int | None = None
+    review_kind: str | None = None
+
+
+def is_stale(observed_at: datetime, *, now: datetime, max_age: timedelta) -> bool:
+    return now - observed_at > max_age
+
+
+def plan_stock_actions(
+    observations: Sequence[StockObservation],
+    products: Mapping[int, StockProduct],
+    *,
+    now: datetime,
+    max_age: timedelta = DEFAULT_MAX_AGE,
+) -> list[StockAction]:
+    """One action per observation, in order. The supplier is authoritative for stock (exact
+    quantity); a stale observation is flagged for review and never applied; a 404 sets stock to 0;
+    an incomplete or incoherent availability is skipped (fail closed, never a guess)."""
+    plan: list[StockAction] = []
+    for obs in observations:
+        product = products.get(obs.product_id) if obs.product_id is not None else None
+        if product is None:
+            plan.append(StockAction(obs.ref, obs.product_id, SKIP, "unlinked"))
+        elif is_stale(obs.observed_at, now=now, max_age=max_age):
+            plan.append(StockAction(obs.ref, product.product_id, REVIEW, "stale", None, "stale"))
+        elif obs.missing_status is not None:
+            if obs.missing_status in MISSING_STATUSES:
+                plan.append(_stock_to(obs, product, 0, "missing"))
+            else:
+                plan.append(StockAction(obs.ref, product.product_id, SKIP, "unreliable_status"))
+        elif not (
+            valid_stock_state(obs.stock_status, obs.stock_quantity)
+            and isinstance(obs.stock_quantity, int)
+        ):
+            plan.append(StockAction(obs.ref, product.product_id, SKIP, "incoherent_stock"))
+        else:
+            plan.append(_stock_to(obs, product, obs.stock_quantity, "supplier"))
+    return plan
+
+
+def _stock_to(
+    obs: StockObservation, product: StockProduct, quantity: int, reason: str
+) -> StockAction:
+    if product.stock_qty == quantity:
+        return StockAction(obs.ref, product.product_id, UNCHANGED, reason, quantity)
+    return StockAction(obs.ref, product.product_id, SET_STOCK, reason, quantity)
+
+
+@dataclass(frozen=True)
+class PriceObservation:
+    """Supplier gross prices (VAT included); a `sale_price_gross` means the item is on sale."""
+
+    ref: int
+    product_id: int | None
+    observed_at: datetime
+    price_gross: Decimal | None
+    sale_price_gross: Decimal | None = None
+
+
+@dataclass(frozen=True)
+class PriceProduct:
+    product_id: int
+    price_net: Decimal | None
+
+
+@dataclass(frozen=True)
+class PriceAction:
+    """`price_net` is the proposed net price; for a review it is held back, not applied."""
+
+    ref: int
+    product_id: int | None
+    kind: str
+    reason: str
+    price_net: Decimal | None = None
+    old_net: Decimal | None = None
+    change_pct: Decimal | None = None
+    review_kind: str | None = None
+
+
+def net_from_gross(gross: Decimal, vat_rate: Decimal = DEFAULT_VAT_RATE) -> Decimal:
+    """Net price = gross / (1 + VAT rate), rounded half up to the cent."""
+    return (gross / (1 + vat_rate)).quantize(_CENT, rounding=ROUND_HALF_UP)
+
+
+def change_pct(old: Decimal, new: Decimal) -> Decimal:
+    """Absolute change of `new` against `old`, in percent (2 places, half up)."""
+    return (abs(new - old) / old * 100).quantize(_CENT, rounding=ROUND_HALF_UP)
+
+
+def _usable_price(value: object) -> bool:
+    return isinstance(value, Decimal) and value.is_finite() and value > 0
+
+
+def plan_price_actions(
+    observations: Sequence[PriceObservation],
+    products: Mapping[int, PriceProduct],
+    *,
+    now: datetime,
+    max_change_pct: Decimal = DEFAULT_MAX_CHANGE_PCT,
+    max_age: timedelta = DEFAULT_MAX_AGE,
+    vat_rate: Decimal = DEFAULT_VAT_RATE,
+) -> list[PriceAction]:
+    """One action per observation. Stale data is flagged, never applied; a product on sale goes to
+    review (its regular price is not written); a change strictly above `max_change_pct` percent goes
+    to review as a price jump; anything else is applied as a net price (gross / (1 + VAT))."""
+    plan: list[PriceAction] = []
+    for obs in observations:
+        product = products.get(obs.product_id) if obs.product_id is not None else None
+        pid = product.product_id if product else obs.product_id
+        if product is None:
+            plan.append(PriceAction(obs.ref, pid, SKIP, "unlinked"))
+        elif is_stale(obs.observed_at, now=now, max_age=max_age):
+            plan.append(PriceAction(obs.ref, pid, REVIEW, "stale", review_kind="stale"))
+        elif not (isinstance(obs.price_gross, Decimal) and _usable_price(obs.price_gross)):
+            plan.append(PriceAction(obs.ref, pid, SKIP, "invalid_price"))
+        else:
+            new = net_from_gross(obs.price_gross, vat_rate)
+            old = product.price_net
+            if obs.sale_price_gross is not None:
+                plan.append(PriceAction(obs.ref, pid, REVIEW, "sale", new, old, None, "sale"))
+            elif old == new:
+                plan.append(PriceAction(obs.ref, pid, UNCHANGED, "same", new, old))
+            elif old is None or old <= 0:
+                plan.append(PriceAction(obs.ref, pid, SET_PRICE, "first_price", new, old))
+            else:
+                pct = change_pct(old, new)
+                if pct > max_change_pct:
+                    plan.append(
+                        PriceAction(obs.ref, pid, REVIEW, "price_jump", new, old, pct, "price_jump")
+                    )
+                else:
+                    plan.append(PriceAction(obs.ref, pid, SET_PRICE, "within_limit", new, old, pct))
+    return plan
