@@ -25,7 +25,7 @@ from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
 from apps.core.i18n import primary_language
 from apps.core.services import audit_changes, run_mutation, save_audited
-from apps.vendors.models import Vendor
+from apps.vendors.models import Vendor, VendorStatus
 
 from . import engine, extraction
 from .catalog_loader import CatalogLoader, LoadReport
@@ -926,3 +926,25 @@ def _publish_one(
         draft.item.save(update_fields=["product", "updated_at"])
         audit_changes(item_change, ctx=ctx, action=DRAFT_PUBLISHED)
     return changes
+
+
+PUBLISH_BATCH: int = 200
+
+
+def publish_ready_drafts(
+    *, ctx: AuditContext, dry_run: bool = False, limit: int = PUBLISH_BATCH
+) -> PublishReport:
+    """Scheduled publication (ING.7): publish the `ready` drafts of every active source that
+    allows writes (`write_enabled`) and whose vendor is active, oldest first, at most `limit`
+    per call. A source without the flag is never touched; a rerun finds nothing new."""
+    drafts = list(
+        ProductDraft.objects.filter(
+            status=ProductDraft.Status.READY,
+            item__source__is_active=True,
+            item__source__write_enabled=True,
+            item__vendor__status=VendorStatus.ACTIVE,
+        )
+        .select_related("item__vendor", "item__product")
+        .order_by("pk")[:limit]
+    )
+    return publish_drafts(drafts, ctx=ctx, dry_run=dry_run)

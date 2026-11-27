@@ -13,6 +13,7 @@ from apps.core.models import AuditLog
 from apps.ingest import services
 from apps.ingest.models import ProductDraft
 from apps.ingest.tests.factories import ProductDraftFactory, SourceItemFactory
+from apps.vendors.models import Vendor, VendorStatus
 from apps.vendors.tests.factories import VendorFactory
 from tests.i18n import other_language
 
@@ -113,3 +114,32 @@ def test_a_product_that_fails_the_publication_rules_stays_a_draft_and_the_ingest
     draft.refresh_from_db()
     assert draft.status == "ready"
     assert not Product.objects.filter(status="published").exists()
+
+
+# --- scheduled publication
+
+
+def test_the_schedule_publishes_only_ready_drafts_of_write_enabled_active_sources() -> None:
+    from apps.ingest import tasks
+    from apps.ingest.tests.factories import SupplierSourceFactory
+
+    vendor = VendorFactory.create()
+    Vendor.objects.filter(pk=vendor.pk).update(status=VendorStatus.ACTIVE)
+    open_source = SupplierSourceFactory.create(vendor=vendor, write_enabled=True)
+    closed_source = SupplierSourceFactory.create(vendor=vendor, write_enabled=False)
+    inactive = SupplierSourceFactory.create(vendor=vendor, write_enabled=True, is_active=False)
+    applicant = SupplierSourceFactory.create(write_enabled=True)  # its vendor is not active
+    waiting = ready_draft(item=SourceItemFactory.create(source=applicant))
+    live = ready_draft(item=SourceItemFactory.create(source=open_source))
+    held = ready_draft(item=SourceItemFactory.create(source=closed_source))
+    off = ready_draft(item=SourceItemFactory.create(source=inactive))
+    not_ready = ready_draft(item=SourceItemFactory.create(source=open_source), status="new")
+    tasks.publish_ready_drafts(0)
+    expected = [(live, "published"), (held, "ready"), (off, "ready")]
+    expected += [(not_ready, "new"), (waiting, "ready")]
+    for draft, status in expected:
+        draft.refresh_from_db()
+        assert draft.status == status
+    assert Product.objects.get().sku == live.item.sku
+    tasks.publish_ready_drafts(0)  # a rerun finds nothing new
+    assert Product.objects.count() == 1
