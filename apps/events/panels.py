@@ -20,6 +20,7 @@ from django.utils.translation import gettext_lazy as _
 from wagtail.admin.panels import (
     FieldPanel,
     FieldRowPanel,
+    InlinePanel,
     MultiFieldPanel,
     Panel,
     TitleFieldPanel,
@@ -159,6 +160,16 @@ def event_content_panels() -> list[Any]:
                 FieldPanel("listing_image"),
             ],
             heading=_("Links"),
+        ),
+        InlinePanel(
+            "fitment_rows",
+            heading=_("Vehicles"),
+            label=_("Vehicle"),
+            help_text=_(
+                "Tag the event with the vehicles it is for. Visitors whose garage matches see a "
+                "badge. Leave it empty for an event for everyone."
+            ),
+            panels=[FieldPanel("node")],
         ),
         FieldPanel("body"),
         StaffOnlyPanel(

@@ -597,6 +597,10 @@ msgstr ""
 "motori di ricerca li usano per riconoscere l'azienda. Esempio: "
 "[\"https://www.wikidata.org/wiki/Q7\"]."
 
+#: apps/events/models.py
+msgid "A make covers all its models. Leave the list empty for an event for everyone."
+msgstr "Una marca comprende tutti i suoi modelli. Lasci vuoto l'elenco per un evento aperto a tutti."
+
 #: apps/events/templates/email/events/event_changes_requested/body.html
 #: apps/events/templates/email/events/event_changes_requested/body.txt
 msgid "A moderator asked for changes to your event %(title)s before it can be published."
@@ -4006,6 +4010,10 @@ msgstr "Adatto a tutto."
 #: themes/base/templates/components/footer.html themes/ride/templates/components/footer.html
 msgid "Footer"
 msgstr "Piè di pagina"
+
+#: apps/events/templates/events/_fitment_badge.html
+msgid "For %(name)s owners"
+msgstr "Per i proprietari di %(name)s"
 
 #: apps/manager/event_image_form.py
 msgid "For a licence that needs a written permission: where it is kept."
@@ -9646,6 +9654,12 @@ msgstr "Cambia"
 #: apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "Switch names by language"
 msgstr "Cambia i nomi per lingua"
+
+#: apps/events/panels.py
+msgid ""
+"Tag the event with the vehicles it is for. Visitors whose garage matches see a badge. Leave it "
+"empty for an event for everyone."
+msgstr "Indichi con quali veicoli è collegato l'evento. I visitatori il cui garage corrisponde vedono un'etichetta. Lasci vuoto per un evento aperto a tutti."
 
 #: apps/manager/forms.py
 msgid "Tagline"

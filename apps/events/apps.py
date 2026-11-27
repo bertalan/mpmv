@@ -13,6 +13,7 @@ class EventsConfig(AppConfig):
     # and the settings are changed by staff through audited services (EVT.3).
     audited_models = ("eventpage", "vendoreventpolicy", "eventsettings")
     unaudited_models = {
+        "eventfitment": "Child rows of the event page: changes are page revisions (FIT.11)",
         "eventindexpage": "Wagtail page: editor content with revisions and Wagtail's action log",
     }
 
@@ -28,10 +29,12 @@ class EventsConfig(AppConfig):
         )
 
         from apps.cms.models import HomePage
+        from apps.fitment.references import register_node_reference
 
         from . import notifications, signals
-        from .models import EventPage
+        from .models import EventFitment, EventPage
 
+        register_node_reference(EventFitment, "node")  # FIT.11: a merge moves the event tags
         # EVT.11: the vendor gets its moderation emails from the outbox, not from Wagtail.
         notifications.register_changes_purpose()
         notifications.switch_off_wagtail_vendor_emails()

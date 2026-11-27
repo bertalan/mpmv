@@ -25,6 +25,7 @@ from wagtail.models import Locale, Page, Site
 from apps.cms.models import HomePage
 from apps.cms.tests.factories import HomePageFactory
 from apps.events.models import (
+    EventFitment,
     EventIndexPage,
     EventPage,
     EventSettings,
@@ -202,3 +203,13 @@ class EventSettingsFactory(DjangoModelFactory[EventSettings]):
                 hostname=f"events{number}.example.test", port=80, root_page=root
             )
         return model_class._default_manager.create(*args, **kwargs)
+
+
+class EventFitmentFactory(DjangoModelFactory[EventFitment]):
+    """Tags `page` with `node` (both required: a node comes from the fitment factories)."""
+
+    class Meta:
+        model = EventFitment
+
+    page = factory.SubFactory(EventPageFactory)
+    node = factory.SubFactory("apps.fitment.tests.factories.FitmentNodeFactory")

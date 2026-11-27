@@ -47,6 +47,7 @@ EVENT_FILES = (
             "event_page",
             "event_past",
             "_filters",
+            "_fitment_badge",
             "_links",
             "_results",
             "_summary",
