@@ -395,7 +395,11 @@ def run_sync(
 
     Any failure, the queueing included, is logged and, once the run exists, ends it as failed with
     the reason; it is never raised, so one source cannot stop the others. Returns the run, or None
-    when it could not even be queued."""
+    when it could not even be queued.
+
+    The run states have no `partial`: a run is `succeeded` or `failed`. Each sync is one
+    transaction (all the plan or nothing), so a failure rolls the whole sync back and the failed
+    run honestly reports `errors=1` with nothing applied; no half-written run needs counting."""
     run: ImportRun | None = None
     try:
         run, _ = queue_run(source, kind, ctx=ctx, write=source.write_enabled)
