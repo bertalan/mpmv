@@ -166,6 +166,21 @@ def parse_decimal(raw: str, decimal: str | None = None) -> Decimal:
     return amount
 
 
+def parse_number(raw: object, decimal: str | None = None) -> Decimal:
+    """`parse_decimal` for cell values: real numbers (int, float, Decimal) need no separator
+    guess; a float goes through its shortest repr, never its binary expansion."""
+    if isinstance(raw, bool):
+        raise ValueError("not a number")
+    if isinstance(raw, float):
+        raw = Decimal(repr(raw))
+    if isinstance(raw, int | Decimal):
+        amount = Decimal(raw)
+        if not amount.is_finite() or not -MAX_AMOUNT <= amount <= MAX_AMOUNT:
+            raise ValueError("out of range")
+        return amount
+    return parse_decimal(str(raw).strip(), decimal)
+
+
 def build_row(
     row_no: int, values: Mapping[str, Any], *, decimal: str | None = None
 ) -> ParsedRow | RowError:
@@ -179,10 +194,10 @@ def build_row(
         if not text(name):
             return RowError(row_no, f"missing_{name}", f"The {name} is empty.")
     price: str | None = None
-    raw_price = text("price")
-    if raw_price:
+    raw_price = values.get("price")
+    if text("price"):
         try:
-            amount = parse_decimal(raw_price, decimal)
+            amount = parse_number(raw_price, decimal)
         except AmbiguousNumber:
             return RowError(row_no, "ambiguous_number", "The price separator is ambiguous.")
         except ValueError:
@@ -191,10 +206,10 @@ def build_row(
             return RowError(row_no, "bad_price", "The price is negative.")
         price = str(amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
     stock: int | None = None
-    raw_stock = text("stock_quantity")
-    if raw_stock:
+    raw_stock = values.get("stock_quantity")
+    if text("stock_quantity"):
         try:
-            quantity = parse_decimal(raw_stock, decimal)
+            quantity = parse_number(raw_stock, decimal)
         except AmbiguousNumber:
             return RowError(row_no, "ambiguous_number", "The stock separator is ambiguous.")
         except ValueError:
