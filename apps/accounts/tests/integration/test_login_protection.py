@@ -14,7 +14,7 @@ from django.contrib.auth import authenticate
 from django.test import Client, override_settings
 from django.urls import reverse
 from django.utils import timezone, translation
-from django.utils.translation import npgettext
+from django.utils.translation import ngettext
 
 from apps.accounts.models import User
 from apps.accounts.services import (
@@ -197,10 +197,9 @@ def test_unknown_emails_are_locked_exactly_like_real_ones(client: Client) -> Non
 # --- The waiting time (CORE.29, owner decision Q-12)
 
 
-def _wait_message(minutes: int, context: str = "staff sign-in") -> str:
+def _wait_message(minutes: int) -> str:
     with translation.override(primary_language()):
-        return npgettext(
-            context,
+        return ngettext(
             "Too many attempts. Please try again in %(minutes)s minute.",
             "Too many attempts. Please try again in %(minutes)s minutes.",
             minutes,
@@ -253,7 +252,7 @@ def test_the_manager_login_shows_the_waiting_time_too(
     page = client.post(
         reverse("login"), {"username": staff.email, "password": password}, REMOTE_ADDR=IP
     ).content.decode()
-    assert _wait_message(1, "") in page
+    assert _wait_message(1) in page
 
 
 # --- Per-IP progressive lockout
