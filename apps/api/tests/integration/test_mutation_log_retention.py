@@ -12,6 +12,7 @@ from django.db import DatabaseError, connection, transaction
 from django.utils import timezone
 
 from apps.api import tasks as api_tasks
+from apps.api.engine import months_before
 from apps.api.models import ApiMutationLog
 from apps.api.services import MUTATION_LOG_RETENTION_MONTHS, purge_mutation_log
 from apps.api.tests.factories import ApiMutationLogFactory
@@ -97,3 +98,31 @@ def test_the_purge_is_a_nightly_job() -> None:
     with mock.patch("apps.api.tasks.services.purge_mutation_log", return_value=0) as purge:
         api_tasks.purge_mutation_log.func(timestamp=0)
     purge.assert_called_once()
+
+
+def test_the_purge_job_is_periodic_and_locked() -> None:
+    assert api_tasks.purge_mutation_log.lock == "api.purge_mutation_log"
+    assert api_tasks.purge_mutation_log.queueing_lock == "api.purge_mutation_log"
+    assert "api.purge_mutation_log" in {s.task_name for s in schedules()}
+
+
+def test_the_job_does_not_raise_when_the_delete_fails(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    boom = DatabaseError("simulated failure")
+    with mock.patch("apps.api.tasks.services.purge_mutation_log", side_effect=boom):
+        api_tasks.purge_mutation_log.func(timestamp=0)  # must not raise
+    assert any("api.purge_mutation_log failed" in r.getMessage() for r in caplog.records)
+    assert any(r.exc_info for r in caplog.records)
+
+
+def test_a_row_just_inside_12_months_stays_and_one_just_outside_goes() -> None:
+    now = dt.datetime.now(dt.UTC).replace(microsecond=0)
+    cutoff = months_before(now, 12)
+    inside = _logged_at(cutoff + dt.timedelta(minutes=1))
+    outside = _logged_at(cutoff - dt.timedelta(minutes=1))
+
+    assert purge_mutation_log(now=now) == 1
+
+    assert list(ApiMutationLog.objects.values_list("pk", flat=True)) == [inside.pk]
+    assert not ApiMutationLog.objects.filter(pk=outside.pk).exists()
