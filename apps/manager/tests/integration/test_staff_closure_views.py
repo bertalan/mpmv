@@ -2,15 +2,18 @@
 
 import datetime as dt
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
 from django.test import Client
 
+from apps.accounts import levels
 from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
 from apps.core.models import AuditLog
+from apps.core.tests.factories import PlatformOperatorFactory
 from apps.vendors.models import Vendor, VendorClosure
 from apps.vendors.tests.factories import VendorClosureFactory
 
@@ -53,6 +56,9 @@ def test_staff_with_the_row_manage_any_shops_closures_and_it_is_audited(
     closure = VendorClosure.objects.get(vendor=vendor)
     entry = AuditLog.objects.get(action="vendors.closure.added")
     assert entry.source == AuditLog.Source.ADMIN
+    assert entry.target_key == str(closure.public_id)
+    assert entry.after is not None
+    assert entry.after["vendor"] == str(vendor.public_id)
     assert entry.actor_label
 
     page = f"{_page(vendor)}{closure.public_id}/"
@@ -168,3 +174,35 @@ def test_the_picker_searches_by_name_and_the_menu_lists_the_section(
     assert str(other_vendor.public_id) in text
     assert str(vendor.public_id) not in text
     assert PICKER in client.get(PLATFORM).content.decode()
+
+
+def test_a_staff_write_needs_the_session_level(vendor: Vendor) -> None:
+    """Once `content_edit` is sensitive, a session with no passkey window is refused on add, edit
+    and remove, and nothing changes."""
+    PlatformOperatorFactory.create(
+        open_ended=True,
+        valid_from=datetime(2020, 1, 1, tzinfo=UTC),
+        session_policy={"actions": {"sensitive": ["content_edit"]}},
+    )
+    closure = VendorClosureFactory.create(vendor=vendor, notice_days=14)
+    client = Client()
+    verified_login(client, UserFactory.create(platform_role="support"), level=levels.NO_WINDOW)
+    page = f"{_page(vendor)}{closure.public_id}/"
+    assert client.post(_page(vendor), _data()).status_code == 403
+    assert client.post(page, _data(notice_days="30")).status_code == 403
+    assert client.post(f"{page}remove/").status_code == 403
+    assert VendorClosure.objects.count() == 1
+    closure.refresh_from_db()
+    assert closure.notice_days == 14
+    assert not AuditLog.objects.filter(action__startswith="vendors.closure.").exists()
+
+
+def test_a_closed_shop_is_not_offered_and_its_urls_are_404(vendor: Vendor) -> None:
+    closure = VendorClosureFactory.create(vendor=vendor)
+    Vendor.objects.filter(pk=vendor.pk).update(status=Vendor.Status.CLOSED)
+    client = _staff("support")
+    assert str(vendor.public_id) not in client.get(PICKER).content.decode()
+    page = f"{_page(vendor)}{closure.public_id}/"
+    for url in (_page(vendor), page, f"{page}remove/"):
+        assert client.get(url).status_code == 404
+        assert client.post(url, _data()).status_code == 404
