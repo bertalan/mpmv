@@ -183,3 +183,83 @@ def test_price_dry_run_writes_nothing() -> None:
     prod.refresh_from_db()
     assert prod.price_net == Decimal("100.00")
     assert not result.changes.is_empty
+
+
+def test_a_vat_exempt_vendor_rate_of_zero_makes_net_equal_gross() -> None:
+    """Pins the current behaviour (lane-a question open): rate 0 means no VAT is taken out."""
+    run, item, prod = setup(price_net=Decimal("100.00"))
+    state(item, state={"price": "110.00"})
+    sync.sync_prices(
+        run, ctx=CTX, now=timezone.now(), max_age=MAX_AGE, vat_rate_for=lambda p, at: Decimal("0")
+    )
+    prod.refresh_from_db()
+    assert prod.price_net == Decimal("110.00")
+
+
+def test_the_rate_is_looked_up_once_per_category_vendor_and_day() -> None:
+    run, item, _ = setup(price_net=Decimal("100.00"))
+    state(item, state={"price": "100.00"})
+    other = ProductFactory.create(vendor=run.source.vendor, price_net=Decimal("100.00"))
+    state(SourceItemFactory.create(source=run.source, product=other), state={"price": "100.00"})
+    calls: list[str] = []
+
+    def counting(product: Product, at: dt.datetime) -> Decimal:
+        calls.append(product.sku)
+        return Decimal("0.25")
+
+    sync.sync_prices(run, ctx=CTX, now=timezone.now(), max_age=MAX_AGE, vat_rate_for=counting)
+    assert len(calls) == 1
+
+
+def test_a_rejected_review_is_not_reopened_for_the_same_observation() -> None:
+    run, item, _ = setup(price_net=Decimal("100.00"))
+    row = state(item, state={"price": "162.50"})
+    prices(run)
+    ReviewItem.objects.update(decision="rejected", resolved_at=timezone.now())
+    prices(run)
+    assert ReviewItem.objects.count() == 1
+    row.state = {**row.state, "price": "187.50"}  # the supplier moved again: a new question
+    row.save()
+    prices(run)
+    assert ReviewItem.objects.count() == 2
+
+
+def test_a_plain_404_opens_no_review() -> None:
+    run, item, _ = setup(stock_qty=3)
+    SourceMissingFactory.create(item=item, http_status=404)
+    result = stock(run)
+    assert result.reviews == 0
+    assert not ReviewItem.objects.exists()
+
+
+def test_a_stale_404_is_flagged_and_stock_stays() -> None:
+    run, item, prod = setup(stock_qty=3)
+    SourceMissingFactory.create(
+        item=item, http_status=404, last_seen_at=timezone.now() - dt.timedelta(days=5)
+    )
+    stock(run)
+    prod.refresh_from_db()
+    assert prod.stock_qty == 3
+    assert ReviewItem.objects.get().kind == "stale"
+
+
+def test_two_rates_are_planned_together_and_keep_item_order() -> None:
+    run, item, prod = setup(price_net=Decimal("100.00"))
+    state(item, state={"price": "110.00"})
+    other = ProductFactory.create(
+        vendor=run.source.vendor, price_net=Decimal("100.00"), fiscal_category="reduced"
+    )
+    state(SourceItemFactory.create(source=run.source, product=other), state={"price": "110.00"})
+    result = sync.sync_prices(
+        run,
+        ctx=CTX,
+        now=timezone.now(),
+        max_age=MAX_AGE,
+        vat_rate_for=lambda p, at: (
+            Decimal("0.10") if p.fiscal_category == "reduced" else Decimal("0")
+        ),
+    )
+    assert [a.ref for a in result.actions] == sorted(a.ref for a in result.actions)
+    prod.refresh_from_db()
+    other.refresh_from_db()
+    assert (prod.price_net, other.price_net) == (Decimal("110.00"), Decimal("100.00"))

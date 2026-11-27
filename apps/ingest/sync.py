@@ -9,7 +9,8 @@ run itself is a dry run (the per-source write flag, spec 08). Ingest never impor
 """
 
 import datetime as dt
-from collections.abc import Callable, Sequence
+import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -28,6 +29,8 @@ from apps.core.services import run_mutation
 from . import engine
 from .models import ImportRun, ReviewItem, SourceItem
 from .services import REVIEW_OPENED, review_snapshot
+
+logger = logging.getLogger(__name__)
 
 SYNC_RUN = "ingest.sync.run"
 
@@ -56,9 +59,12 @@ def vat_rate_resolver() -> VatRateFor:
 
 
 def _items(run: ImportRun) -> list[SourceItem]:
+    """The source's matched items with their products locked: the plan is made from the rows that
+    are then written (call inside a transaction)."""
     return list(
         SourceItem.objects.filter(source=run.source, product__isnull=False)
         .select_related("product", "state", "missing")
+        .select_for_update(of=("product",))
         .order_by("pk")
     )
 
@@ -82,12 +88,15 @@ def _open_review(
     kind: str,
     payload: dict[str, Any],
     *,
+    fingerprint: str,
     ctx: AuditContext,
     changes: ChangeSet,
     dry_run: bool,
 ) -> bool:
-    """Open a non-blocking review item unless the same one is still open for this item."""
-    if ReviewItem.objects.filter(item=item, kind=kind, decision__in=engine.OPEN_DECISIONS).exists():
+    """Open a non-blocking review item unless this item already has one of this kind for the same
+    observation, in any decision: a person's rejection is not asked again until the supplier says
+    something new (`fingerprint` is the observed value)."""
+    if ReviewItem.objects.filter(item=item, kind=kind, payload__fingerprint=fingerprint).exists():
         return False
     review = ReviewItem(
         run=run,
@@ -95,7 +104,7 @@ def _open_review(
         product=item.product,
         kind=kind,
         blocking=engine.is_blocking(kind),
-        payload=payload,
+        payload={**payload, "fingerprint": fingerprint},
     )
     review.full_clean()
     part = ChangeSet()
@@ -140,37 +149,38 @@ def sync_stock(
     `catalog.services.update_by_sku`.
     """
     dry = dry_run or run.dry_run
-    items = {item.pk: item for item in _items(run)}
-    observations: list[engine.StockObservation] = []
-    for item in items.values():
-        missing = getattr(item, "missing", None)
-        state = getattr(item, "state", None)
-        if missing is not None:
-            observations.append(
-                engine.StockObservation(
-                    item.pk,
-                    item.product_id,
-                    missing.last_seen_at,
-                    missing_status=missing.http_status,
-                )
-            )
-        elif state is not None:
-            observations.append(
-                engine.StockObservation(
-                    item.pk,
-                    item.product_id,
-                    state.observed_at,
-                    state.stock_status,
-                    state.stock_quantity,
-                )
-            )
-    products = {
-        _product(item).pk: engine.StockProduct(_product(item).pk, _product(item).stock_qty)
-        for item in items.values()
-    }
-    plan = engine.plan_stock_actions(observations, products, now=now, max_age=max_age)
-    result = SyncResult(list(plan), ChangeSet())
     with transaction.atomic():
+        items = {item.pk: item for item in _items(run)}
+        observations: list[engine.StockObservation] = []
+        for item in items.values():
+            missing = getattr(item, "missing", None)
+            state = getattr(item, "state", None)
+            if missing is not None:
+                observations.append(
+                    engine.StockObservation(
+                        item.pk,
+                        item.product_id,
+                        missing.last_seen_at,
+                        missing_status=missing.http_status,
+                    )
+                )
+            elif state is not None:
+                observations.append(
+                    engine.StockObservation(
+                        item.pk,
+                        item.product_id,
+                        state.observed_at,
+                        state.stock_status,
+                        state.stock_quantity,
+                    )
+                )
+        observed = {o.ref: o.observed_at.isoformat() for o in observations}
+        products = {
+            _product(item).pk: engine.StockProduct(_product(item).pk, _product(item).stock_qty)
+            for item in items.values()
+        }
+        plan = engine.plan_stock_actions(observations, products, now=now, max_age=max_age)
+        result = SyncResult(list(plan), ChangeSet())
         rows = []
         for action in plan:
             item = items[action.ref]
@@ -183,13 +193,17 @@ def sync_stock(
                     )
                 )
             elif action.kind == engine.REVIEW and action.review_kind:
-                payload = {"sync": "stock", "reason": action.reason}
-                payload["observed_at"] = _observed_at(observations, action.ref)
+                payload = {
+                    "sync": "stock",
+                    "reason": action.reason,
+                    "observed_at": observed[action.ref],
+                }
                 if _open_review(
                     run,
                     item,
                     action.review_kind,
                     payload,
+                    fingerprint=observed[action.ref],
                     ctx=ctx,
                     changes=result.changes,
                     dry_run=dry,
@@ -202,10 +216,6 @@ def sync_stock(
         if not dry:
             _summary(run, result, "stock", dry, ctx)
     return result
-
-
-def _observed_at(observations: Sequence[engine.StockObservation], ref: int) -> str:
-    return next(o.observed_at.isoformat() for o in observations if o.ref == ref)
 
 
 def sync_prices(
@@ -221,54 +231,74 @@ def sync_prices(
     """Plan and apply the net prices of the source's matched items (supplier gross prices from the
     item's state: `price` and an optional `sale_price`).
 
-    `vat_rate_for(product, observed_at)` gives the rate; a product without one is an error, never
-    a guess. A change above `max_change_pct`, a sale and stale data open a `ReviewItem` and write
-    nothing; the product's own sale is kept when the regular price moves.
+    `vat_rate_for(product, observed_at)` gives the rate (looked up once per fiscal category, vendor
+    and day); a product without one is an error, never a guess. A VAT-exempt vendor's rate is 0, so
+    its net price equals the supplier gross (pending a lane-a decision, pinned by a test). A
+    change above `max_change_pct`, a sale and stale data open a `ReviewItem` and write nothing;
+    the product's own sale is kept when the regular price moves.
     """
     dry = dry_run or run.dry_run
-    items = {item.pk: item for item in _items(run) if getattr(item, "state", None) is not None}
-    result = SyncResult([], ChangeSet())
-    price_actions: list[engine.PriceAction] = []
-    by_rate: dict[
-        Decimal, tuple[list[engine.PriceObservation], dict[int, engine.PriceProduct]]
-    ] = {}
-    for item in items.values():
-        state = item.state
-        product = _product(item)
-        try:
-            rate = vat_rate_for(product, state.observed_at)
-        except Exception as exc:  # no tax rate or profile: reported, the rest goes on
-            result.errors.append(f"{product.sku}: {exc}")
-            continue
-        observations, products = by_rate.setdefault(rate, ([], {}))
-        observations.append(
-            engine.PriceObservation(
+    with transaction.atomic():
+        items = {item.pk: item for item in _items(run) if getattr(item, "state", None) is not None}
+        order = {pk: n for n, pk in enumerate(items)}
+        result = SyncResult([], ChangeSet())
+        by_rate: dict[
+            Decimal, tuple[list[engine.PriceObservation], dict[int, engine.PriceProduct]]
+        ] = {}
+        rates: dict[tuple[str, int, dt.date], Decimal | str] = {}
+        obs_by_ref: dict[int, engine.PriceObservation] = {}
+        for item in items.values():
+            state = item.state
+            product = _product(item)
+            key = (product.fiscal_category, product.vendor_id, state.observed_at.date())
+            if key not in rates:  # one tax lookup per category, vendor and day, not per product
+                try:
+                    rates[key] = vat_rate_for(product, state.observed_at)
+                except Exception as exc:  # no rate or profile: reported, the rest goes on
+                    logger.warning(
+                        "ingest price sync: no VAT rate for %s", product.sku, exc_info=True
+                    )
+                    rates[key] = str(exc)
+            rate = rates[key]
+            if isinstance(rate, str):
+                result.errors.append(f"{product.sku}: {rate}")
+                continue
+            observation = engine.PriceObservation(
                 item.pk,
                 product.pk,
                 state.observed_at,
                 _decimal(state.state.get("price")),
                 _decimal(state.state.get("sale_price")),
             )
-        )
-        products[product.pk] = engine.PriceProduct(product.pk, product.price_net)
-    for rate, (observations, products) in by_rate.items():
-        price_actions.extend(
-            engine.plan_price_actions(
-                observations,
-                products,
-                now=now,
-                max_age=max_age,
-                vat_rate=rate,
-                max_change_pct=max_change_pct,
+            obs_by_ref[item.pk] = observation
+            observations, products = by_rate.setdefault(rate, ([], {}))
+            observations.append(observation)
+            products[product.pk] = engine.PriceProduct(product.pk, product.price_net)
+        price_actions: list[engine.PriceAction] = []
+        for rate, (observations, products) in by_rate.items():
+            price_actions.extend(
+                engine.plan_price_actions(
+                    observations,
+                    products,
+                    now=now,
+                    max_age=max_age,
+                    vat_rate=rate,
+                    max_change_pct=max_change_pct,
+                )
             )
-        )
-    result.actions.extend(price_actions)
-    with transaction.atomic():
+        price_actions.sort(key=lambda action: order[action.ref])  # item order, whatever the rate
+        result.actions.extend(price_actions)
         for action in price_actions:
             item = items[action.ref]
             if action.kind == engine.SET_PRICE and action.price_net is not None:
                 _set_price(_product(item), action.price_net, ctx=ctx, dry=dry, result=result)
             elif action.kind == engine.REVIEW and action.review_kind:
+                observation = obs_by_ref[action.ref]
+                fingerprint = (
+                    observation.observed_at.isoformat()
+                    if action.reason == "stale"
+                    else f"{observation.price_gross}|{observation.sale_price_gross}"
+                )
                 payload = {
                     "sync": "price",
                     "reason": action.reason,
@@ -281,6 +311,7 @@ def sync_prices(
                     item,
                     action.review_kind,
                     payload,
+                    fingerprint=fingerprint,
                     ctx=ctx,
                     changes=result.changes,
                     dry_run=dry,
