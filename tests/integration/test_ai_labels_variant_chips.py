@@ -130,3 +130,25 @@ def test_the_label_adds_no_query_per_image(client: Client, theme: str) -> None:
         client.get(plain)  # warm the caches
         client.get(labelled)
         assert _queries(client, labelled) == _queries(client, plain)  # the label costs none
+
+
+@pytest.mark.parametrize("theme", ["base", "ride"])
+def test_a_labelled_chip_radio_is_described_by_its_label(client: Client, theme: str) -> None:
+    url = _page((ai_labels.AI_GENERATED, ai_labels.AI_NONE, ai_labels.AI_EDITED))
+    with use_theme(theme):
+        html = client.get(url).content.decode()
+    generated, plain, edited = _chips(html)
+    ids = []
+    for chip in (generated, edited):
+        described = re.search(r'<input[^>]*aria-describedby="([^"]+)"', chip)
+        assert described is not None
+        target = re.search(
+            r'<p[^>]*id="([^"]+)"[^>]*gallery__ai-label|<p[^>]*gallery__ai-label[^>]*id="([^"]+)"',
+            chip,
+        )
+        assert target is not None
+        assert described.group(1) in target.groups()
+        ids.append(described.group(1))
+    assert len(set(ids)) == 2  # one unique id per chip
+    assert html.count(f'id="{ids[0]}"') == 1
+    assert "aria-describedby" not in plain

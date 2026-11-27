@@ -5,5 +5,6 @@ shown with the image, with the IPTC digital source type as a data attribute for 
   {% include "components/ai_image_label.html" with image=image only %}
 
 - `image.ai_origin`: `generated` or `edited` (anything else shows nothing);
-- `image.ai_source_type`: the IPTC digital source type URI.
-{% endcomment %}{% if image.ai_origin == "generated" %}<p class="gallery__ai-label" data-ai-origin="generated" data-digital-source-type="{{ image.ai_source_type }}">{% translate "AI-generated image" %}</p>{% elif image.ai_origin == "edited" %}<p class="gallery__ai-label" data-ai-origin="edited" data-digital-source-type="{{ image.ai_source_type }}">{% translate "AI-edited image" %}</p>{% endif %}
+- `image.ai_source_type`: the IPTC digital source type URI;
+- `label_id` (optional): an id for the paragraph, so a control can point at it with aria-describedby.
+{% endcomment %}{% if image.ai_origin == "generated" %}<p class="gallery__ai-label"{% if label_id %} id="{{ label_id }}"{% endif %} data-ai-origin="generated" data-digital-source-type="{{ image.ai_source_type }}">{% translate "AI-generated image" %}</p>{% elif image.ai_origin == "edited" %}<p class="gallery__ai-label"{% if label_id %} id="{{ label_id }}"{% endif %} data-ai-origin="edited" data-digital-source-type="{{ image.ai_source_type }}">{% translate "AI-edited image" %}</p>{% endif %}
