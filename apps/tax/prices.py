@@ -34,7 +34,7 @@ shows no amount, never the net price.
 import datetime as dt
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Any
+from typing import Any, Protocol
 
 from django.http import HttpRequest
 from django.utils import timezone
@@ -299,3 +299,28 @@ class PriceCheck:
         except PriceUnavailable:
             return False
         return True
+
+
+class _SoldItem(Protocol):
+    """What the rate needs from a catalog product (tax never imports the catalog)."""
+
+    fiscal_category: str
+    vendor: Vendor
+
+
+def supplier_vat_rate(product: _SoldItem, at: dt.datetime) -> Decimal:
+    """The VAT rate, as a fraction (0.22), inside a supplier's gross price of `product` at `at`
+    (ING.8; the ingest app names this function in `INGEST_VAT_RATE_RESOLVER`).
+
+    The supplier prices in the vendor's own country: the rate is what the tax engine applies to the
+    product's fiscal category and the vendor's tax position there (`consumer_price` with the
+    destination forced to that country). Raises `PriceUnavailable` when there is no rate, profile or
+    operator: never a guess."""
+    quote = consumer_price(
+        Decimal("100.00"),
+        product.fiscal_category,
+        vendor=product.vendor,
+        country=str(product.vendor.country),
+        at=at,
+    )
+    return quote.rate / 100
