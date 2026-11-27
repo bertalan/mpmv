@@ -81,6 +81,7 @@ Jobs on `main` today (cron in Europe/Rome; a new job adds its row here):
 | `core.heartbeat` | `*/5 * * * *` | none | Counts a beat in `core_heartbeat`, so monitoring sees the worker is alive (ARC.9) |
 | `core.purge_throttles` | `17 4 * * *` | none | Deletes throttle counters whose lock and quiet period are over (CORE.5; also CORE.20 blocks) |
 | `api.purge_refused_keys` | `22 4 * * *` | none | Deletes refused-key rows older than the window, of every IP (CORE.20) |
+| `api.purge_mutation_log` | `12 4 * * *` | none | Deletes API mutation log rows older than 12 months; the table's trigger refuses any younger row (CORE.29, CMP.4) |
 | `accounts.clear_sessions` | `37 4 * * *` | none | `clearsessions`: deletes expired sessions and the session index rows left without a live session (CORE.24) |
 | `core.purge_geocode_cache` | `27 4 * * *` | none | Deletes geocoding cache entries past their 180 days (EVT.12) |
 | `tax.check_profile_consistency` | `41 5 * * *` | none | Logs current tax profiles that disagree with the vendor's fiscal regime (TAX.2) |

@@ -108,7 +108,8 @@ class ApiMutationLog(models.Model):
 
     The client is stored by public id, name and key prefix, not as a foreign key, so rows
     outlive the client. Request bodies and query strings are not stored (they may carry
-    personal data). Append-only: save guard plus a database trigger.
+    personal data). Append-only: save guard plus a database trigger, which lets a row go only
+    after its 12 months of retention (CORE.29, `services.purge_mutation_log`).
     """
 
     public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)

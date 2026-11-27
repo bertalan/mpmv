@@ -96,6 +96,10 @@ DRY_RUN_EXCEPTIONS: Final[dict[str, tuple[str, str]]] = {
         THROTTLE,
         "deletes refused-key rows older than the window (CORE.20)",
     ),
+    "apps.api.services.purge_mutation_log": (
+        TELEMETRY,
+        "Deletes API call log rows past their 12 months, which the trigger alone allows (CORE.29)",
+    ),
     "apps.cms.services.sync_locales": (
         MIGRATION_HOOK,
         "post-migrate handler that adds the missing Wagtail locales",

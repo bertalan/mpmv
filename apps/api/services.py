@@ -66,6 +66,7 @@ from .engine import (
     hash_key,
     key_matches,
     limits_for,
+    months_before,
     normalize_allowed_ips,
     parse_authorization,
     parse_rate,
@@ -579,4 +580,22 @@ def purge_expired_refused_keys(*, now: dt.datetime | None = None) -> int:
     deleted, _ = ApiRefusedKey.objects.filter(
         refused_at__lte=now - dt.timedelta(seconds=period)
     ).delete()
+    return deleted
+
+
+# --- The mutation log's retention (CORE.29, owner decision Q-14)
+
+MUTATION_LOG_RETENTION_MONTHS = 12
+
+
+def purge_mutation_log(*, now: dt.datetime | None = None) -> int:
+    """Delete the API mutation log rows older than 12 months; return how many were deleted.
+
+    Run nightly by `api.purge_mutation_log`. The table is append-only; its trigger lets a
+    DELETE through only for a row past the same 12 months (migration `api/0008`), so this is
+    the one way a row leaves, and never a recent one.
+    """
+    now = now or timezone.now()
+    cutoff = months_before(now, MUTATION_LOG_RETENTION_MONTHS)
+    deleted, _ = ApiMutationLog.objects.filter(created_at__lt=cutoff).delete()
     return deleted

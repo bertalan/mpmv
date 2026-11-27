@@ -166,6 +166,7 @@ when a new mutating service has neither `dry_run` nor a place in this table (ARC
 | `apps.api.services.authenticate` | telemetry | Records when an API key was last used |
 | `apps.api.services.record_refused_key` | throttle counter | Counts one refused-key (401) answer per client IP, blocking it past the limit (CORE.20) |
 | `apps.api.services.purge_expired_refused_keys` | throttle counter | Deletes refused-key rows older than the window (CORE.20) |
+| `apps.api.services.purge_mutation_log` | telemetry | Deletes API call log rows past their 12 months, which the trigger alone allows (CORE.29) |
 | `apps.cms.services.sync_locales` | migration hook | Post-migrate handler that adds the missing Wagtail locales |
 | `apps.cms.services.seed_site` | migration hook | Idempotent setup seed (`seed_cms`) that only adds missing sample pages |
 | `apps.core.services.record_heartbeat` | telemetry | Operational heartbeat of a scheduled job |

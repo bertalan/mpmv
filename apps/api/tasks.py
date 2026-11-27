@@ -19,3 +19,12 @@ def purge_refused_keys(timestamp: int) -> None:
     """
     deleted = services.purge_expired_refused_keys()
     logger.info("api.purge_refused_keys deleted %d expired rows", deleted)
+
+
+@periodic("12 4 * * *")
+@locked()
+@task("api.purge_mutation_log", retry=NO_RETRY)
+def purge_mutation_log(timestamp: int) -> None:
+    """Every night: delete the API mutation log rows older than 12 months (CORE.29, Q-14)."""
+    deleted = services.purge_mutation_log()
+    logger.info("api.purge_mutation_log deleted %d rows past their retention", deleted)
