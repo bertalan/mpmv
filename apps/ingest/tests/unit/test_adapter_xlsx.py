@@ -104,3 +104,10 @@ def test_column_cap() -> None:
     data = _book([["Ref", "Item", "Net", "Stock", "More"], ["B-1", "Pan", 1, 1, 1]])
     with pytest.raises(base.AdapterError):
         XlsxAdapter(COLUMNS, vendor_id=1, max_columns=3).parse(data)
+
+
+def test_float_cell_is_not_an_ambiguous_separator() -> None:
+    res = XlsxAdapter(COLUMNS, vendor_id=1).parse(
+        _book([["Ref", "Item", "Net"], ["B-1", "Pan", 1.234]])
+    )
+    assert res.rows[0].product.price == "1.23"
