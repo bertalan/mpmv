@@ -87,10 +87,12 @@ def cms_page_nodes(
     main_entity_id: str = "",
     extra: Sequence[Node] = (),
     items: Node | None = None,
+    lists: Sequence[Node] = (),
 ) -> list[Node]:
     """The `WebPage`, its breadcrumb (none on the home page), the page's FAQ, the named lists of
     its widgets and `extra` nodes. `items` is the page's own main `ItemList` (a collection
-    page's `mainEntity`). Only the FAQ is a `hasPart`: the lists are not `CreativeWork`s, so they
+    page's `mainEntity`); `lists` are the page's own widget lists, not blocks of its body. Only the
+    FAQ is a `hasPart`: the lists are not `CreativeWork`s, so they
     sit in the graph by their `@id` (SEO.16)."""
     from apps.cms.blocks import page_graph_nodes
     from apps.cms.engine import faq_questions
@@ -107,6 +109,7 @@ def cms_page_nodes(
     widgets: list[Node] = []
     for number, widget in enumerate(page_graph_nodes(body, ctx.context) if body else [], 1):
         widgets.append({**widget, "@id": f"{url}#list-{number}"})
+    widgets.extend(node for node in lists if node)
     parts = [str(faq["@id"])] if faq else []
     if items and not main_entity_id:
         main_entity_id = str(items["@id"])
@@ -138,10 +141,10 @@ def register_all() -> None:
         cms.LegalPage,
         cms.VendorRecruitmentPage,
         cms.TermLandingPage,
-        cms.VendorLandingPage,
         cms.FormPage,
     ):
         register(model)(_web_page)
+    register(cms.VendorLandingPage)(_vendor_story)
     register(events.EventPage)(_event_page)
     register(events.EventIndexPage)(_event_index)
     register(cms.BlogIndexPage)(_blog_index)
@@ -153,6 +156,20 @@ def register_all() -> None:
 
 def _web_page(ctx: PageContext) -> list[Node]:
     return cms_page_nodes(ctx)
+
+
+def _vendor_story(ctx: PageContext) -> list[Node]:
+    """A vendor's story page: its featured products (the page's own widget) as one named
+    `ItemList` of product ids, public products in the page language only, no offers."""
+    url = ctx.obj.get_full_url(ctx.request) or ""
+    featured = ctx.context.get("featured")
+    if not url or featured is None:
+        return cms_page_nodes(ctx)
+    with translation.override(ctx.language):
+        name = str(translation.gettext("Featured products"))
+    entries = product_entries(ctx, featured.cards)
+    featured_list = ge.item_list_node(list_id=f"{url}#featured", name=name, entries=entries)
+    return cms_page_nodes(ctx, lists=[featured_list])
 
 
 def _post_items(ctx: PageContext, url: str, name: str) -> Node:
@@ -408,7 +425,29 @@ def _listing(ctx: PageContext) -> list[Node]:
         main_entity_id=main_entity,
         has_part_ids=parts,
     )
-    return [web, breadcrumb, *([faq] if faq else []), *([items] if items else []), *nodes]
+    related = _related_articles(ctx, url)
+    return [
+        web,
+        breadcrumb,
+        *([faq] if faq else []),
+        *([items] if items else []),
+        *([related] if related else []),
+        *nodes,
+    ]
+
+
+def _related_articles(ctx: PageContext, url: str) -> Node:
+    """A term page's related articles (its landing page's `related` cards) as one named
+    `ItemList`; the editorial shows on the first unfiltered page only, so only that page has it.
+    Pages that are not live, and cards in another language, are not in `related`."""
+    with translation.override(ctx.language):
+        name = str(translation.gettext("Related articles"))
+    entries = [
+        ge.ListEntry(url=_absolute(ctx.site, href), name=label, kind="WebPage")
+        for label, href in ctx.context.get("editorial_related") or ()
+        if _is_in_language(href, ctx.language)
+    ]
+    return ge.item_list_node(list_id=f"{url}#related", name=name, entries=entries)
 
 
 _SEARCH_GROUP_KINDS = {"events": "Event", "articles": "BlogPosting", "vendors": "Organization"}

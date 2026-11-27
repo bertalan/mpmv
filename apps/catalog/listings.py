@@ -286,6 +286,7 @@ class ListingEditorial:
     title: str = ""
     description: str = ""
     faq: tuple[tuple[str, str], ...] = ()  # (question, answer HTML) for the page graph
+    related: tuple[tuple[str, str], ...] = ()  # (label, path) of the related articles, same
 
 
 def shows_editorial(params: ListingParams) -> bool:

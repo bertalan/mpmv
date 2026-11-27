@@ -208,6 +208,7 @@ def _listing(
             ),
         ),
         "editorial_faq": editorial.faq if editorial else (),
+        "editorial_related": editorial.related if editorial else (),
         "anchor": anchor,
         "location": location,
         "cards": services.product_cards(page.products, language),
