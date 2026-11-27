@@ -12,14 +12,17 @@ parsing, and reports a bad row instead of raising, so one bad row never hides th
 Parsing is a read: a dry-run is the default and writes nothing; the caller stores the result.
 """
 
+import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any, Final, Protocol
 
 from apps.ingest import engine
 
 DEFAULT_MAX_BYTES: Final = 5 * 1024 * 1024
 DEFAULT_MAX_ROWS: Final = 20_000
+DEFAULT_MAX_COLUMNS: Final = 200
 
 # The generic observation fields every file adapter can fill. `sku` and `title` are required.
 FIELDS: Final = ("sku", "title", "description", "price", "stock_quantity", "url", "ean")
@@ -117,9 +120,56 @@ class FileAdapter(Protocol):
     def parse(self, data: bytes) -> AdapterResult: ...
 
 
-def build_row(row_no: int, values: Mapping[str, Any]) -> ParsedRow | RowError:
+class AmbiguousNumber(ValueError):
+    """A number whose separators could mean thousands or decimals (e.g. "1,234")."""
+
+
+MAX_AMOUNT: Final = Decimal(10) ** 9
+FIELD_MAX_CHARS: Final = 65_536
+
+
+def parse_decimal(raw: str, decimal: str | None = None) -> Decimal:
+    """A finite decimal with |value| <= 10**9, or ValueError.
+
+    `decimal` ("," or ".") says which separator is the decimal one; the other is a thousands
+    separator. Without it: when both appear the last one is the decimal; a single separator
+    repeated, in groups of three, is thousands; a single one followed by exactly three digits
+    (not after a leading 0) is ambiguous and refused, any other single separator is decimal.
+    """
+    cleaned = "".join(raw.split())
+    if decimal in {",", "."}:
+        other = "." if decimal == "," else ","
+        cleaned = cleaned.replace(other, "").replace(decimal, ".")
+    else:
+        found = [sep for sep in ",." if sep in cleaned]
+        if len(found) == 2:
+            dot_last = cleaned.rfind(".") > cleaned.rfind(",")
+            thousands, dec = (",", ".") if dot_last else (".", ",")
+            cleaned = cleaned.replace(thousands, "").replace(dec, ".")
+        elif found:
+            sep = found[0]
+            head, _, tail = cleaned.partition(sep)
+            if cleaned.count(sep) > 1:
+                if not re.fullmatch(rf"[+-]?\d{{1,3}}(?:{re.escape(sep)}\d{{3}})+", cleaned):
+                    raise ValueError("bad grouping")
+                cleaned = cleaned.replace(sep, "")
+            elif len(tail) == 3 and tail.isdigit() and head.lstrip("+-") not in {"", "0"}:
+                raise AmbiguousNumber(raw)
+            else:
+                cleaned = cleaned.replace(sep, ".")
+    try:
+        amount = Decimal(cleaned)
+    except InvalidOperation as exc:
+        raise ValueError("not a number") from exc
+    if not amount.is_finite() or not -MAX_AMOUNT <= amount <= MAX_AMOUNT:
+        raise ValueError("out of range")
+    return amount
+
+
+def build_row(
+    row_no: int, values: Mapping[str, Any], *, decimal: str | None = None
+) -> ParsedRow | RowError:
     """Validate one mapped row (field name -> raw text/value) into an observation and product."""
-    from decimal import Decimal, InvalidOperation
 
     def text(name: str) -> str:
         value = values.get(name)
@@ -131,29 +181,27 @@ def build_row(row_no: int, values: Mapping[str, Any]) -> ParsedRow | RowError:
     price: str | None = None
     raw_price = text("price")
     if raw_price:
-        cleaned = "".join(raw_price.split())
-        if "," in cleaned and "." in cleaned:
-            dot_last = cleaned.rfind(".") > cleaned.rfind(",")
-            thousands, decimal = (",", ".") if dot_last else (".", ",")
-            cleaned = cleaned.replace(thousands, "").replace(decimal, ".")
-        else:
-            cleaned = cleaned.replace(",", ".")
         try:
-            amount = Decimal(cleaned)
-        except InvalidOperation:
-            return RowError(row_no, "bad_price", "The price is not a number.")
-        if not amount.is_finite() or amount < 0:
-            return RowError(row_no, "bad_price", "The price is not a non-negative number.")
-        price = f"{amount:.2f}"
+            amount = parse_decimal(raw_price, decimal)
+        except AmbiguousNumber:
+            return RowError(row_no, "ambiguous_number", "The price separator is ambiguous.")
+        except ValueError:
+            return RowError(row_no, "bad_price", "The price is not a usable number.")
+        if amount < 0:
+            return RowError(row_no, "bad_price", "The price is negative.")
+        price = str(amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
     stock: int | None = None
     raw_stock = text("stock_quantity")
     if raw_stock:
         try:
-            stock = int(Decimal(raw_stock.replace(",", ".")))
-        except (InvalidOperation, ValueError):
-            return RowError(row_no, "bad_stock", "The stock is not a whole number.")
-        if stock < 0:
-            return RowError(row_no, "bad_stock", "The stock is negative.")
+            quantity = parse_decimal(raw_stock, decimal)
+        except AmbiguousNumber:
+            return RowError(row_no, "ambiguous_number", "The stock separator is ambiguous.")
+        except ValueError:
+            return RowError(row_no, "bad_stock", "The stock is not a usable number.")
+        if quantity != quantity.to_integral_value() or quantity < 0:
+            return RowError(row_no, "bad_stock", "The stock is not a whole, non-negative number.")
+        stock = int(quantity)
     product = ExtractedProduct(
         sku=text("sku"),
         title=text("title"),
