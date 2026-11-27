@@ -1,0 +1,14 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+Remove one closure range (VEN.20): a confirmation before the POST. No inline script or style.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{{ title }}</h1>
+  <p>{% blocktranslate with start=closure.start_date|date:"DATE_FORMAT" end=closure.end_date|date:"DATE_FORMAT" %}Remove the closure from {{ start }} to {{ end }}? Buyers stop seeing its notice and orders are no longer moved to a later dispatch date.{% endblocktranslate %}</p>
+  <form method="post">
+    {% csrf_token %}
+    {% include "components/button.html" with label=_("Remove the closure") type="submit" variant="danger" only %}
+  </form>
+  <p><a href="{{ list_url }}">{% translate "Keep the closure" %}</a></p>
+{% endblock %}

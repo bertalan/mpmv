@@ -47,6 +47,8 @@ VENDOR_GRANTABLE_SCOPES: Final = frozenset(
         "stock:write",
         "events:read",  # EVT.5
         "events:write",  # EVT.5
+        "closures:read",  # VEN.20
+        "closures:write",  # VEN.20
     }
 )
 

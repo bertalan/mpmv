@@ -1,0 +1,15 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+Edit one closure range (VEN.20). No inline script or style.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{{ title }}</h1>
+  {% include "components/error_summary.html" with form=form autofocus=True only %}
+  <form method="post" class="manager-form" novalidate>
+    {% csrf_token %}
+    {% for field in form.visible_fields %}{% include "components/field.html" with field=field only %}{% endfor %}
+    {% include "components/button.html" with label=_("Save the closure") type="submit" only %}
+  </form>
+  <p><a href="{{ list_url }}">{% translate "Back to the closures" %}</a></p>
+{% endblock %}

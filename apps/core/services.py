@@ -3,6 +3,8 @@ conventions), the platform operator with its allowed vendor countries (CMP.13), 
 the worker heartbeat, throttle counters, the rotation of field encryption keys and the transactional
 email outbox."""
 
+import contextlib
+import contextvars
 import datetime as dt
 import functools
 import json
@@ -10,9 +12,10 @@ import logging
 import re
 import uuid
 from collections import defaultdict
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass, field
 from typing import Any, cast
+from zoneinfo import ZoneInfo
 
 from django.apps import apps
 from django.conf import settings
@@ -20,7 +23,7 @@ from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser, Permission, PermissionsMixin
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.validators import validate_email
-from django.db import IntegrityError, connection, transaction
+from django.db import DatabaseError, IntegrityError, connection, transaction
 from django.db.models import F, Model, Q, QuerySet
 from django.template import Context, TemplateDoesNotExist
 from django.template.loader import select_template
@@ -43,6 +46,7 @@ from .models import (
     OutboxEmailEvent,
     PlatformOperator,
     Throttle,
+    configured_time_zone_name,
 )
 from .throttling import BackoffPolicy, ThrottleState, after_failure
 from .validity import NoValidRow, OverlappingValidity, next_start_error, pick_valid
@@ -126,6 +130,7 @@ OPERATOR_FIELDS = (
     "tax_regime",
     "commission_vat_mode",
     "dac7_authority_country",
+    "business_time_zone",
     "support_email",
     "compliance_email",
     "require_sales_terms",
@@ -166,6 +171,82 @@ def current_operator(at: dt.datetime | None = None) -> PlatformOperator:
         raise OverlappingPlatformOperators(str(exc)) from exc
     except NoValidRow as exc:
         raise NoPlatformOperator(str(exc)) from exc
+
+
+#: F5 (ARC.27): `business_tz()` for "now", remembered for one request (`business_tz_memo`, set
+#: by `BusinessZoneMemoMiddleware`) and forgotten when an operator row is saved. Outside a request
+#: there is no memo: jobs and commands ask every time.
+_zone_memo: contextvars.ContextVar[dict[str, ZoneInfo] | None] = contextvars.ContextVar(
+    "business_tz_memo", default=None
+)
+
+
+@contextlib.contextmanager
+def business_tz_memo() -> Iterator[None]:
+    """Remember `business_tz()` (now) until the block ends: one operator query per request."""
+    token = _zone_memo.set({})
+    try:
+        yield
+    finally:
+        _zone_memo.reset(token)
+
+
+def forget_business_tz() -> None:
+    """Drop the remembered zone (an operator row was saved)."""
+    memo = _zone_memo.get()
+    if memo is not None:
+        memo.clear()
+
+
+def business_tz(at: dt.datetime | None = None) -> ZoneInfo:
+    """ARC.27 (D-31): the business time zone, from the operator configuration valid at `at`.
+
+    The only reader of the business calendar (fiscal year, order numbering year, retention
+    dates, legal deadlines); storage stays UTC. `at` (default: now) picks the operator version
+    valid then, so a document date (an invoice, a VAT quarter, a DAC7 year) keeps the zone it
+    was issued in after a later change; a moment before the first configuration reads today's.
+    Before an operator exists (a fresh install, a migration) the configured zone stands in.
+    """
+    memo = _zone_memo.get() if at is None else None
+    if memo is not None and "now" in memo:
+        return memo["now"]
+    zone = _operator_zone(at)
+    if memo is not None:
+        memo["now"] = zone
+    return zone
+
+
+def _operator_zone(at: dt.datetime | None) -> ZoneInfo:
+    try:
+        name = current_operator(at).business_time_zone
+    except NoPlatformOperator:
+        return business_tz() if at is not None else configured_tz()
+    except (OverlappingPlatformOperators, DatabaseError):
+        return configured_tz()
+    return ZoneInfo(name)
+
+
+def configured_tz() -> ZoneInfo:
+    """The configured zone (`MPMV_BUSINESS_TIME_ZONE`, UTC when unset): `business_tz()`'s
+    fallback before an operator exists or when the database cannot be asked. An unknown name
+    raises `ImproperlyConfigured` (core.E931 reports it at start-up)."""
+    return ZoneInfo(configured_time_zone_name())
+
+
+#: ARC.27: a guard gets a business time zone name and returns why its app cannot follow that zone
+#: yet, or None. Apps register theirs in `ready()` (orders until ORD.41), so `core` imports none.
+type ZoneGuard = Callable[[str], str | None]
+_ZONE_GUARDS: list[ZoneGuard] = []
+
+
+def register_business_zone_guard(guard: ZoneGuard) -> None:
+    if guard not in _ZONE_GUARDS:
+        _ZONE_GUARDS.append(guard)
+
+
+def business_zone_refusals(name: str) -> list[str]:
+    """Why the registered apps refuse the business time zone `name` (empty: it is accepted)."""
+    return [refusal for guard in _ZONE_GUARDS if (refusal := guard(name)) is not None]
 
 
 def latest_operator() -> PlatformOperator | None:
@@ -218,6 +299,9 @@ def _add_operator_version[C: ChangeSet](
     """
     new.valid_to = None
     new.full_clean(validate_constraints=False)  # constraints are enforced by the database
+    refusals = business_zone_refusals(new.business_time_zone)
+    if refusals:
+        raise ValidationError({"business_time_zone": refusals})
     check_operator_start(new.valid_from, latest)
 
     closing = latest if latest is not None and latest.valid_to is None else None

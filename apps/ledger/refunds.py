@@ -57,7 +57,7 @@ from apps.core.changeset import ChangeSet
 from apps.core.models import PLATFORM_ERROR, PLATFORM_REFUND_CASES, AuditLog
 from apps.core.money import round_line
 from apps.core.opschecks import Alert
-from apps.core.services import audit_changes, current_operator
+from apps.core.services import audit_changes, business_tz, current_operator
 from apps.orders import amendment_engine as am
 from apps.orders import amendments as orders_amendments
 from apps.orders import services as orders_services
@@ -1360,7 +1360,7 @@ def mark_refunded_outside(
     method = declared_method.strip()
     if not method or len(method) > METHOD_MAX:
         raise RefundRefused("the refund method is required (at most 64 characters)")
-    if declared_date > timezone.localdate():
+    if declared_date > timezone.localdate(timezone=business_tz()):
         raise RefundRefused("the refund date cannot be in the future")
     if len(reason) > REASON_MAX:
         raise RefundRefused("the reason is too long")

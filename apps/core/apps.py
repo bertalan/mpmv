@@ -48,6 +48,7 @@ class CoreConfig(AppConfig):
             check_admin_network_settings,
             check_audit_policy,
             check_avif_support,
+            check_business_time_zone,
             check_client_ip_settings,
             check_email_settings,
             check_encrypted_data,
@@ -86,6 +87,7 @@ class CoreConfig(AppConfig):
         checks.register(check_email_settings)
         checks.register(check_privacy_pepper, checks.Tags.security)
         checks.register(check_avif_support)
+        checks.register(check_business_time_zone)  # ARC.27
         checks.register(check_image_upload_limits)
         checks.register(check_live_site_flags, checks.Tags.security, deploy=True)
 

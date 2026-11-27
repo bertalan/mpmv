@@ -28,7 +28,7 @@ from apps.accounts.tests.factories import UserFactory
 from apps.core import tasks
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog, PlatformOperator
-from apps.core.services import FLAG_CACHE
+from apps.core.services import FLAG_CACHE, business_tz
 from apps.core.tests.factories import PlatformOperatorFactory
 from apps.ledger import refunds, settlement
 from apps.ledger.models import LedgerEntry, Refund
@@ -723,7 +723,7 @@ def test_an_outside_refund_needs_the_date_and_the_method(stripe: FakeStripeClien
     with pytest.raises(refunds.RefundRefused):
         mark(sub, declared_method="  ")
     with pytest.raises(refunds.RefundRefused):
-        mark(sub, declared_date=timezone.localdate() + dt.timedelta(days=1))
+        mark(sub, declared_date=timezone.localdate(timezone=business_tz()) + dt.timedelta(days=1))
     with pytest.raises(TypeError):
         refunds.mark_refunded_outside(  # type: ignore[call-arg]
             sub, AMOUNT("amount", amount=D("1.00")), request_id=rid(),

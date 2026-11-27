@@ -25,7 +25,7 @@ from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
 from apps.core.countries import InvalidCountry, normalize_country
 from apps.core.models import AuditLog
-from apps.core.services import run_mutation
+from apps.core.services import business_tz, run_mutation
 
 from . import terms_engine as engine
 from .models import SalesTermsInForce, SalesTermsVersion, Vendor
@@ -124,7 +124,7 @@ def publish_sales_terms(
         version = SalesTermsVersion(
             vendor=vendor,
             number=(last or 0) + 1,
-            effective_from=timezone.localdate(),
+            effective_from=timezone.localdate(timezone=business_tz()),
             body=str(values["body"]).strip(),
             clauses=[
                 {"article": str(c["article"]).strip(), "title": str(c["title"]).strip()}

@@ -18,9 +18,7 @@ import datetime as dt
 from collections import defaultdict
 from dataclasses import dataclass, field
 from itertools import batched
-from zoneinfo import ZoneInfo
 
-from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.db.models import Q
@@ -29,6 +27,7 @@ from wagtail.models import Page, Revision, TaskState, WorkflowState
 
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
+from apps.core.services import business_tz
 
 from . import retention_engine as engine
 from .retention_engine import RevisionInfo
@@ -139,7 +138,7 @@ def purge_page_revisions(
     if timezone.is_naive(now):
         raise ValueError("now must be timezone-aware")
     # Months are counted on the business calendar, not UTC's.
-    now = now.astimezone(ZoneInfo(settings.BUSINESS_TIME_ZONE))
+    now = now.astimezone(business_tz())
     cutoff = engine.months_back(now, engine.KEEP_MONTHS)
     result = PurgeResult()
     for chunk in batched(_page_ids_with_old_revisions(cutoff), batch_size, strict=False):

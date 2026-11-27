@@ -1,0 +1,45 @@
+{% extends "manager/layout.html" %}
+{% load i18n dispatch %}
+{% comment %}
+Holidays and closures (VEN.20): the shop's closed ranges, the notice buyers see now, and the form
+to add a range. A change takes effect at once and needs no review. No inline script or style.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{% translate "Holidays and closures" %}</h1>
+  {% if shop_name %}<p class="manager-lead"><strong>{{ shop_name }}</strong> · <a href="{{ picker_url }}">{% translate "Choose another shop" %}</a></p>{% endif %}
+  <p class="manager-lead">{% translate "Buyers can still order while the shop is closed. They are told the dates and when the package will leave. The notice has fixed wording and shows only these dates." %}</p>
+  <h2>{% translate "What buyers see now" %}</h2>
+  {% closure_notice vendor_id %}
+  <p class="helptext">{% translate "The notice appears the chosen number of days before a closure and stays until it ends. If you see nothing above, no notice is shown today." %}</p>
+  <h2>{% translate "Current and upcoming closures" %}</h2>
+  {% if current %}
+    <ul class="manager-list">
+      {% for closure, edit_url, remove_url in current %}
+        <li>
+          {% blocktranslate with start=closure.start_date|date:"DATE_FORMAT" end=closure.end_date|date:"DATE_FORMAT" days=closure.notice_days %}From {{ start }} to {{ end }}, notice {{ days }} days before.{% endblocktranslate %}
+          {% if closure.repeats_yearly %}{% translate "Every year." %}{% endif %}
+          <a href="{{ edit_url }}">{% translate "Edit" %}</a>
+          <a href="{{ remove_url }}">{% translate "Remove" %}</a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>{% translate "No closure is planned." %}</p>
+  {% endif %}
+  <h2>{% translate "Add a closure" %}</h2>
+  {% include "components/error_summary.html" with form=form autofocus=True only %}
+  <form method="post" action="{{ form_action }}" class="manager-form" novalidate>
+    {% csrf_token %}
+    {% for field in form.visible_fields %}{% include "components/field.html" with field=field only %}{% endfor %}
+    {% include "components/button.html" with label=_("Save the closure") type="submit" only %}
+  </form>
+  {% if history %}
+    <h2>{% translate "Past closures" %}</h2>
+    <p class="helptext">{% translate "A closure that has ended stays here as history and cannot be changed." %}</p>
+    <ul class="manager-list">
+      {% for closure in history %}
+        <li>{% blocktranslate with start=closure.start_date|date:"DATE_FORMAT" end=closure.end_date|date:"DATE_FORMAT" %}From {{ start }} to {{ end }}.{% endblocktranslate %}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+{% endblock %}

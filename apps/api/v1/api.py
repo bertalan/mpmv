@@ -15,6 +15,7 @@ from ninja import NinjaAPI
 from ninja.openapi.docs import Swagger
 
 from .catalog import router as catalog_router
+from .closures import router as closures_router
 from .endpoints import router as v1_router
 from .errors import install_problem_handlers
 from .events import router as events_router
@@ -64,3 +65,4 @@ api = create_api()
 api.add_router("", v1_router)
 api.add_router("/catalog", catalog_router)
 api.add_router("/events", events_router)
+api.add_router("/vendors", closures_router)
