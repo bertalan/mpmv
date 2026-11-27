@@ -6,7 +6,7 @@ from django.db.models.signals import post_init, post_save
 from django.dispatch import receiver
 
 from . import images
-from .models import MediaImage
+from .models import MediaImage, PlatformOperator
 from .tasks import enqueue, render_image
 
 _MISSING = object()
@@ -49,3 +49,11 @@ def queue_renditions(
             group=group,
             queueing_lock=f"core.render_image:{instance.pk}:{group}",
         )
+
+
+@receiver(post_save, sender=PlatformOperator, dispatch_uid="core_operator_forget_zone")
+def forget_operator_zone(sender: Any, **kwargs: Any) -> None:
+    """ARC.27: a saved operator row may change the business time zone the request remembered."""
+    from .services import forget_business_tz
+
+    forget_business_tz()

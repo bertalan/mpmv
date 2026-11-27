@@ -17,7 +17,6 @@ from dataclasses import replace
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from django.conf import settings
 from django.core.paginator import Paginator
 from django.db.models import QuerySet
 from django.http import Http404, HttpRequest, HttpResponse
@@ -30,6 +29,7 @@ from django_stubs_ext import StrOrPromise
 from apps.accounts.decorators import requires_level_method
 from apps.core.audit import audit_context
 from apps.core.models import AuditLog
+from apps.core.services import business_tz as operator_tz
 from apps.ledger import engine
 from apps.ledger.models import LedgerEntry
 from apps.ledger.services import (
@@ -82,7 +82,7 @@ def kind_label(kind: str) -> str:
 def business_tz() -> ZoneInfo:
     """The zone of the vendor's calendar days: periods, "this month" and the dates shown and
     exported are cut there, not in the server's UTC (like `termination_views._effective_at`)."""
-    return ZoneInfo(settings.BUSINESS_TIME_ZONE)
+    return operator_tz()
 
 
 class Filters:

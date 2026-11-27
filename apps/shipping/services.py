@@ -8,6 +8,7 @@ editor): it is validated, returned as a ChangeSet (dry-run) and written to the a
 before and after (spec 01 conventions, docs/dev/audit-trail.md).
 """
 
+import datetime as dt
 from collections.abc import Iterable
 from typing import Any
 
@@ -19,11 +20,14 @@ from apps.core.changeset import ChangeSet
 from apps.core.models import TranslationStatus
 from apps.core.services import run_mutation, save_audited
 from apps.core.translations import source_language
-from apps.vendors.models import Vendor
+from apps.vendors.models import Vendor, VendorClosure
 
 from .engine import (
     AreaTreatment,
     BandSnap,
+    ClosedPeriod,
+    ClosureNotice,
+    ClosureRule,
     Destination,
     MethodSnap,
     PickupSnap,
@@ -33,6 +37,8 @@ from .engine import (
     SpecialAreaSnap,
     VendorPackage,
     ZoneSnap,
+    closure_notice_for,
+    expand_closures,
 )
 from .engine import quote_shipping as engine_quote_shipping
 from .engine import special_area_treatment as resolve_area_treatment
@@ -359,3 +365,50 @@ def methods_missing_return_estimate(vendor: Vendor, *, estimate: str) -> list[Sh
         .select_related("zone")
         .order_by("zone__code", "key")
     )
+
+
+# --- Vendor closures (VEN.20): the schedule the vendors app stores, as shipping reads it ---------
+
+
+def _closure_rows(vendor_ids: Iterable[int]) -> dict[int, list[VendorClosure]]:
+    rows: dict[int, list[VendorClosure]] = {vendor_id: [] for vendor_id in vendor_ids}
+    for closure in VendorClosure.objects.filter(vendor_id__in=list(rows)):
+        rows[closure.vendor_id].append(closure)
+    return rows
+
+
+def vendor_closed_periods(
+    vendor_ids: Iterable[int], start: dt.date, end: dt.date
+) -> dict[int, tuple[ClosedPeriod, ...]]:
+    """The closed periods of each vendor that touch `start` to `end`, whole and sorted (a vendor
+    with no closure maps to an empty tuple). One query, whatever the number of vendors."""
+    return {
+        vendor_id: expand_closures(
+            [ClosureRule(c.start_date, c.end_date, c.repeats_yearly) for c in closures],
+            start,
+            end,
+        )
+        for vendor_id, closures in _closure_rows(vendor_ids).items()
+    }
+
+
+def closure_notices(vendor_ids: Iterable[int], today: dt.date) -> dict[int, ClosureNotice | None]:
+    """The neutral notice of each vendor on `today` (None for none), in one query whatever the
+    number of vendors. `today` is the date in the business time zone
+    (`apps.vendors.services.business_today()`): storefront, product page, cart and checkout must
+    all pass the same one."""
+    return {
+        vendor_id: closure_notice_for(
+            [
+                (ClosureRule(c.start_date, c.end_date, c.repeats_yearly), c.notice_days)
+                for c in closures
+            ],
+            today,
+        )
+        for vendor_id, closures in _closure_rows(vendor_ids).items()
+    }
+
+
+def closure_notice(vendor_id: int, today: dt.date) -> ClosureNotice | None:
+    """The neutral notice of one vendor on `today`, or None (see `closure_notices`)."""
+    return closure_notices([vendor_id], today)[vendor_id]

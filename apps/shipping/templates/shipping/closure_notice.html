@@ -1,0 +1,4 @@
+{% load i18n %}{% if notice %}<section class="closure-notice" role="region" aria-labelledby="{{ heading_id }}">
+  <h2 id="{{ heading_id }}" class="closure-notice__heading">{% translate "Shop closure" %}</h2>
+  <p class="closure-notice__text">{% if one_day %}{% blocktranslate with day=start dispatch=dispatch %}This shop is closed on {{ day }}. Orders placed now will be dispatched from {{ dispatch }}.{% endblocktranslate %}{% else %}{% blocktranslate with start=start end=end dispatch=dispatch %}This shop is closed from {{ start }} to {{ end }}. Orders placed now will be dispatched from {{ dispatch }}.{% endblocktranslate %}{% endif %}</p>
+</section>{% endif %}
