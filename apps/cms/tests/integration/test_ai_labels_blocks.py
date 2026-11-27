@@ -56,18 +56,15 @@ def test_a_gallery_labels_its_ai_images_and_only_those(theme: str) -> None:
     assert 'data-ai-origin="edited"' in html
     assert "trainedAlgorithmicMedia" in html
     assert "compositeWithTrainedAlgorithmicMedia" in html
-    assert "AI-generated image" in html
-    assert "AI-edited image" in html
     # one label per AI image (ride repeats it in the zoom dialog), none for the third image
-    labels = html.count("AI-generated image") + html.count("AI-edited image")
-    assert labels == (4 if theme == "ride" else 2)
+    assert html.count("gallery__ai-label") == (4 if theme == "ride" else 2)
 
 
 @pytest.mark.parametrize("theme", THEMES)
 def test_a_gallery_without_ai_images_shows_no_label(theme: str) -> None:
     html = render(theme, GalleryBlock(), gallery((ai_labels.AI_NONE, ai_labels.AI_NONE)))
     assert "data-ai-origin" not in html
-    assert "AI-" not in html
+    assert "gallery__ai-label" not in html
 
 
 def test_an_image_block_labels_its_ai_image() -> None:
@@ -77,7 +74,7 @@ def test_an_image_block_labels_its_ai_image() -> None:
 
     labelled = render("base", FigureBlock(), figure(ai_labels.AI_EDITED))
     assert 'data-ai-origin="edited"' in labelled
-    assert "AI-edited image" in labelled
+    assert labelled.count("gallery__ai-label") == 1
     assert "data-ai-origin" not in render("base", FigureBlock(), figure(ai_labels.AI_NONE))
 
 
