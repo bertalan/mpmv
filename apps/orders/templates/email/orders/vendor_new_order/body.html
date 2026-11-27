@@ -6,6 +6,7 @@
 {% endif %}<ul>
 {% for line in lines %}<li>{{ line.title }}{% if line.variant %} ({{ line.variant }}){% endif %} x {{ line.quantity }}: {{ line.total }} EUR</li>
 {% endfor %}</ul>
-<p>{% translate "Ship to:" %}<br>{% for part in ship_to %}{{ part }}<br>{% endfor %}</p>
+{% if dispatch_on %}<p>{% blocktranslate %}Your shop is closed: the buyer was told that the package will be dispatched from {{ dispatch_on }}.{% endblocktranslate %}</p>
+{% endif %}<p>{% translate "Ship to:" %}<br>{% for part in ship_to %}{{ part }}<br>{% endfor %}</p>
 </body>
 </html>

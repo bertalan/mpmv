@@ -18,8 +18,10 @@ SPLIT_SHIPPING = "0021_ord29_split_shipping_vat"
 BEFORE_SPLIT = "0020_ord20_order_events"
 # The leaf this test was last checked against: ORD.32 (0022) only adds the staff draft tables,
 # which `create_order` never writes, so creating an order at 0020 still works. 0023 only changes
-# the state labels (I18N.10 follow-up): no column.
-CHECKED_LEAF = "0023_alter_order_state_alter_orderamendment_state"
+# the state labels (I18N.10 follow-up): no column. 0024 (VEN.20) adds a nullable date that the
+# current model writes, so the test lends the 0020 table that column while it creates the order.
+CHECKED_LEAF = "0024_ven20_expected_dispatch_on"
+LATER_COLUMN = "expected_dispatch_on"
 TOTALS = (
     "SELECT goods_net, shipping_net, tax_total, gross_total, shipping_tax_rate,"
     " shipping_tax_amount, shipping_tax_reason FROM orders_vendororder ORDER BY id"
@@ -67,6 +69,15 @@ def test_migrating_back_to_0003_leaves_working_guards_and_forward_again_works() 
         migrate(latest)
 
 
+def _later_column(*, add: bool) -> None:
+    """Add (or drop again) the column a later migration brings, on the older schema."""
+    with connection.cursor() as cursor:
+        if add:
+            cursor.execute(f"ALTER TABLE orders_vendororder ADD COLUMN {LATER_COLUMN} date NULL")
+        else:
+            cursor.execute(f"ALTER TABLE orders_vendororder DROP COLUMN IF EXISTS {LATER_COLUMN}")
+
+
 def _totals() -> list[tuple[object, ...]]:
     with connection.cursor() as cursor:
         cursor.execute(TOTALS)
@@ -91,6 +102,7 @@ def test_the_split_shipping_migration_keeps_an_existing_order_exactly() -> None:
     )
     try:
         migrate(BEFORE_SPLIT)
+        _later_column(add=True)
         order, _ = services.create_order(
             email="buyer@example.com",
             language="en",
@@ -111,6 +123,7 @@ def test_the_split_shipping_migration_keeps_an_existing_order_exactly() -> None:
             ctx=AuditContext(actor_label="system:test", source=AuditLog.Source.SYSTEM),
         )
         assert order is not None
+        _later_column(add=False)
         before = _totals()
         migrate(SPLIT_SHIPPING)
         after = _totals()
@@ -127,4 +140,5 @@ def test_the_split_shipping_migration_keeps_an_existing_order_exactly() -> None:
         ]
         assert after == before, f"the migration changed an existing order: {before} -> {after}"
     finally:
+        _later_column(add=False)
         migrate(latest)

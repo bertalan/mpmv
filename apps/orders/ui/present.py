@@ -9,13 +9,14 @@ delivery address, or before the address at the estimated country's rate (`apps.t
 business buyer who opted in to net prices sees them without VAT.
 """
 
+import datetime as dt
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any
 
 from django.http import HttpRequest
-from django.utils.formats import number_format
+from django.utils.formats import date_format, number_format
 from django.utils.translation import get_language, gettext_lazy
 from django.utils.translation import gettext as _
 
@@ -26,7 +27,7 @@ from apps.core.money import CURRENCY, round_line
 from apps.orders import engine
 from apps.orders.services import CheckoutPreview
 from apps.shipping import services as shipping_services
-from apps.shipping.engine import ClosureNotice
+from apps.shipping.engine import ClosureNotice, delivery_window
 from apps.tax import engine as tax_engine
 from apps.tax import prices as tax_prices
 from apps.vendors.models import Vendor
@@ -130,10 +131,20 @@ def thumbnail_alt(name: str, alt: str) -> str:
     return alt
 
 
-def _delivery(min_days: int | None, max_days: int | None) -> str:
+def _delivery(
+    min_days: int | None, max_days: int | None, dispatch_on: dt.date | None = None
+) -> str:
+    """The method's delivery time; after a closure (`dispatch_on`, VEN.20) the dates it gives,
+    counted from the day the package leaves."""
     if min_days is None and max_days is None:
         return ""
     low, high = min_days or max_days or 0, max_days or min_days or 0
+    if dispatch_on is not None:
+        window = delivery_window(dispatch_on, low, high)
+        first, last = (date_format(day, "DATE_FORMAT") for day in window)
+        if first == last:
+            return _("estimated delivery on %(day)s") % {"day": first}
+        return _("estimated delivery from %(first)s to %(last)s") % {"first": first, "last": last}
     if low == high:
         return _("%(days)s working days") % {"days": low}
     return _("%(low)s to %(high)s working days") % {"low": low, "high": high}
@@ -221,8 +232,9 @@ def package_views(
         [(product, variant) for product, variant in lines], language
     )
     # One query for every vendor of the cart (the closure notice of each package).
+    today = business_today()
     notices = shipping_services.closure_notices(
-        {package.vendor_id for package in preview.packages}, business_today()
+        {package.vendor_id for package in preview.packages}, today
     )
     out: list[PackageView] = []
     for index, package in enumerate(preview.packages, start=1):
@@ -283,12 +295,14 @@ def package_views(
                 )
             )
         net_view = tax_prices.business_net_view(request)
+        dispatch_on = package.dispatch_on
+        shifted = dispatch_on if dispatch_on is not None and dispatch_on > today else None
         view.options = [
             OptionView(
                 key=option.key,
                 label=option.label,
                 price=option_price(option, net_view=net_view),
-                delivery=_delivery(option.min_days, option.max_days),
+                delivery=_delivery(option.min_days, option.max_days, shifted),
                 checked=option.key == package.selected_shipping,
             )
             for option in package.shipping_options

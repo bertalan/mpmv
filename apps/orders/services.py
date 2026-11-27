@@ -104,6 +104,7 @@ class VendorOrderInput:
     shipping_choice: dict[str, Any] = field(default_factory=dict)
     commission_snapshot: dict[str, Any] = field(default_factory=dict)
     tax_profile_snapshot: dict[str, Any] = field(default_factory=dict)
+    expected_dispatch_on: dt.date | None = None  # VEN.20
 
 
 logger = logging.getLogger(__name__)
@@ -287,6 +288,7 @@ def _build_vendor_order(
         shipping_choice=item.shipping_choice,
         commission_snapshot=_frozen_commission(item.commission_snapshot),
         tax_profile_snapshot=item.tax_profile_snapshot,
+        expected_dispatch_on=item.expected_dispatch_on,
     )
     lines = [
         OrderLine(
@@ -933,6 +935,7 @@ class PlaceVendor:
     commission_snapshot: dict[str, Any] = field(default_factory=dict)
     tax_profile_snapshot: dict[str, Any] = field(default_factory=dict)
     shipping_portions: Sequence[ShippingPortion] = ()
+    expected_dispatch_on: dt.date | None = None  # VEN.20, from the checkout
 
     def __post_init__(self) -> None:
         if self.shipping_net > 0 and self.shipping_tax is None and not self.shipping_portions:
@@ -1174,6 +1177,7 @@ def place_order(
                 **_shipping_tax_fields(item),
                 commission_snapshot=item.commission_snapshot,
                 tax_profile_snapshot=item.tax_profile_snapshot,
+                expected_dispatch_on=item.expected_dispatch_on,
             )
             for item in preview.vendors
         ]

@@ -11,6 +11,7 @@ Tax and shipping never import orders; this module is the one place that joins th
 
 import datetime as dt
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from decimal import Decimal
 from typing import Any
 
@@ -27,7 +28,7 @@ from apps.core.countries import InvalidCountry
 from apps.core.money import round_line
 from apps.core.services import flag_enabled
 from apps.shipping import engine as shipping_engine
-from apps.shipping.services import quote_shipping
+from apps.shipping.services import quote_shipping, vendor_closed_periods
 from apps.tax import engine as tax_engine
 from apps.tax import prices as tax_prices
 from apps.tax import services as tax_services
@@ -39,6 +40,8 @@ from . import engine
 from .services import CheckoutPreview, PlaceLine, PlaceVendor, _held
 
 _ZERO = Decimal("0.00")
+# VEN.20: how far ahead the checkout reads the vendors' closures for the dispatch date.
+DISPATCH_LOOKAHEAD_DAYS = 180
 
 
 def _title(product: Product, language: str) -> str:
@@ -228,6 +231,13 @@ def build_checkout(
             if not cart_services.has_price(line.item.product, line.item.variant, prices)
         }
 
+    # VEN.20: one read of the closures of every vendor in the cart; "today" is the business day.
+    today = vendors_services.business_today(now)
+    closed = vendor_closed_periods(
+        {package.vendor_id for package in cart_packages},
+        today,
+        today + dt.timedelta(days=DISPATCH_LOOKAHEAD_DAYS),
+    )
     summaries: list[engine.PackageSummary] = []
     ready: list[PlaceVendor] = []
     customer_ctx: tax_engine.TaxContext | None = None
@@ -261,10 +271,13 @@ def build_checkout(
         if refused is not None:
             summary = _blocked(summary, refused)
             place = None
+        # A closed vendor still takes the order; the package leaves after the closure.
+        dispatch_on = shipping_engine.earliest_dispatch_date(today, closed.get(vendor.pk, ()))
+        summary = replace(summary, dispatch_on=dispatch_on)
         summaries.append(summary)
         blocks.extend(summary.blocks)
         if place is not None:
-            ready.append(place)
+            ready.append(replace(place, expected_dispatch_on=dispatch_on))
             customer_ctx = customer_ctx or ctx
     totals = (
         engine.add_totals(

@@ -1,5 +1,5 @@
-"""VEN.20 slice 2: the closure notice of each cart package costs one query for the whole cart and
-has its own heading id."""
+"""VEN.20 slice 2: the closure notice of each cart package costs the same queries for the whole
+cart, whatever its number of vendors, and has its own heading id."""
 
 import datetime as dt
 import re
@@ -44,7 +44,8 @@ def test_the_closure_query_count_is_the_same_for_one_and_for_three_vendors(
     add(cart, _closed_vendor("Beta Shop"), "20.00", "Red cup")
     add(cart, _closed_vendor("Gamma Shop"), "10.00", "Green jug")
     three, html = _closure_queries(client)
-    assert one == three == 1
+    # One read for the notices and one for the checkout's dispatch dates (VEN.20 slice 3a).
+    assert one == three == 2
     assert html.count("closure-notice__text") == 3
 
 
