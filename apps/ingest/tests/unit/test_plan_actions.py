@@ -4,6 +4,8 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
+import pytest
+
 from apps.ingest import engine as e
 
 NOW = datetime(2026, 11, 27, 12, 0, tzinfo=UTC)
@@ -136,3 +138,25 @@ def test_plan_keeps_order_one_action_per_observation() -> None:
     obs = [sobs(ref=3), sobs(ref=1, product_id=None), sobs(ref=2, observed_at=OLD)]
     plan = e.plan_stock_actions(obs, {1: e.StockProduct(1, 0)}, now=NOW, max_age=MAX_AGE)
     assert [a.ref for a in plan] == [3, 1, 2]
+
+
+def _jump(old: str, new: str) -> e.PriceAction:
+    """Net prices compared as given: rate 0, so gross equals net."""
+    products = {1: e.PriceProduct(1, Decimal(old))}
+    return e.plan_price_actions(
+        [pobs(new)], products, now=NOW, max_age=MAX_AGE, vat_rate=Decimal("0")
+    )[0]
+
+
+def test_the_limit_is_compared_on_the_exact_ratio() -> None:
+    assert _jump("10000.00", "11500.00").kind == e.SET_PRICE  # exactly 15
+    assert _jump("10000.00", "11499.90").kind == e.SET_PRICE  # 14.999
+    over = _jump("10000.00", "11500.40")  # 15.004: rounds to 15.00, still above 15
+    assert (over.kind, over.review_kind) == (e.REVIEW, "price_jump")
+    assert over.change_pct == Decimal("15.00")  # display only
+
+
+def test_a_negative_or_non_finite_vat_rate_is_refused() -> None:
+    for bad in (Decimal("-0.5"), Decimal("NaN")):
+        with pytest.raises(ValueError, match="VAT rate"):
+            e.net_from_gross(Decimal("1.00"), vat_rate=bad)

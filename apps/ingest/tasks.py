@@ -25,22 +25,27 @@ def _run_all(kind: str) -> int:
     return count
 
 
-@periodic("10 7 * * *")
+@periodic("30 8 * * *")
 @locked()
 @task("ingest.stock_sync", retry=NO_RETRY)
 def stock_sync(timestamp: int) -> None:
     """Every morning, after the scrape: apply each active source's supplier stock (ING.8).
+
+    Spec 08 puts the scrape at about 06:20 UTC and this sync at 07:30 UTC. The schedule is read in
+    Rome time, so 08:30 is 07:30 UTC in winter and 06:30 UTC in summer: after the scrape either way.
+    There is no `ingest.scrape` job yet; when it exists this should follow its completion.
 
     A source writes only with its per-source write flag, otherwise the run is a dry run. A 404
     sets stock to 0, stale data opens a review item and is never applied."""
     logger.info("ingest.stock_sync ran %d source(s)", _run_all(ImportRun.Kind.STOCK))
 
 
-@periodic("40 7 * * *")
+@periodic("0 9 * * *")
 @locked()
 @task("ingest.price_sync", retry=NO_RETRY)
 def price_sync(timestamp: int) -> None:
-    """Every morning: apply each active source's supplier prices as net prices (ING.8).
+    """Every morning, half an hour after the stock sync: apply each active source's supplier prices
+    as net prices (ING.8).
 
     A change above 15 percent, a sale and stale data open a review item and write nothing; a
     source writes only with its per-source write flag, otherwise the run is a dry run."""

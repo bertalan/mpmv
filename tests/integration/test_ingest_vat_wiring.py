@@ -22,3 +22,11 @@ def test_the_resolver_returns_the_engine_rate_as_a_fraction() -> None:
 
 def test_the_stale_age_is_a_named_provisional_setting() -> None:
     assert sync.stale_max_age() == dt.timedelta(hours=settings.INGEST_STALE_MAX_AGE_HOURS)
+
+
+def test_without_an_operator_or_rate_the_resolver_fails_closed() -> None:
+    from apps.tax.prices import PriceUnavailable
+
+    product = ProductFactory.create()
+    with pytest.raises(PriceUnavailable):
+        sync.vat_rate_resolver()(product, timezone.now())
