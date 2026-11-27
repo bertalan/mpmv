@@ -303,9 +303,7 @@ SKIP: Final = "skip"
 REVIEW: Final = "review"
 
 MISSING_STATUSES: Final = frozenset({404})
-DEFAULT_MAX_AGE: Final = timedelta(hours=48)
 DEFAULT_MAX_CHANGE_PCT: Final = Decimal("15")
-DEFAULT_VAT_RATE: Final = Decimal("0.22")
 _CENT: Final = Decimal("0.01")
 
 
@@ -350,7 +348,7 @@ def plan_stock_actions(
     products: Mapping[int, StockProduct],
     *,
     now: datetime,
-    max_age: timedelta = DEFAULT_MAX_AGE,
+    max_age: timedelta,
 ) -> list[StockAction]:
     """One action per observation, in order. The supplier is authoritative for stock (exact
     quantity); a stale observation is flagged for review and never applied; a 404 sets stock to 0;
@@ -416,8 +414,11 @@ class PriceAction:
     review_kind: str | None = None
 
 
-def net_from_gross(gross: Decimal, vat_rate: Decimal = DEFAULT_VAT_RATE) -> Decimal:
-    """Net price = gross / (1 + VAT rate), rounded half up to the cent."""
+def net_from_gross(gross: Decimal, *, vat_rate: Decimal) -> Decimal:
+    """Net price = gross / (1 + VAT rate), rounded half up to the cent.
+
+    The rate is never a literal here: the caller (the service) derives it from `apps.tax` for the
+    product's tax category and the vendor's tax position at the observation time."""
     return (gross / (1 + vat_rate)).quantize(_CENT, rounding=ROUND_HALF_UP)
 
 
@@ -435,13 +436,15 @@ def plan_price_actions(
     products: Mapping[int, PriceProduct],
     *,
     now: datetime,
+    max_age: timedelta,
+    vat_rate: Decimal,
     max_change_pct: Decimal = DEFAULT_MAX_CHANGE_PCT,
-    max_age: timedelta = DEFAULT_MAX_AGE,
-    vat_rate: Decimal = DEFAULT_VAT_RATE,
 ) -> list[PriceAction]:
     """One action per observation. Stale data is flagged, never applied; a product on sale goes to
     review (its regular price is not written); a change strictly above `max_change_pct` percent goes
-    to review as a price jump; anything else is applied as a net price (gross / (1 + VAT))."""
+    to review as a price jump; anything else is applied as a net price (gross / (1 + VAT)).
+    `vat_rate` and `max_age` are required: the caller derives the rate from `apps.tax` (product
+    tax category, vendor tax position at the observation time)."""
     plan: list[PriceAction] = []
     for obs in observations:
         product = products.get(obs.product_id) if obs.product_id is not None else None
@@ -453,7 +456,7 @@ def plan_price_actions(
         elif not (isinstance(obs.price_gross, Decimal) and _usable_price(obs.price_gross)):
             plan.append(PriceAction(obs.ref, pid, SKIP, "invalid_price"))
         else:
-            new = net_from_gross(obs.price_gross, vat_rate)
+            new = net_from_gross(obs.price_gross, vat_rate=vat_rate)
             old = product.price_net
             if obs.sale_price_gross is not None:
                 plan.append(PriceAction(obs.ref, pid, REVIEW, "sale", new, old, None, "sale"))
