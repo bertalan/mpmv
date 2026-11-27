@@ -483,7 +483,6 @@ EXCLUDED = {
     "apps/cms/templates/wagtail_localize/": "wagtail-localize overrides, its own catalog",
     "apps/core/templates/admin/": "Django admin filter widget, Django translates it",
     "apps/vendors/templates/admin/": "Django delete confirmation copy, Django translates it",
-    "apps/themes/templates/themes/admin/": "editor-only palette builder, I18N.20 part 3b",
     "themes/base/templates/styleguide.html": "developer style guide, not shown to customers",
     "themes/ride/templates/styleguide": "developer style guide, not shown to customers",
 }
@@ -732,3 +731,10 @@ def test_the_notice_verification_error_is_formal_and_the_withdrawal_one_is_not(l
     assert set(by_ctx) == {None, "formal"}
     if lang != "fr":  # the French source text was already formal (Veuillez)
         assert by_ctx["formal"] != by_ctx[None]
+
+
+def test_the_palette_builder_template_is_in_the_catalog_scope() -> None:
+    # I18N.20 3b: the editor-only palette builder is no longer excluded; its msgids are catalogued.
+    path = "apps/themes/templates/themes/admin/palette_builder.html"
+    assert ROOT / path in set(catalog._files())
+    assert not any(path.startswith(prefix) for prefix in EXCLUDED)

@@ -173,6 +173,7 @@ SCOPES = (
     # see in the brand merge, the image lists, the render monitor, the events moderation screens,
     # the ride Manager login and the error page. Formal register.
     "apps/catalog/templates/admin",
+    "apps/themes/templates/themes/admin",  # the editor-only palette builder (I18N.20 3b)
     "apps/catalog/templates/catalog/admin",
     "apps/cms/templates/cms/admin/image_review.html",
     "apps/cms/templates/cms/admin/content_snippet_confirm_delete.html",
