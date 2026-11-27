@@ -67,3 +67,6 @@ TEMPLATES[0]["DIRS"] = [*TEMPLATES[0]["DIRS"], BASE_DIR / "apps" / "core" / "tes
 # Site (`http://localhost`), so canonical, hreflang and sitemap expectations stay on one root.
 SITE_BASE_URL = "http://localhost"
 WAGTAILADMIN_BASE_URL = SITE_BASE_URL
+
+# The API documentation is open locally (CORE.29).
+API_DOCS_PUBLIC = True

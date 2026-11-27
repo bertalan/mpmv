@@ -73,3 +73,22 @@ def test_a_refused_key_on_the_docs_counts_against_the_ip_limit(client: Client) -
     """Guessing keys at the docs URL is as costly as guessing them at the API (CORE.20)."""
     client.get(DOCS, headers=_bearer("mpmv_bad_key"))
     assert ApiRefusedKey.objects.exists()
+
+
+@override_settings(**LIVE)
+def test_live_does_not_serve_staff_without_a_second_factor(client: Client) -> None:
+    client.force_login(UserFactory.create(staff=True))
+    assert client.get(DOCS).status_code != 200
+
+
+@pytest.mark.parametrize("url", [DOCS, SCHEMA])
+@override_settings(**LIVE)
+def test_live_answers_404_to_every_method_without_credentials(client: Client, url: str) -> None:
+    assert client.head(url).status_code == 404
+    assert client.options(url).status_code == 404
+    assert client.post(url).status_code == 404
+
+
+@override_settings(**LIVE)
+def test_live_answers_404_to_the_docs_with_a_slash(client: Client) -> None:
+    assert client.get(DOCS + "/").status_code == 404
