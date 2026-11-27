@@ -134,3 +134,25 @@ def test_the_switch_target_of_an_untranslated_page_is_canonical_to_the_primary_p
     assert fallback_notice(primary_language(), lang) in body
     assert re.search(r'<link rel="canonical" href="[^"]*' + re.escape(primary_url), body)
     assert f'hreflang="{lang}"' not in body
+
+
+def test_a_switch_to_a_path_with_a_redirect_rule_lands_on_the_rule_target(
+    client: Client, seeded: Any
+) -> None:
+    """A CAT.6 rule wins over the fallback (I18N.21): the switch to the fallback URL follows the
+    rule's redirect to its target, not a loop and not the fallback copy."""
+    from apps.catalog.tests.factories import RedirectFactory
+
+    home = Site.objects.get(is_default_site=True).root_page
+    StandardPageFactory.create(title="Only in English", slug="only-in-english", parent=home)
+    lang = other_language()
+    target, _flash = switch_targets(client.get("/only-in-english/").content.decode())[lang]
+    RedirectFactory.create(source_path=target, target_path="/elsewhere/")
+    response = client.post(
+        reverse("switch_language"),
+        {"language": lang, "next": target, "exact": "1", "notice": "0"},
+    )
+    assert response["Location"] == target
+    followed = client.get(target)
+    assert followed.status_code == 301
+    assert followed["Location"].endswith("/elsewhere/")
