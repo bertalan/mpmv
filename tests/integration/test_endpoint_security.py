@@ -34,7 +34,7 @@ guard fails when it gets routes, so they join this sweep.
 import re
 import secrets
 import uuid
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -507,7 +507,7 @@ def empty_parameter_sets(
     vendor_scoped: list[Endpoint],
     confined: list[Endpoint],
     owner_only: list[Endpoint],
-    roles: list[VendorMemberRole],
+    roles: Sequence[VendorMemberRole],
 ) -> list[str]:
     """The role tests that pytest would skip silently although VendorScoped endpoints exist."""
     if not vendor_scoped:
