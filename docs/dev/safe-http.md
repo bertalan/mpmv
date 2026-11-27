@@ -21,6 +21,11 @@ What the guard does:
   6to4 wrapper of one of those.
 - Connects to the vetted IP (no second lookup); the name is kept for SNI, certificate and `Host`.
 - Refuses redirects by default. With `max_redirects=n` every hop repeats all the checks.
+- Tries each vetted address in turn when a connection fails; all of them were vetted.
+- Enforces a total `deadline` (default 30 s) over connect, headers and body, checked while
+  streaming, besides the per-step `timeout`; a trickling server cannot hold a worker.
+- On a redirect to another origin it drops the caller's credential headers (only Accept,
+  Accept-Language and User-Agent survive).
 - Reads the body in chunks and raises `ResponseTooLarge` past `max_bytes`.
 - Raises typed errors (`SafeHttpError` subclasses); messages never carry the query or credentials.
 

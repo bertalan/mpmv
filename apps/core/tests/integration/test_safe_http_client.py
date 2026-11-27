@@ -1,10 +1,12 @@
 """MIG.12: `safe_get` end to end with a fake resolver and a fake transport (no real network)."""
 
+import http.client
 import socket
 from collections.abc import Callable, Iterator, Mapping, Sequence
 
 import pytest
 
+from apps.core import safe_http
 from apps.core.safe_http import (
     BlockedAddress,
     RawResponse,
@@ -280,3 +282,126 @@ def test_the_default_transport_pins_the_connection_to_the_vetted_ip(
             resolver=resolver_for({"feed.example": [PUBLIC]}),
         )
     assert dialled == [(PUBLIC, 443)]
+
+
+class Clock:
+    def __init__(self) -> None:
+        self.now = 0.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
+def test_a_trickling_body_hits_the_overall_deadline() -> None:
+    clock = Clock()
+
+    class Trickle(FakeTransport):
+        def get(self, *args: object) -> RawResponse:
+            def slow() -> Iterator[bytes]:
+                while True:
+                    clock.now += 4.0  # a byte every few seconds
+                    yield b"x"
+
+            return RawResponse(200, {}, slow)
+
+    with pytest.raises(safe_http.DeadlineExceeded):
+        safe_get(
+            "https://feed.example/",
+            max_bytes=10_000,
+            deadline=10.0,
+            clock=clock,
+            resolver=resolver_for({"feed.example": [PUBLIC]}),
+            transport=Trickle([]),
+        )
+
+
+def test_mid_body_read_errors_are_typed() -> None:
+    class Cut(FakeTransport):
+        def get(self, *args: object) -> RawResponse:
+            def broken() -> Iterator[bytes]:
+                yield b"a"
+                raise http.client.IncompleteRead(b"a")
+
+            return RawResponse(200, {}, broken)
+
+    with pytest.raises(TransportFailure):
+        safe_get(
+            "https://feed.example/",
+            max_bytes=100,
+            resolver=resolver_for({"feed.example": [PUBLIC]}),
+            transport=Cut([]),
+        )
+    with pytest.raises(TransportFailure):
+        safe_get(
+            "https://feed.example/",
+            max_bytes=100,
+            resolver=resolver_for({"feed.example": [PUBLIC]}),
+            transport=Cut2([]),
+        )
+
+
+class Cut2(FakeTransport):
+    def get(self, *args: object) -> RawResponse:
+        def broken() -> Iterator[bytes]:
+            raise TimeoutError("read timed out")
+            yield b""
+
+        return RawResponse(200, {}, broken)
+
+
+def test_credential_headers_do_not_cross_origins() -> None:
+    seen: list[Mapping[str, str]] = []
+
+    class Spy(FakeTransport):
+        def get(
+            self, target: Target, ip: str, headers: Mapping[str, str], timeouts: tuple[float, float]
+        ) -> RawResponse:
+            seen.append(dict(headers))
+            return super().get(target, ip, headers, timeouts)
+
+    safe_get(
+        "https://feed.example/",
+        max_bytes=100,
+        max_redirects=2,
+        headers={"Authorization": "x", "X-Api-Key": "y", "Accept": "text/csv"},
+        resolver=resolver_for({"feed.example": [PUBLIC], "cdn.example": [PUBLIC]}),
+        transport=Spy(
+            [
+                (302, {"Location": "/same"}, []),
+                (302, {"Location": "https://cdn.example/f"}, []),
+                (200, {}, [b"ok"]),
+            ]
+        ),
+    )
+    assert "Authorization" in seen[1]  # same origin keeps them
+    assert "Authorization" not in seen[2]
+    assert "X-Api-Key" not in seen[2]
+    assert seen[2]["Accept"] == "text/csv"
+
+
+def test_the_next_vetted_ip_is_tried_after_a_connect_failure() -> None:
+    other = "93.184.216.35"
+    dialled: list[str] = []
+
+    class Flaky(FakeTransport):
+        def get(self, target: Target, ip: str, *args: object) -> RawResponse:
+            dialled.append(ip)
+            if ip == PUBLIC:
+                raise TransportFailure("request failed (ConnectionRefusedError)")
+            return RawResponse(200, {}, lambda: iter([b"ok"]))
+
+    response = safe_get(
+        "https://feed.example/",
+        max_bytes=10,
+        resolver=resolver_for({"feed.example": [PUBLIC, other]}),
+        transport=Flaky([]),
+    )
+    assert dialled == [PUBLIC, other]
+    assert response.body == b"ok"
+
+
+def test_the_host_header_omits_the_default_port() -> None:
+    conn = safe_http._PinnedTLSConnection("feed.example", 443, PUBLIC, 1.0)
+    assert conn.default_port == 443
+    http_conn = safe_http._PinnedConnection("feed.example", 80, PUBLIC, 1.0)
+    assert http_conn.default_port == 80

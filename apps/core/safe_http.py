@@ -22,6 +22,7 @@ import ipaddress
 import re
 import socket
 import ssl
+import time
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Protocol
@@ -78,7 +79,11 @@ class ResponseTooLarge(SafeHttpError):
 
 
 class TransportFailure(SafeHttpError):
-    """Connection, TLS or timeout error."""
+    """Connection, TLS, mid-body read or per-call timeout error."""
+
+
+class DeadlineExceeded(SafeHttpError):
+    """The overall deadline (connect, headers and body together) ran out."""
 
 
 @dataclass(frozen=True)
@@ -185,8 +190,8 @@ def system_resolver(host: str, port: int) -> Sequence[str]:
     return [str(info[4][0]) for info in infos]
 
 
-def vet_host(target: Target, resolver: Resolver) -> str:
-    """Resolve `target.host`; refuse if ANY answer is blocked; return the IP to connect to."""
+def vet_host(target: Target, resolver: Resolver) -> list[str]:
+    """Resolve `target.host`; refuse if ANY answer is blocked; return the vetted IPs."""
     try:
         literal = ipaddress.ip_address(target.host)
     except ValueError:
@@ -204,7 +209,7 @@ def vet_host(target: Target, resolver: Resolver) -> str:
         if is_blocked_ip(ip):
             raise BlockedAddress("host resolves to an address that is not publicly routable")
         parsed.append(ip)
-    return str(parsed[0])
+    return [str(ip) for ip in parsed]
 
 
 @dataclass
@@ -242,6 +247,8 @@ class _PinnedConnection(http.client.HTTPConnection):
 
 
 class _PinnedTLSConnection(_PinnedConnection):
+    default_port = 443  # so the Host header omits ":443"
+
     def connect(self) -> None:
         raw = self._open_socket()
         context = ssl.create_default_context()
@@ -275,8 +282,11 @@ class HttpClientTransport:
             raise TransportFailure(f"request failed ({type(exc).__name__})") from None
 
         def chunks() -> Iterator[bytes]:
-            while chunk := response.read(_CHUNK):
-                yield chunk
+            try:
+                while chunk := response.read1(_CHUNK):  # one recv at a time: deadline checkable
+                    yield chunk
+            except (OSError, http.client.HTTPException) as exc:
+                raise TransportFailure(f"body read failed ({type(exc).__name__})") from None
 
         return RawResponse(response.status, dict(response.getheaders()), chunks, conn.close)
 
@@ -291,31 +301,68 @@ class SafeResponse:
     resolved_ip: str = field(default="", repr=False)
 
 
+# Caller headers that may follow a redirect to ANOTHER origin; everything else (Authorization,
+# Cookie, API-key style headers) is dropped there.
+_CROSS_ORIGIN_SAFE = frozenset({"accept", "accept-language", "user-agent", "accept-encoding"})
+
+
 def safe_get(
     url: str,
     *,
     timeout: tuple[float, float] = (5.0, 15.0),
+    deadline: float = 30.0,
     max_bytes: int,
     allowed_schemes: Sequence[str] = ("https",),
     max_redirects: int = 0,
     headers: Mapping[str, str] | None = None,
     resolver: Resolver = system_resolver,
     transport: Transport | None = None,
+    clock: Callable[[], float] = time.monotonic,
 ) -> SafeResponse:
-    """GET `url` through the SSRF guard. `timeout` is (connect, read) seconds.
+    """GET `url` through the SSRF guard. `timeout` is (connect, read) seconds per step and
+    `deadline` the total seconds for the whole call (every hop, headers and body).
 
     A 3xx answer raises `TooManyRedirects` unless `max_redirects` > 0, and then every hop is
-    checked like the first. Non-2xx statuses are returned, not raised: the caller decides.
+    checked like the first; a redirect to another origin drops the caller's credential headers.
+    Each vetted address is tried in turn on a connection failure. Non-2xx statuses are returned,
+    not raised: the caller decides. Every failure is a `SafeHttpError`.
     """
     if max_bytes <= 0:
         raise ValueError("max_bytes must be positive")
     transport = transport or HttpClientTransport()
-    sent = {"User-Agent": "mpmv-fetch", "Accept-Encoding": "identity", **(headers or {})}
+    base = {"User-Agent": "mpmv-fetch", "Accept-Encoding": "identity"}
+    caller = dict(headers or {})
+    started = clock()
+
+    def remaining() -> float:
+        left = deadline - (clock() - started)
+        if left <= 0:
+            raise DeadlineExceeded("overall deadline exceeded")
+        return left
+
     current = url
+    first_origin: tuple[str, str, int] | None = None
     for hop in range(max_redirects + 1):
         target = check_url(current, allowed_schemes=allowed_schemes)
-        ip = vet_host(target, resolver)
-        raw = transport.get(target, ip, sent, timeout)
+        origin = (target.scheme, target.host, target.port)
+        first_origin = first_origin or origin
+        sent = {**base, **caller}
+        if origin != first_origin:
+            sent = {**base, **{k: v for k, v in caller.items() if k.lower() in _CROSS_ORIGIN_SAFE}}
+        addresses = vet_host(target, resolver)
+        raw: RawResponse | None = None
+        for ip in addresses:
+            left = remaining()
+            try:
+                raw = transport.get(
+                    target, ip, sent, (min(timeout[0], left), min(timeout[1], left))
+                )
+            except TransportFailure:
+                if ip == addresses[-1]:
+                    raise
+                continue
+            break
+        assert raw is not None  # noqa: S101 (the loop either breaks with a response or raises)
         try:
             if raw.status in REDIRECT_STATUSES:
                 location = raw.headers.get("Location") or raw.headers.get("location")
@@ -327,11 +374,17 @@ def safe_get(
             if declared and declared.isdigit() and int(declared) > max_bytes:
                 raise ResponseTooLarge("declared length is over the limit")
             body = bytearray()
-            for chunk in raw.chunks():
-                body += chunk
-                if len(body) > max_bytes:
-                    raise ResponseTooLarge("body is over the limit")
-            return SafeResponse(raw.status, dict(raw.headers), bytes(body), target.origin, hop, ip)
+            try:
+                for chunk in raw.chunks():
+                    body += chunk
+                    if len(body) > max_bytes:
+                        raise ResponseTooLarge("body is over the limit")
+                    remaining()
+            except (OSError, http.client.HTTPException) as exc:
+                raise TransportFailure(f"body read failed ({type(exc).__name__})") from None
+            return SafeResponse(
+                raw.status, dict(raw.headers), bytes(body), target.origin, hop, addresses[0]
+            )
         finally:
             raw.close()
     raise TooManyRedirects("redirect refused")  # pragma: no cover
