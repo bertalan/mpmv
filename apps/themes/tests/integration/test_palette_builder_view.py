@@ -14,6 +14,7 @@ from apps.core.models import AuditLog
 from apps.themes.models import BrandPalette, ThemeSettings
 from apps.themes.services import PALETTE_CONFIGURED, THEME_CONFIGURED
 from apps.themes.tests.factories import SiteFactory
+from tests.i18n import translated, translated_plural
 
 pytestmark = pytest.mark.django_db
 
@@ -71,7 +72,7 @@ def test_the_page_lists_every_pair_with_its_ratio_and_starts_valid(
     assert response.status_code == 200
     html = response.content.decode()
     assert 'aria-live="polite"' in html
-    assert "Every pair passes." in html
+    assert translated("Every pair passes.") in html
     assert html.count("data-pair-result=") >= 14
     assert re.search(r"\d+[.,]\d\d:1", html)
     assert "<script" not in html.split('id="palette-builder"')[1].split("</form>")[0]
@@ -96,8 +97,12 @@ def test_a_failing_primary_is_refused_on_submit_with_the_pair_and_ratio(
     html = response.content.decode()
     assert "primary (link) on surface" in html
     assert re.search(r'data-pair-result="fail"', html)
-    assert "Fail" in html
-    assert "pairs fail." in html or "pair fails." in html
+    assert translated("Fail") in html
+    fails = [
+        translated_plural("%(counter)s pair fails.", "%(counter)s pairs fail.", n) % {"counter": n}
+        for n in range(1, 10)
+    ]
+    assert any(text in html for text in fails)
     assert not BrandPalette.objects.filter(name="Mine").exists()
     assert not AuditLog.objects.filter(action=PALETTE_CONFIGURED).exists()
 
@@ -111,7 +116,8 @@ def test_save_is_disabled_with_the_reason_in_text_while_a_pair_fails(
     assert "disabled" in save_button
     assert 'aria-describedby="palette-save-reason"' in save_button
     assert 'id="palette-save-reason"' in html
-    assert "Save is off while a pair fails" in html
+    reason = "Save is off while a pair fails. Use the suggested shade or pick another colour, "
+    assert translated(reason + "then check again.") in html
 
 
 def test_use_this_puts_the_compliant_shade_in_the_field_without_saving(
@@ -170,7 +176,7 @@ def test_a_value_that_is_not_a_colour_is_an_error_not_a_crash(
     mfa_login(client, builder_user())
     response = post(client, action="save", primary="red")
     assert response.status_code == 200
-    assert "six digit hex colour" in response.content.decode()
+    assert translated("Use a six digit hex colour such as #C40417.") in response.content.decode()
     assert not BrandPalette.objects.filter(slug="mine").exists()
 
 
@@ -238,8 +244,9 @@ def test_the_page_loads_its_script_and_preview_container_without_inline_code(
     assert re.search(r'<script[^>]+src="[^"]*themes/palette-builder\.js"[^>]+nonce="[^"]+"', html)
     assert 'data-check-url="' in html
     assert 'data-preview-url="' in html
-    assert 'data-picker-label="colour picker"' in html
-    assert 'data-check-error="The check could not be reached.' in html
+    assert f'data-picker-label="{translated("colour picker")}"' in html
+    unreachable = translated("The check could not be reached. Save is off until it works again.")
+    assert f'data-check-error="{unreachable}"' in html
     assert 'class="palette-preview"' in html
     assert 'id="palette-preview-css"' in html
 
