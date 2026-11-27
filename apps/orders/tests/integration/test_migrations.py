@@ -18,8 +18,11 @@ SPLIT_SHIPPING = "0021_ord29_split_shipping_vat"
 BEFORE_SPLIT = "0020_ord20_order_events"
 # The leaf this test was last checked against: ORD.32 (0022) only adds the staff draft tables,
 # which `create_order` never writes, so creating an order at 0020 still works. 0023 only changes
-# the state labels (I18N.10 follow-up): no column.
-CHECKED_LEAF = "0023_alter_order_state_alter_orderamendment_state"
+# the state labels (I18N.10 follow-up): no column. 0024 (ORD.41) only replaces the order guard
+# function, so the order placed at 0020 still migrates.
+CHECKED_LEAF = "0024_ord41_trigger_time_zone"
+TRIGGER_ZONE = "0024_ord41_trigger_time_zone"
+BEFORE_TRIGGER_ZONE = "0023_alter_order_state_alter_orderamendment_state"
 TOTALS = (
     "SELECT goods_net, shipping_net, tax_total, gross_total, shipping_tax_rate,"
     " shipping_tax_amount, shipping_tax_reason FROM orders_vendororder ORDER BY id"
@@ -128,3 +131,39 @@ def test_the_split_shipping_migration_keeps_an_existing_order_exactly() -> None:
         assert after == before, f"the migration changed an existing order: {before} -> {after}"
     finally:
         migrate(latest)
+
+
+def _guard_source() -> str:
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT prosrc FROM pg_proc WHERE proname = 'orders_order_guard'")
+        [(source,)] = cursor.fetchall()
+    return str(source)
+
+
+def _zone_function_exists() -> bool:
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT count(*) FROM pg_proc WHERE proname = 'business_time_zone_at'")
+        row = cursor.fetchone()
+    return bool(row == (1,))
+
+
+@pytest.mark.django_db(transaction=True)
+def test_the_trigger_zone_migration_reverses_to_the_frozen_zone_and_forward_again() -> None:
+    """ORD.41: back to 0023 the guard computes in its historical frozen zone again (0010's
+    function); core back to 0035 drops `business_time_zone_at`; forward, both read the operator."""
+    latest = _orders_leaf()
+    executor = MigrationExecutor(connection)
+    try:
+        migrate(BEFORE_TRIGGER_ZONE)
+        assert "AT TIME ZONE 'Europe/Rome'" in _guard_source()
+        executor.loader.build_graph()
+        executor.migrate([("core", "0035_platformoperator_business_time_zone")])
+        assert not _zone_function_exists()
+    finally:
+        executor = MigrationExecutor(connection)
+        executor.migrate(executor.loader.graph.leaf_nodes())
+    assert latest == TRIGGER_ZONE
+    assert _zone_function_exists()
+    source = _guard_source()
+    assert "AT TIME ZONE '" not in source
+    assert source.count("business_time_zone_at(") == 3

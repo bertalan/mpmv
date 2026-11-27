@@ -233,22 +233,6 @@ def configured_tz() -> ZoneInfo:
     return ZoneInfo(configured_time_zone_name())
 
 
-#: ARC.27: a guard gets a business time zone name and returns why its app cannot follow that zone
-#: yet, or None. Apps register theirs in `ready()` (orders until ORD.41), so `core` imports none.
-type ZoneGuard = Callable[[str], str | None]
-_ZONE_GUARDS: list[ZoneGuard] = []
-
-
-def register_business_zone_guard(guard: ZoneGuard) -> None:
-    if guard not in _ZONE_GUARDS:
-        _ZONE_GUARDS.append(guard)
-
-
-def business_zone_refusals(name: str) -> list[str]:
-    """Why the registered apps refuse the business time zone `name` (empty: it is accepted)."""
-    return [refusal for guard in _ZONE_GUARDS if (refusal := guard(name)) is not None]
-
-
 def latest_operator() -> PlatformOperator | None:
     return PlatformOperator.objects.order_by("-valid_from").first()
 
@@ -299,9 +283,6 @@ def _add_operator_version[C: ChangeSet](
     """
     new.valid_to = None
     new.full_clean(validate_constraints=False)  # constraints are enforced by the database
-    refusals = business_zone_refusals(new.business_time_zone)
-    if refusals:
-        raise ValidationError({"business_time_zone": refusals})
     check_operator_start(new.valid_from, latest)
 
     closing = latest if latest is not None and latest.valid_to is None else None

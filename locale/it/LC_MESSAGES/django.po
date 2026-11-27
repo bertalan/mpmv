@@ -11611,14 +11611,6 @@ msgstr ""
 "L'ordine delle versioni: i numeri più bassi vengono prima, per esempio 1, 2, 3. Lascia 0 per "
 "mantenere l'ordine in cui sono state aggiunte."
 
-#: apps/orders/tz.py
-msgid ""
-"The order records still compute their retention dates in %(zone)s, so the business time zone must "
-"stay %(zone)s until a developer updates them (ORD.41)."
-msgstr ""
-"I dati degli ordini calcolano ancora le date di conservazione in %(zone)s, quindi il fuso orario "
-"aziendale deve restare %(zone)s finché uno sviluppatore non li aggiorna (ORD.41)."
-
 #: apps/manager/views.py
 msgid "The order was updated."
 msgstr "L'ordine è stato aggiornato."

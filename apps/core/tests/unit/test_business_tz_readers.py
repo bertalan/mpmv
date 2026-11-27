@@ -1,7 +1,8 @@
 """ARC.27 (D-31): `business_tz()` next to `current_operator()` is the only reader of the business
 time zone. The setting `BUSINESS_TIME_ZONE` (from `MPMV_BUSINESS_TIME_ZONE`, UTC when unset) stays a
 bootstrap value: only the operator field's default, the helper's fallback and the start-up check
-may read it; the job scheduler reads `business_tz()` too, once per worker process."""
+may read it (the connection signal of ORD.41 may name it); the job scheduler reads
+`business_tz()` too, once per worker process."""
 
 import ast
 from collections.abc import Iterator
@@ -11,6 +12,9 @@ ROOT = Path(__file__).resolve().parents[4]
 ALLOWED = {
     "apps/core/models.py",  # configured_time_zone_name(): the operator field's default
     "apps/core/checks.py",  # check_business_time_zone(): core.E931 on an unknown name
+    # ORD.41: names the setting only to follow a test override onto the connections' copy;
+    # the value comes from configured_time_zone_name().
+    "apps/core/signals.py",
 }
 # Calendar days read in UTC on purpose (F4 of the PR #1107 review): file -> why.
 UTC_DAYS = {
