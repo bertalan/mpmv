@@ -10,9 +10,14 @@ from apps.catalog.tests.factories import ProductFactory, ProductTranslationFacto
 from apps.core.audit import AuditContext
 from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
-from apps.ingest import services
-from apps.ingest.models import ProductDraft
-from apps.ingest.tests.factories import ProductDraftFactory, SourceItemFactory
+from apps.ingest import services, tasks
+from apps.ingest.models import ProductDraft, SupplierSource
+from apps.ingest.tests.factories import (
+    ProductDraftFactory,
+    SourceItemFactory,
+    SupplierSourceFactory,
+)
+from apps.vendors.models import Vendor, VendorStatus
 from apps.vendors.tests.factories import VendorFactory
 from tests.i18n import other_language
 
@@ -115,6 +120,32 @@ def test_a_product_that_fails_the_publication_rules_stays_a_draft_and_the_ingest
     assert not Product.objects.filter(status="published").exists()
 
 
+# --- scheduled publication
+
+
+def test_the_schedule_publishes_only_ready_drafts_of_write_enabled_active_sources() -> None:
+    vendor = VendorFactory.create()
+    Vendor.objects.filter(pk=vendor.pk).update(status=VendorStatus.ACTIVE)
+    open_source = SupplierSourceFactory.create(vendor=vendor, write_enabled=True)
+    closed_source = SupplierSourceFactory.create(vendor=vendor, write_enabled=False)
+    inactive = SupplierSourceFactory.create(vendor=vendor, write_enabled=True, is_active=False)
+    applicant = SupplierSourceFactory.create(write_enabled=True)  # its vendor is not active
+    waiting = ready_draft(item=SourceItemFactory.create(source=applicant))
+    live = ready_draft(item=SourceItemFactory.create(source=open_source))
+    held = ready_draft(item=SourceItemFactory.create(source=closed_source))
+    off = ready_draft(item=SourceItemFactory.create(source=inactive))
+    not_ready = ready_draft(item=SourceItemFactory.create(source=open_source), status="new")
+    tasks.publish_ready_drafts(0)
+    expected = [(live, "published"), (held, "ready"), (off, "ready")]
+    expected += [(not_ready, "new"), (waiting, "ready")]
+    for draft, status in expected:
+        draft.refresh_from_db()
+        assert draft.status == status
+    assert Product.objects.get().sku == live.item.sku
+    tasks.publish_ready_drafts(0)  # a rerun finds nothing new
+    assert Product.objects.count() == 1
+
+
 # --- review fixes: dry-run parity, locking, retired products
 
 
@@ -173,6 +204,148 @@ def test_a_concurrent_creation_is_a_skip_not_an_error(monkeypatch: pytest.Monkey
     assert report.published == []
     assert set(report.skipped) == {first.item.sku, second.item.sku}  # the batch went on
     assert report.refused == set()
+
+
+def _active_vendor_source() -> tuple[Vendor, SupplierSource]:
+    vendor = VendorFactory.create()
+    Vendor.objects.filter(pk=vendor.pk).update(status=VendorStatus.ACTIVE)
+    return vendor, SupplierSourceFactory.create(vendor=vendor, write_enabled=True)
+
+
+def _ready_in(source: SupplierSource, **overrides: object) -> ProductDraft:
+    return ready_draft(item=SourceItemFactory.create(source=source), **overrides)
+
+
+def test_a_draft_the_catalog_refuses_goes_to_review_and_does_not_block_the_batch() -> None:
+    _, source = _active_vendor_source()
+    stuck = _ready_in(source, extracted={"title": "Raw", "price": "10.00"})  # no weight
+    fine = _ready_in(source)
+    report = services.publish_ready_drafts(ctx=CTX, limit=1)
+    assert report.published == []
+    assert report.refused == {stuck.item.sku}
+    stuck.refresh_from_db()
+    assert stuck.status == "needs_review"
+    audit = AuditLog.objects.get(action=services.DRAFT_NEEDS_REVIEW)
+    assert "weight" in str(audit.after)
+    again = services.publish_ready_drafts(ctx=CTX, limit=1)  # the next draft is reached
+    assert again.published == [fine.item.sku]
+
+
+def test_the_schedule_does_not_touch_a_draft_changed_after_the_selection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, source = _active_vendor_source()
+    draft = _ready_in(source)
+    real = services.publish_drafts
+
+    def late(drafts: object, **kwargs: object) -> services.PublishReport:
+        ProductDraft.objects.filter(pk=draft.pk).update(status="rejected")
+        return real(drafts, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(services, "publish_drafts", late)
+    report = services.publish_ready_drafts(ctx=CTX)
+    assert report.published == []
+    assert report.refused == set()
+    assert not Product.objects.exists()
+
+
+def test_the_schedule_dry_run_writes_nothing_and_the_task_audits_as_the_task() -> None:
+    _, source = _active_vendor_source()
+    draft = _ready_in(source)
+    report = services.publish_ready_drafts(ctx=CTX, dry_run=True)
+    assert report.published == [draft.item.sku]
+    assert not Product.objects.exists()
+    tasks.publish_ready_drafts(0)
+    assert AuditLog.objects.get(action=services.DRAFT_PUBLISHED).source == AuditLog.Source.TASK
+
+
+# --- job guard (lane-a review of #1131): one failing draft, two vendors, registration
+
+
+def _active_source() -> SupplierSource:
+    vendor = VendorFactory.create()
+    Vendor.objects.filter(pk=vendor.pk).update(status=VendorStatus.ACTIVE)
+    return SupplierSourceFactory.create(vendor=vendor, write_enabled=True)
+
+
+def test_one_draft_that_raises_is_moved_aside_and_the_rest_still_publish(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = _active_source()
+    bad = ready_draft(item=SourceItemFactory.create(source=source))
+    good = ready_draft(item=SourceItemFactory.create(source=source))
+    real = services._publish_one
+
+    def explode(draft: ProductDraft, *args: object, **kwargs: object) -> object:
+        if draft.pk == bad.pk:
+            raise ValueError("odd draft")
+        return real(draft, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(services, "_publish_one", explode)
+    tasks.publish_ready_drafts(0)  # the task itself does not raise
+    bad.refresh_from_db()
+    good.refresh_from_db()
+    assert (bad.status, good.status) == ("needs_review", "published")
+    assert Product.objects.get().sku == good.item.sku
+    entry = AuditLog.objects.get(action=services.DRAFT_NEEDS_REVIEW)
+    assert "ValueError" in str(entry.after)
+    tasks.publish_ready_drafts(0)  # the bad draft is not first in line again
+    assert Product.objects.count() == 1
+
+
+def test_a_failure_while_moving_a_draft_aside_does_not_skip_the_next_one(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = _active_source()
+    bad = ready_draft(item=SourceItemFactory.create(source=source), extracted={})
+    other = ready_draft(item=SourceItemFactory.create(source=source), extracted={})
+    real = services._send_to_review
+
+    def explode(draft: ProductDraft, reason: str, *, ctx: AuditContext) -> None:
+        if draft.pk == bad.pk:
+            raise RuntimeError("db hiccup")
+        real(draft, reason, ctx=ctx)
+
+    monkeypatch.setattr(services, "_send_to_review", explode)
+    report = services.publish_ready_drafts(ctx=CTX)
+    other.refresh_from_db()
+    assert other.status == "needs_review"
+    assert bad.item.sku in report.failed
+
+
+def test_a_selection_failure_is_logged_and_the_task_does_not_raise(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def boom(**kwargs: object) -> None:
+        raise RuntimeError("down")
+
+    monkeypatch.setattr(services, "publish_ready_drafts", boom)
+    tasks.publish_ready_drafts(0)
+
+
+def test_two_vendors_with_the_same_sku_never_touch_each_other() -> None:
+    a_source, b_source = _active_source(), _active_source()
+    a_item = SourceItemFactory.create(source=a_source, sku="SAME-1")
+    b_item = SourceItemFactory.create(source=b_source, sku="SAME-1")
+    a_draft = ready_draft(item=a_item)
+    b_draft = ready_draft(item=b_item, status="new")
+    tasks.publish_ready_drafts(0)
+    a_draft.refresh_from_db()
+    b_draft.refresh_from_db()
+    assert (a_draft.status, b_draft.status) == ("published", "new")
+    product = Product.objects.get()
+    assert product.vendor_id == a_item.vendor_id
+    b_item.refresh_from_db()
+    assert b_item.product_id is None
+
+
+def test_the_job_is_registered_as_periodic_and_locked() -> None:
+    from apps.core.tasks import schedules
+
+    schedule = {s.task_name: s for s in schedules()}["ingest.publish_ready_drafts"]
+    assert schedule.cron == "*/15 * * * *"
+    assert tasks.publish_ready_drafts.lock == "ingest.publish_ready_drafts"
+    assert tasks.publish_ready_drafts.queueing_lock == "ingest.publish_ready_drafts"
 
 
 def test_two_vendors_with_the_same_sku_each_run_publishes_only_its_own_draft() -> None:
