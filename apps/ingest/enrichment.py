@@ -15,6 +15,18 @@ ENRICH_LANGUAGES = ("en",)
 # The text fields of one language, in schema order.
 TEXT_FIELDS = ("title", "short_description", "description", "seo_title", "seo_description")
 
+# Hard ceilings of the schema: a field longer than this is refused whatever the policy says, so a
+# partial ``max_lengths`` map can never leave a field unbounded.
+HARD_MAX_LENGTHS: Mapping[str, int] = MappingProxyType(
+    {
+        "title": 255,
+        "short_description": 1000,
+        "description": 10_000,
+        "seo_title": 120,
+        "seo_description": 320,
+    }
+)
+
 
 class ProviderError(Exception):
     """A provider failed (network, quota, bad answer). The caller leaves the text unchanged."""
@@ -38,8 +50,10 @@ class TextPolicy:
     )
     required: tuple[str, ...] = ("title", "description")
     banned_terms: tuple[str, ...] = ()
-    allow_html: bool = False
     allow_urls: bool = False
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "max_lengths", MappingProxyType(dict(self.max_lengths)))
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,6 +64,9 @@ class ProductFacts:
     title: str
     attributes: Mapping[str, str] = field(default_factory=dict)
     source_text: str = ""
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "attributes", MappingProxyType(dict(self.attributes)))
 
 
 @dataclass(frozen=True, slots=True)
