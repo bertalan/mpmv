@@ -303,7 +303,9 @@ def csrf_exempt_declaration_problems(
     problems += [f"declared but no longer csrf_exempt: {key}" for key in sorted(allowed - exempt)]
     problems += [f"declared twice: {key}" for key in sorted(set(declared) & set(admin_declared))]
     problems += [
-        f"no reason for {key}" for key, why in {**declared, **admin_declared}.items() if not why
+        f"no reason for {key}"
+        for key, why in {**declared, **admin_declared}.items()
+        if len(why.strip()) < MIN_REASON
     ]
     return problems
 
@@ -333,14 +335,15 @@ def test_the_csrf_exempt_guard_fails_on_an_undeclared_view() -> None:
         regex="^admin/throwaway/$",
         callback=throwaway,
     )
+    reviewed = "Checks the token itself, reviewed by hand."
     assert csrf_exempt_declaration_problems([view], {}, {}) == [
         "undeclared csrf_exempt view: wagtailadmin_throwaway"
     ]
-    assert csrf_exempt_declaration_problems([view], {}, {view.key: "Reviewed."}) == []
+    assert csrf_exempt_declaration_problems([view], {}, {view.key: reviewed}) == []
     assert csrf_exempt_declaration_problems([view], {}, {view.key: ""}) == [
         "no reason for wagtailadmin_throwaway"
     ]
-    assert csrf_exempt_declaration_problems([], {}, {view.key: "Reviewed."}) == [
+    assert csrf_exempt_declaration_problems([], {}, {view.key: reviewed}) == [
         "declared but no longer csrf_exempt: wagtailadmin_throwaway"
     ]
 

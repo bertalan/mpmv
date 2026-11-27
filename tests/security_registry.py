@@ -258,7 +258,7 @@ CSRF_EXEMPT: dict[str, str] = {
 ADMIN_CSRF_EXEMPT: dict[str, str] = {
     "wagtailadmin_api:explorer": (
         "Wagtail admin API (django-ninja), read-only page explorer: no POST handler, so an "
-        "unsigned POST gets 405."
+        "unsigned POST gets 405 (`test_post_without_csrf_token_is_refused`)."
     ),
     "wagtail_localize:edit_string_translation": (
         "wagtail-localize DRF view: SessionAuthentication enforces the CSRF token on writes "
