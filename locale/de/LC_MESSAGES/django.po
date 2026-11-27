@@ -6136,7 +6136,7 @@ msgstr ""
 msgid "not yet"
 msgstr "noch nicht"
 
-#: themes/base/templates/layouts/base.html
+#: apps/accounts/views.py themes/base/templates/layouts/base.html
 msgid "Not yet available in this language; shown in %(endonym)s"
 msgstr "In dieser Sprache noch nicht verfügbar; angezeigt auf %(endonym)s"
 
@@ -13225,10 +13225,6 @@ msgstr ""
 "erklärt hast, dass du den Vertrag über die folgenden Teile der Bestellung %(order_number)s "
 "widerrufst:"
 
-#: apps/accounts/views.py
-msgid "This content is not available in this language."
-msgstr "Dieser Inhalt ist in dieser Sprache nicht verfügbar."
-
 #: apps/orders/ui/forms.py
 msgid "This does not look like an EU VAT number. Check the prefix and the digits."
 msgstr "Dies sieht nicht wie eine EU-USt-IdNr. aus. Prüfe das Präfix und die Ziffern."
@@ -13480,11 +13476,6 @@ msgid ""
 msgstr ""
 "Dieses Paket ist %(state)s: Eine Bestellung kann nur vor dem Versand geändert werden, solange das "
 "Paket ausstehend oder angenommen ist."
-
-#: apps/catalog/templates/catalog/listing.html apps/catalog/templates/catalog/product.html
-#: themes/ride/templates/catalog/listing.html themes/ride/templates/catalog/product.html
-msgid "This page is not available in your language yet."
-msgstr "Diese Seite ist in deiner Sprache noch nicht verfügbar."
 
 #: apps/manager/fitment_forms.py
 msgid "This parent does not exist."

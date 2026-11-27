@@ -18,7 +18,7 @@ Context: `languages` (CMS `LanguageLink`s or Django language info dicts), `curre
         <form action="{% url 'switch_language' %}" method="post">
           {% csrf_token %}
           {% if item.url %}<input type="hidden" name="exact" value="1">
-          <input type="hidden" name="notice" value="{% if item.available %}0{% else %}1{% endif %}">
+          <input type="hidden" name="notice" value="{% if item.notice %}1{% else %}0{% endif %}">
           {% endif %}<input type="hidden" name="next" value="{% firstof item.url next_url %}">
           <button type="submit" class="language-menu__item" name="language" value="{{ item.code }}" lang="{{ item.code }}"{% if item.current %} aria-current="true" disabled{% endif %}>{% if item.flag %}<img class="language-menu__flag" src="{{ item.flag }}" alt="" aria-hidden="true" width="24" height="16">{% endif %}{{ item.label|capfirst }}</button>
         </form>

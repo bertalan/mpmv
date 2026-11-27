@@ -19,7 +19,6 @@
 {% block content %}
   <article class="product-page">
     {% include "components/page_banner.html" with title=page_data.title items=trail text=page_data.short_description only %}
-    {% if page_data.is_fallback %}<p class="product-notice alert alert-info mt-3" role="note">{% translate "This page is not available in your language yet." %}</p>{% endif %}
 
     <div class="row g-4 my-0 py-4">
       <div class="col-lg-7">

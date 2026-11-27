@@ -1,7 +1,7 @@
 """Template tags for the public pages (CMS.1): per-language navigation and language switcher;
 the page-level FAQPage structured data (CMS.2); the page's image credits (CMS.8)."""
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -17,6 +17,7 @@ from wagtail.models import Locale, Page, Site
 from apps.core.i18n import (
     LanguageLink,
     configured_languages,
+    primary_language,
     switch_goes_home,
     switcher_links,
     translate_path,
@@ -159,6 +160,23 @@ def _home(code: str, suffix: str = "") -> str:
         return reverse("home") + suffix
 
 
+def _stay(
+    urls: Mapping[str, str], current: str, *, fallback: bool
+) -> Callable[[str], tuple[str, bool] | None]:
+    """Where a switch to a language without a translation stays (`switcher_links`): the
+    primary-language page under the new prefix when the object falls back to it, else the page
+    the visitor is on (the switch flashes the notice); None, hence the home, with no page at all."""
+    primary = primary_language()
+
+    def stay(code: str) -> tuple[str, bool] | None:
+        if fallback and primary in urls:
+            return translate_path(urls[primary], code), False
+        own = urls.get(current) or next(iter(urls.values()), None)
+        return (own, True) if own is not None else None
+
+    return stay
+
+
 @register.simple_tag(takes_context=True)
 def language_links(context: dict[str, Any]) -> list[LanguageLink]:
     """One entry per configured language: where the switcher takes the visitor.
@@ -166,16 +184,20 @@ def language_links(context: dict[str, Any]) -> list[LanguageLink]:
     The target is the same object in that language: the translations a view puts in the context
     as `language_urls` (listings and storefronts, the set of their `hreflang` links), else the
     CMS page's live translations (slugs differ between languages). An object without a
-    translation leads to the language's home, flagged so the switch shows a notice. A view with
-    no object (search, cart, account, 404) keeps its own path in the other language, no notice.
+    translation stays on the page (I18N.22, owner decision 2026-11-21): the same object under
+    the new prefix, where the primary-language fallback (I18N.21, catalog objects) shows it with
+    its own notice, or, when nothing falls back (an event, an object with no primary-language
+    text), the page the visitor is on, with the switch flashing the notice. A view with no object
+    (search, cart, account, 404) keeps its own path in the other language, no notice; a page
+    marked `language_switch_home` (secret URL) goes to the target home, no notice.
     """
     request: HttpRequest | None = context.get("request")
     current = translation.get_language()
     query = request.META.get("QUERY_STRING", "") if request is not None else ""
     suffix = f"?{query}" if query else ""
     urls: Mapping[str, str] | None = context.get("language_urls")
-    if urls is not None:  # a listing's filters mean nothing on a home page
-        return switcher_links(urls, current, _home)
+    if urls is not None:  # the catalog's objects always fall back to the primary language
+        return switcher_links(urls, current, _home, _stay(urls, current, fallback=True))
     page: Page | None = context.get("page")
     if page is not None:
         found = services.page_language_urls(page, request)
@@ -183,6 +205,11 @@ def language_links(context: dict[str, Any]) -> list[LanguageLink]:
             {code: url + suffix for code, url in found.items()},
             current,
             lambda code: _home(code, suffix),
+            _stay(
+                {code: url + suffix for code, url in found.items()},
+                current,
+                fallback=bool(getattr(page.specific_class, "language_fallback", True)),
+            ),
         )
     if request is None or switch_goes_home(request):
         return switcher_links(

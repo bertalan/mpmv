@@ -6076,7 +6076,7 @@ msgstr ""
 msgid "not yet"
 msgstr "non ancora"
 
-#: themes/base/templates/layouts/base.html
+#: apps/accounts/views.py themes/base/templates/layouts/base.html
 msgid "Not yet available in this language; shown in %(endonym)s"
 msgstr "Non ancora disponibile in questa lingua; mostrato in %(endonym)s"
 
@@ -13086,10 +13086,6 @@ msgstr ""
 "Confermiamo che il %(submitted_at)s hai dichiarato, con la funzione di recesso del nostro sito, di"
 " recedere dal contratto per le seguenti parti dell'ordine %(order_number)s:"
 
-#: apps/accounts/views.py
-msgid "This content is not available in this language."
-msgstr "Questo contenuto non è disponibile in questa lingua."
-
 #: apps/orders/ui/forms.py
 msgid "This does not look like an EU VAT number. Check the prefix and the digits."
 msgstr "Questa non sembra una partita IVA dell'UE. Controlla il prefisso e le cifre."
@@ -13331,11 +13327,6 @@ msgid ""
 msgstr ""
 "Questo pacco è %(state)s: un ordine si può modificare solo prima della spedizione, mentre il pacco"
 " è in attesa o accettato."
-
-#: apps/catalog/templates/catalog/listing.html apps/catalog/templates/catalog/product.html
-#: themes/ride/templates/catalog/listing.html themes/ride/templates/catalog/product.html
-msgid "This page is not available in your language yet."
-msgstr "Questa pagina non è ancora disponibile nella tua lingua."
 
 #: apps/manager/fitment_forms.py
 msgid "This parent does not exist."

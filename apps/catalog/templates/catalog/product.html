@@ -19,7 +19,6 @@
   <article class="product-page">
     <header class="product-header">
       <h1>{{ page_data.title }}</h1>
-      {% if page_data.is_fallback %}<p class="product-notice" role="note">{% translate "This page is not available in your language yet." %}</p>{% endif %}
       {% if page_data.short_description %}<p class="product-teaser">{{ page_data.short_description }}</p>{% endif %}
     </header>
 

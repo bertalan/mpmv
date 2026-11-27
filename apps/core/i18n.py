@@ -34,6 +34,11 @@ def primary_language() -> str:
     return str(settings.LANGUAGE_CODE)
 
 
+# Set on the request when a page shows the text of another language in place of a missing
+# translation: the language actually shown. The layout reads it for the notice (I18N.21, I18N.22).
+FALLBACK_ATTR = "language_fallback"
+
+
 def configured_languages() -> list[str]:
     """Language codes in the configured order (primary first)."""
     return [code for code, _name in settings.LANGUAGES]
@@ -59,9 +64,12 @@ class LanguageLink:
 
     code: str
     name: str  # in its own language ("Italiano")
-    url: str  # where the switch leads: the object in that language, else its home
+    url: str  # where the switch leads: the object in that language, else where it stays
     current: bool
-    available: bool  # False: the object has no translation, `url` is the home (notice shown)
+    available: bool  # False: the object has no translation in this language
+    # True: the switch itself flashes the "not yet available" notice, as `url` is a page in
+    # another language (an event: no fallback). A served fallback shows its own notice.
+    notice: bool = False
 
 
 def hreflang_alternates(urls: Mapping[str, str]) -> list[tuple[str, str]]:
@@ -78,21 +86,32 @@ def hreflang_alternates(urls: Mapping[str, str]) -> list[tuple[str, str]]:
 
 
 def switcher_links(
-    urls: Mapping[str, str], current: str, home: Callable[[str], str]
+    urls: Mapping[str, str],
+    current: str,
+    home: Callable[[str], str],
+    stay: Callable[[str], tuple[str, bool] | None] | None = None,
 ) -> list[LanguageLink]:
     """One switcher entry per configured language for an object with translations `urls`
     (`{language: URL}`, the mapping of `hreflang_alternates`): the translation where there is
-    one, otherwise `home(language)`, flagged unavailable so the switch shows a notice."""
+    one. Otherwise `stay(language)` says where the visitor stays, as `(URL, flash)` (I18N.22): the
+    same object under the new prefix, whose fallback page shows the notice itself, or an
+    original-language page with `flash` set, for the switch to show it. Without `stay` (or when
+    it returns None) the switch leads to `home(language)`, flagged for the notice."""
     links = []
     for code in configured_languages():
         url = urls.get(code)
+        notice = False
+        if url is None:
+            target = stay(code) if stay is not None else None
+            url, notice = target if target is not None else (home(code), True)
         links.append(
             LanguageLink(
                 code=code,
                 name=str(translation.get_language_info(code)["name_local"]),
-                url=url if url is not None else home(code),
+                url=url,
                 current=code == current,
-                available=url is not None,
+                available=code in urls,
+                notice=notice,
             )
         )
     return links
