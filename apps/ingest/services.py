@@ -12,7 +12,7 @@ from typing import Any
 
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
-from django.db import connection, transaction
+from django.db import IntegrityError, connection, transaction
 from django.db.models import Q
 from django.utils import timezone
 
@@ -53,6 +53,8 @@ SOURCE_UPDATED = "ingest.source.updated"
 CATALOG_LOAD_RUN = "ingest.catalog_load.run"
 ENRICHMENT_ARCHIVED = "ingest.enrichment.archived"
 DRAFT_ENRICHED = "ingest.draft.enriched"
+REVIEW_REFRESHED = "ingest.review.refreshed"
+RAW_ARCHIVE_LIMIT = 20_000  # characters of the provider answer kept in the archive
 
 
 class WriteNotEnabled(Exception):
@@ -932,10 +934,12 @@ def enrich_draft(
         model=output.model,
         prompt_version=output.prompt_version,
         outcome=outcome,
-        raw=dict(output.raw),
+        raw=_bounded_raw(output.raw),
         violations=violations,
     )
     review: ReviewItem | None = None
+    refreshed: ReviewItem | None = None
+    old_violations: list[str] = []
     changes = ChangeSet()
     with transaction.atomic():
         locked = (
@@ -943,26 +947,39 @@ def enrich_draft(
         )
         if lang in locked.enriched:
             raise EnrichmentRefused(f"Language {lang!r} got texts while the provider ran.")
+        # The catalogue check is repeated under the lock, right before the write (Q-71): a
+        # translation created while the provider ran (for example by the MIG.3 load) wins.
+        if (
+            locked.item.product_id is not None
+            and locked.item.product.translations.filter(language=lang).exists()
+        ):
+            raise EnrichmentRefused(f"The product got {lang!r} texts while the provider ran.")
         before = _draft_snapshot(locked)
         if text is not None and not violations:
             locked.enriched = {**locked.enriched, lang: {**text.as_dict(), "origin": "machine"}}
         else:
             locked.status = ProductDraft.Status.NEEDS_REVIEW
-            review = ReviewItem(
-                run=run,
-                item=locked.item,
-                product=locked.item.product,
-                kind=ReviewItem.Kind.TEXT_POLICY,
-                blocking=False,
-                payload={
-                    "lang": lang,
-                    "provider": output.provider,
-                    "model": output.model,
-                    "prompt_version": output.prompt_version,
-                    "violations": violations,
-                },
-            )
-            review.full_clean()
+            payload = {
+                "lang": lang,
+                "provider": output.provider,
+                "model": output.model,
+                "prompt_version": output.prompt_version,
+                "violations": violations,
+            }
+            refreshed = _open_text_review(locked.item)
+            if refreshed is not None:
+                old_violations = list(refreshed.payload.get("violations", []))
+                refreshed.payload = payload
+            else:
+                review = ReviewItem(
+                    run=run,
+                    item=locked.item,
+                    product=locked.item.product,
+                    kind=ReviewItem.Kind.TEXT_POLICY,
+                    blocking=False,
+                    payload=payload,
+                )
+                review.full_clean()
         version.draft = locked
         changes.create(
             "ingest.enrichmentversion", str(version.public_id), _enrichment_snapshot(version)
@@ -971,22 +988,68 @@ def enrich_draft(
         changes.update("ingest.productdraft", str(locked.public_id), before, after)
         if review is not None:
             changes.create("ingest.reviewitem", str(review.public_id), review_snapshot(review))
+        if refreshed is not None:
+            changes.update(
+                "ingest.reviewitem",
+                str(refreshed.public_id),
+                {"violations": old_violations},
+                {"violations": violations, "version": str(version.public_id)},
+            )
         if not dry_run:
             version.save()
             locked.save()
             if review is not None:
-                review.save()
+                try:
+                    with transaction.atomic():
+                        review.save()
+                except IntegrityError:  # an open review for this product is already there
+                    existing = _open_text_review(locked.item)
+                    if existing is None:
+                        raise
+                    refreshed, review = existing, None
+                    old_violations = list(existing.payload.get("violations", []))
+                    refreshed.payload = payload
+                    changes.changes = [c for c in changes.changes if c.model != "ingest.reviewitem"]
+                    changes.update(
+                        "ingest.reviewitem",
+                        str(refreshed.public_id),
+                        {"violations": old_violations},
+                        {"violations": violations, "version": str(version.public_id)},
+                    )
+            if refreshed is not None:
+                refreshed.save(update_fields=["payload", "updated_at"])
             record(ctx, ENRICHMENT_ARCHIVED, *_first(changes, "ingest.enrichmentversion"))
             audit_draft = [c for c in changes.changes if c.model == "ingest.productdraft"]
             for change in audit_draft:
                 record(ctx, DRAFT_ENRICHED, change.model, change.key, change.before, change.after)
             if review is not None:
-                review_change = _first(changes, "ingest.reviewitem")
-                record(ctx, REVIEW_OPENED, *review_change)
+                record(ctx, REVIEW_OPENED, *_first(changes, "ingest.reviewitem"))
+            elif refreshed is not None:
+                record(ctx, REVIEW_REFRESHED, *_first(changes, "ingest.reviewitem"))
             draft.enriched, draft.status = locked.enriched, locked.status
-    return EnrichmentResult(outcome, changes, None if dry_run else version, review)
+    return EnrichmentResult(outcome, changes, None if dry_run else version, review or refreshed)
 
 
 def _first(changes: ChangeSet, model: str) -> tuple[str, str, Any, Any]:
     change = next(c for c in changes.changes if c.model == model)
     return change.model, change.key, change.before, change.after
+
+
+def _open_text_review(item: SourceItem) -> ReviewItem | None:
+    """The open ``text_policy`` review of this item's product (or of the item, if it has no
+    product), if any: a rerun refreshes it instead of piling up a second one."""
+    scope = Q(item=item) if item.product_id is None else Q(item=item) | Q(product=item.product)
+    return (
+        ReviewItem.objects.select_for_update()
+        .filter(scope, kind=ReviewItem.Kind.TEXT_POLICY, decision__in=engine.OPEN_DECISIONS)
+        .order_by("created_at")
+        .first()
+    )
+
+
+def _bounded_raw(raw: Mapping[str, Any]) -> dict[str, Any]:
+    """The provider answer for the archive, replaced by a stub when it is absurdly large."""
+    text = json.dumps(raw, default=str)
+    if len(text) <= RAW_ARCHIVE_LIMIT:
+        return dict(raw)
+    return {"truncated": True, "size": len(text), "head": text[:RAW_ARCHIVE_LIMIT]}

@@ -6,6 +6,7 @@ provider SDK here; ``FakeEnricher`` is the deterministic stand-in for tests and 
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from types import MappingProxyType
 from typing import Protocol, runtime_checkable
 
 # The only language the enricher writes until I18N.8 is decided (D-18, D-18 bis, Q-71).
@@ -13,6 +14,18 @@ ENRICH_LANGUAGES = ("en",)
 
 # The text fields of one language, in schema order.
 TEXT_FIELDS = ("title", "short_description", "description", "seo_title", "seo_description")
+
+# Hard ceilings of the schema: a field longer than this is refused whatever the policy says, so a
+# partial ``max_lengths`` map can never leave a field unbounded.
+HARD_MAX_LENGTHS: Mapping[str, int] = MappingProxyType(
+    {
+        "title": 255,
+        "short_description": 1000,
+        "description": 10_000,
+        "seo_title": 120,
+        "seo_description": 320,
+    }
+)
 
 
 class ProviderError(Exception):
@@ -25,18 +38,22 @@ class TextPolicy:
 
     languages: tuple[str, ...] = ENRICH_LANGUAGES
     max_lengths: Mapping[str, int] = field(
-        default_factory=lambda: {
-            "title": 120,
-            "short_description": 300,
-            "description": 4000,
-            "seo_title": 70,
-            "seo_description": 160,
-        }
+        default_factory=lambda: MappingProxyType(
+            {
+                "title": 120,
+                "short_description": 300,
+                "description": 4000,
+                "seo_title": 70,
+                "seo_description": 160,
+            }
+        )
     )
     required: tuple[str, ...] = ("title", "description")
     banned_terms: tuple[str, ...] = ()
-    allow_html: bool = False
     allow_urls: bool = False
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "max_lengths", MappingProxyType(dict(self.max_lengths)))
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +64,9 @@ class ProductFacts:
     title: str
     attributes: Mapping[str, str] = field(default_factory=dict)
     source_text: str = ""
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "attributes", MappingProxyType(dict(self.attributes)))
 
 
 @dataclass(frozen=True, slots=True)
