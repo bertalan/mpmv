@@ -486,16 +486,37 @@ def test_staff_only_endpoint_refuses_a_customer(
     check_refused(client, endpoint, classify(endpoint), tenants, caller="a signed-in customer")
 
 
+# A route count that only grows: an enumeration that regresses to a few or no routes must fail
+# here, not pass an empty matrix. Raise it when staff-only routes are added.
+MIN_STAFF_ONLY_ROUTES = 600
+
+
+def test_the_staff_only_enumeration_is_not_empty() -> None:
+    assert len(STAFF_ONLY) >= MIN_STAFF_ONLY_ROUTES, (
+        f"only {len(STAFF_ONLY)} staff-only routes found, expected at least "
+        f"{MIN_STAFF_ONLY_ROUTES}: the enumeration regressed"
+    )
+
+
+def vendor_member_client(client: Client, tenants: Tenants, role: VendorMemberRole) -> None:
+    member = UserFactory.create(email=f"{role}-staff-check@example.com")
+    VendorMemberFactory.create(vendor=tenants().a.vendor, user=member, role=role)
+    # With the second factor done: a redirect to MFA setup would hide what the role may open.
+    verified_login(client, member)
+
+
 @pytest.mark.parametrize("role", list(VendorMember.Role), ids=str)
 @pytest.mark.parametrize("endpoint", STAFF_ONLY, ids=lambda e: e.key)
 def test_staff_only_endpoint_refuses_every_vendor_member_role(
     endpoint: Endpoint, role: VendorMemberRole, client: Client, tenants: Tenants
 ) -> None:
-    """SEC.11: a vendor member of any role (owner included) is not staff."""
-    member = UserFactory.create(email=f"{role}-staff-check@example.com")
-    VendorMemberFactory.create(vendor=tenants().a.vendor, user=member, role=role)
-    # With the second factor done: a redirect to MFA setup would hide what the role may open.
-    verified_login(client, member)
+    """SEC.11: a vendor member of any role (owner included) is not staff.
+
+    This pins the state where vendor members lack `wagtailadmin.access_admin` (and any other
+    staff permission). Recheck SEC.11 before they are given it: this test must then keep failing
+    only for routes the new permission is meant to open.
+    """
+    vendor_member_client(client, tenants, role)
     check_refused(
         client, endpoint, classify(endpoint), tenants, caller=f"a signed-in vendor {role}"
     )
@@ -539,36 +560,35 @@ CONFINED_WEB = [e for e in VENDOR_SCOPED_WEB if e.key not in OWNER_ONLY_WEB]
 
 
 def empty_parameter_sets(
-    vendor_scoped: list[Endpoint],
-    confined: list[Endpoint],
-    owner_only: list[Endpoint],
-    roles: Sequence[VendorMemberRole],
+    vendor_scoped: Sequence[Endpoint], confined: Sequence[Endpoint], roles: Sequence[object]
 ) -> list[str]:
-    """The role tests that pytest would skip silently although VendorScoped endpoints exist."""
+    """The role confinement parameter sets that pytest would skip silently.
+
+    One rule: when VendorScoped web endpoints exist, there must be non-owner roles and endpoints
+    outside `OWNER_ONLY_WEB` to run `test_every_vendor_role_is_confined_to_its_vendor` on.
+    """
     if not vendor_scoped:
         return []
     empty = []
     if not roles:
         empty.append("no non-owner VendorMember.Role")
-    if not confined and not owner_only:
-        empty.append("no endpoint for the role confinement tests")
+    if not confined:
+        empty.append("no VendorScoped endpoint outside OWNER_ONLY_WEB")
     return empty
 
 
 def test_the_vendor_role_tests_never_skip_for_an_empty_parameter_set() -> None:
     """SEC.11: an empty parameter set made the confinement test skip, not fail (SEC.5)."""
-    owner_only = [e for e in VENDOR_SCOPED_WEB if e.key in OWNER_ONLY_WEB]
-    empty = empty_parameter_sets(VENDOR_SCOPED_WEB, CONFINED_WEB, owner_only, NON_OWNER_ROLES)
+    empty = empty_parameter_sets(VENDOR_SCOPED_WEB, CONFINED_WEB, NON_OWNER_ROLES)
     assert not empty, "The vendor role tests would skip: " + ", ".join(empty)
-    assert CONFINED_WEB, "test_every_vendor_role_is_confined_to_its_vendor has no endpoint"
 
 
 def test_the_empty_parameter_guard_fails_when_vendor_scoped_endpoints_exist() -> None:
     sample = WEB_ENDPOINTS[:1]
-    assert empty_parameter_sets(sample, [], [], NON_OWNER_ROLES)
-    assert empty_parameter_sets(sample, sample, [], [])
-    assert not empty_parameter_sets([], [], [], [])
-    assert not empty_parameter_sets(sample, sample, [], NON_OWNER_ROLES)
+    assert empty_parameter_sets(sample, [], NON_OWNER_ROLES)
+    assert empty_parameter_sets(sample, sample, [])
+    assert not empty_parameter_sets([], [], [])
+    assert not empty_parameter_sets(sample, sample, NON_OWNER_ROLES)
 
 
 @pytest.mark.parametrize("role", NON_OWNER_ROLES, ids=str)
