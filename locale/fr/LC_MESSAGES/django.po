@@ -9767,10 +9767,9 @@ msgstr "Nommer par langue"
 #: apps/events/panels.py
 msgid ""
 "Tag the event with the vehicles it is for. Visitors whose garage matches see a badge. Leave it "
-"empty for an event for everyone."
-msgstr ""
-"Indiquez les véhicules concernés par l'événement. Les visiteurs dont le garage correspond voient "
-"un badge. Laissez vide pour un événement ouvert à tous."
+"empty for an event for everyone. Edit the tags on the page in the original language: translations "
+"follow it."
+msgstr "Indiquez les véhicules concernés par l'événement. Les visiteurs dont le garage correspond voient un badge. Laissez vide pour un événement ouvert à tous. Modifiez les véhicules sur la page dans la langue d'origine : les traductions la suivent."
 
 #: apps/manager/forms.py
 msgid "Tagline"
