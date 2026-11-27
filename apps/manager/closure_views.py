@@ -12,6 +12,7 @@ from typing import Any
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
+from django.db.models import QuerySet
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
@@ -37,13 +38,29 @@ class _ClosureView(ManagerView):
             raise Http404("No vendor selected.")
         return self.manager.vendor
 
+    audit_source = AuditLog.Source.VENDOR
+
     def audit(self, request: HttpRequest) -> AuditContext:
-        return replace(audit_context(request), source=AuditLog.Source.VENDOR)
+        return replace(audit_context(request), source=self.audit_source)
+
+    # The URLs of the page, so the staff page in the platform space reuses every view and template.
+    def list_url(self) -> str:
+        return reverse(LIST_URL)
+
+    def edit_url(self, closure: VendorClosure) -> str:
+        return reverse("manager:shop:closure_edit", args=[closure.public_id])
+
+    def remove_url(self, closure: VendorClosure) -> str:
+        return reverse("manager:shop:closure_remove", args=[closure.public_id])
+
+    def rows(self) -> QuerySet[VendorClosure]:
+        """The closures this page may touch: the selected shop's."""
+        return self.scoped(VendorClosure)
 
     def closure(self) -> VendorClosure:
         """The closure of the URL in the selected shop; another shop's is a 404."""
         public_id: uuid.UUID = self.kwargs["public_id"]
-        return get_object_or_404(self.scoped(VendorClosure), public_id=public_id)
+        return get_object_or_404(self.rows(), public_id=public_id)
 
     def fail(self, form: ClosureForm, error: ValidationError) -> None:
         for name, problems in error.message_dict.items():
@@ -58,10 +75,12 @@ class ClosuresView(_ClosureView):
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
         today = services.business_today()
-        rows = list(self.scoped(VendorClosure).order_by("start_date", "end_date"))
-        context["current"] = [c for c in rows if c.repeats_yearly or c.end_date >= today]
-        context["history"] = [c for c in rows if not (c.repeats_yearly or c.end_date >= today)]
+        rows = list(self.rows().order_by("start_date", "end_date"))
+        current = [c for c in rows if c.repeats_yearly or c.end_date >= today]
+        context["current"] = [(c, self.edit_url(c), self.remove_url(c)) for c in current]
+        context["history"] = [c for c in rows if c not in current]
         context["vendor_id"] = self.vendor().pk
+        context["form_action"] = self.list_url()
         context.setdefault("form", ClosureForm())
         return context
 
@@ -81,7 +100,7 @@ class ClosuresView(_ClosureView):
             self.fail(form, error)
             return self.render_to_response(self.get_context_data(form=form))
         messages.success(request, _("The closure is saved. Buyers see the notice from now on."))
-        return HttpResponseRedirect(reverse(LIST_URL))
+        return HttpResponseRedirect(self.list_url())
 
 
 class ClosureEditView(_ClosureView):
@@ -91,7 +110,7 @@ class ClosureEditView(_ClosureView):
         context = super().get_context_data(**kwargs)
         closure = self.closure()
         context["closure"] = closure
-        context["list_url"] = reverse(LIST_URL)
+        context["list_url"] = self.list_url()
         context["title"] = _("Edit a closure")
         context.setdefault(
             "form",
@@ -122,7 +141,7 @@ class ClosureEditView(_ClosureView):
             self.fail(form, error)
             return self.render_to_response(self.get_context_data(form=form))
         messages.success(request, _("The closure is saved. Buyers see the notice from now on."))
-        return HttpResponseRedirect(reverse(LIST_URL))
+        return HttpResponseRedirect(self.list_url())
 
 
 class ClosureDeleteView(_ClosureView):
@@ -134,7 +153,7 @@ class ClosureDeleteView(_ClosureView):
         context = super().get_context_data(**kwargs)
         context["closure"] = self.closure()
         context["title"] = _("Remove a closure")
-        context["list_url"] = reverse(LIST_URL)
+        context["list_url"] = self.list_url()
         return context
 
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
@@ -147,4 +166,4 @@ class ClosureDeleteView(_ClosureView):
             messages.error(request, " ".join(error.messages))
         else:
             messages.success(request, _("The closure is removed."))
-        return HttpResponseRedirect(reverse(LIST_URL))
+        return HttpResponseRedirect(self.list_url())
