@@ -10,7 +10,11 @@ from apps.core.models import AuditLog
 from apps.ingest import services
 from apps.ingest.enrichment import FakeEnricher, TextPolicy
 from apps.ingest.models import EnrichmentVersion, ImportRun, ProductDraft, ReviewItem
-from apps.ingest.tests.factories import ImportRunFactory, ProductDraftFactory
+from apps.ingest.tests.factories import (
+    EnrichmentVersionFactory,
+    ImportRunFactory,
+    ProductDraftFactory,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -118,3 +122,10 @@ def test_run_of_another_vendor_is_refused() -> None:
     other = ImportRunFactory.create()
     with pytest.raises(services.EnrichmentRefused):
         services.enrich_draft(draft, FakeEnricher(), run=other, ctx=CTX)
+
+
+def test_archive_lists_the_newest_version_first() -> None:
+    draft, _ = make_draft()
+    older = EnrichmentVersionFactory.create(draft=draft, outcome="out_of_policy")
+    newer = EnrichmentVersionFactory.create(draft=draft)
+    assert list(draft.enrichment_versions.all()) == [newer, older]
