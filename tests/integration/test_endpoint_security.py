@@ -49,7 +49,9 @@ from django.test import Client
 from django.test.utils import CaptureQueriesContext
 from django.urls import resolve, reverse
 from django.utils import translation
+from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
+from django.views.generic import View
 from wagtail.contrib.routable_page.models import RoutablePageMixin
 from wagtail.models import Page, PageViewRestriction
 
@@ -293,6 +295,9 @@ def test_public_allow_list_has_no_stale_entries() -> None:
     assert not stale, "No such endpoint any more, remove from PUBLIC: " + ", ".join(stale)
 
 
+MIN_REASON = 15  # characters: a sentence, not a placeholder like "ok" or "TODO"
+
+
 def csrf_exempt_declaration_problems(
     endpoints: Sequence[Endpoint], declared: Mapping[str, str], admin_declared: Mapping[str, str]
 ) -> list[str]:
@@ -320,13 +325,33 @@ def test_csrf_exempt_views_are_declared() -> None:
     )
 
 
-def test_the_csrf_exempt_guard_fails_on_an_undeclared_view() -> None:
-    """Meta-test: a throwaway admin view that skips the CSRF check turns the guard red."""
+def _exempt_view_forms() -> dict[str, Callable[..., HttpResponseBase]]:
+    """The ways a package can mark a view csrf_exempt; the guard must see all of them."""
 
     @csrf_exempt
-    def throwaway(request: HttpRequest) -> HttpResponse:
+    def decorated(request: HttpRequest) -> HttpResponse:
         return HttpResponse("")
 
+    class Cbv(View):
+        def post(self, request: HttpRequest) -> HttpResponse:
+            return HttpResponse("")
+
+    def plain(request: HttpRequest) -> HttpResponse:
+        return HttpResponse("")
+
+    return {
+        "decorator": decorated,
+        "method_decorator on dispatch": method_decorator(csrf_exempt, name="dispatch")(
+            Cbv
+        ).as_view(),
+        "url-level wrapper": csrf_exempt(plain),
+    }
+
+
+@pytest.mark.parametrize("form", ["decorator", "method_decorator on dispatch", "url-level wrapper"])
+def test_the_csrf_exempt_guard_fails_on_an_undeclared_view(form: str) -> None:
+    """Meta-test: a throwaway view that skips the CSRF check turns the guard red, in each form."""
+    throwaway = _exempt_view_forms()[form]
     view = Endpoint(
         key="wagtailadmin_throwaway",
         route="admin/throwaway/",
@@ -775,7 +800,6 @@ REPO = Path(__file__).resolve().parents[2]
 CITED_TEST = re.compile(r"`(test_\w+)`")
 CITED_FILE = re.compile(r"\b((?:apps|tests)/[\w/]+\.py)\b")
 TEST_DEF = re.compile(r"^\s*(?:async\s+)?def\s+(test_\w+)\s*\(", re.MULTILINE)
-MIN_REASON = 15  # characters: a sentence, not a placeholder like "ok" or "TODO"
 
 
 def defined_tests() -> set[str]:

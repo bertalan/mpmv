@@ -255,6 +255,9 @@ CSRF_EXEMPT: dict[str, str] = {
 # (SEC.11). Each is declared one by one; a new one fails `test_csrf_exempt_views_are_declared`.
 # `test_post_without_csrf_token_is_refused` proves each answers an unsigned POST with 403 (the
 # view checks the token itself) or 405 (it takes no POST), and writes nothing.
+# Accepting a 405 is deliberate: a view that later gains a POST handler behind `csrf_exempt` turns
+# that test red, which is the intended behaviour. It then needs a review of its own token or
+# authentication check before its entry is updated.
 ADMIN_CSRF_EXEMPT: dict[str, str] = {
     "wagtailadmin_api:explorer": (
         "Wagtail admin API (django-ninja), read-only page explorer: no POST handler, so an "
