@@ -20,6 +20,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from apps.catalog.models import Product
+from apps.core.encryption import AI_KEYS_SETTING
 from apps.core.fields import EncryptedCharField
 from apps.core.models import BaseModel
 from apps.vendors.models import Vendor
@@ -620,8 +621,9 @@ class AIProvider(models.TextChoices):
 class VendorAIProvider(BaseModel):
     """A vendor's own AI provider for its own catalogue texts (ING.14, owner decision D-13).
 
-    The key is encrypted at rest with the field keys of SEC.3 (`EncryptedCharField`), write-only
-    in every form and never part of an audit snapshot, a serializer or an error message.
+    The key is encrypted at rest (`EncryptedCharField`) with the dedicated key ring of the AI
+    keys, bound to the vendor in its associated data, write-only in every form and never part of
+    an audit snapshot, a serializer or an error message.
     """
 
     vendor_scope: ClassVar[str] = "vendor"
@@ -641,6 +643,8 @@ class VendorAIProvider(BaseModel):
     api_key = EncryptedCharField(
         max_length=300,
         blank=True,
+        keyring_setting=AI_KEYS_SETTING,  # its own key-encryption keys, not the SEC.3 field keys
+        bound_to="vendor",  # the ciphertext only decrypts in this vendor's row
         help_text=_("The vendor's own key. It is never shown again."),
     )
     key_version = models.PositiveIntegerField(
@@ -663,7 +667,9 @@ class VendorAIProvider(BaseModel):
 
     @property
     def has_key(self) -> bool:
-        return bool(self.api_key)
+        """Whether a key is stored. Reads the column as it is: no decryption, so the page works
+        even while the key ring is unavailable."""
+        return bool(self.__dict__.get("api_key"))
 
 
 class ImportRun(BaseModel):

@@ -12,6 +12,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from django_stubs_ext import StrOrPromise
 
 from apps.accounts.models import User
 from apps.core.audit import AuditContext
@@ -75,7 +76,7 @@ def save_provider(
         raise PermissionDenied("Setting the AI provider needs a passkey confirmation.")
     if not has_vendor_permission(actor, vendor, "profile"):
         raise PermissionDenied("Only the vendor owner chooses the AI provider.")
-    errors: dict[str, str] = {}
+    errors: dict[str, StrOrPromise] = {}
     if provider not in AIProvider.values:
         errors["provider"] = _("Choose one of the listed providers.")
     if not MODEL_NAME.match(model):

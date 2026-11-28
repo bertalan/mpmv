@@ -43,7 +43,9 @@ class Migration(migrations.Migration):
                     "api_key",
                     apps.core.fields.EncryptedCharField(
                         blank=True,
+                        bound_to="vendor",
                         help_text="The vendor's own key. It is never shown again.",
+                        keyring_setting="AI_KEY_ENCRYPTION_KEYS",
                         max_length=300,
                     ),
                 ),
