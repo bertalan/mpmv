@@ -227,6 +227,12 @@ msgid_plural "%(n)s products selected."
 msgstr[0] "%(n)s prodotto selezionato."
 msgstr[1] "%(n)s prodotti selezionati."
 
+#: apps/manager/templates/manager/platform/ingest_source_new.html
+msgid "%(n)s row read."
+msgid_plural "%(n)s rows read."
+msgstr[0] "%(n)s riga letta."
+msgstr[1] "%(n)s righe lette."
+
 #: apps/fitment/garage_views.py
 msgid "%(name)s is deleted."
 msgstr "%(name)s è stato eliminato."
@@ -754,6 +760,10 @@ msgstr "Un intervallo già concluso non può essere salvato."
 msgid "A range that has ended stays as history."
 msgstr "Un intervallo concluso resta nello storico."
 
+#: apps/manager/ingest_views.py
+msgid "A real export of the supplier. It is read once to show you the result and is not kept."
+msgstr "Un'esportazione reale del fornitore. Viene letta una sola volta per mostrarLe il risultato e non viene conservata."
+
 #: apps/manager/amendment_views.py
 msgid "a refund to the customer"
 msgstr "un rimborso al cliente"
@@ -761,6 +771,10 @@ msgstr "un rimborso al cliente"
 #: apps/manager/amendment_views.py
 msgid "a refund to the customer by platform staff"
 msgstr "un rimborso al cliente da parte dello staff della piattaforma"
+
+#: apps/manager/ingest_views.py
+msgid "A sample was read without errors with the current mapping"
+msgstr "Un campione è stato letto senza errori con l'associazione attuale"
 
 #: apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "A scheme has at most %(max)s levels. The new level goes last."
@@ -930,6 +944,10 @@ msgstr ""
 msgid "A short name without spaces that is unique, for example 'dhl'."
 msgstr "Un nome breve senza spazi e unico, per esempio 'dhl'."
 
+#: apps/manager/ingest_views.py
+msgid "A short name without spaces, for example price-list."
+msgstr "Un nome breve senza spazi, per esempio listino."
+
 #: apps/vendors/admin.py
 msgid ""
 "A short reason shown to staff when the commission is zero, for example 'Launch promo'. Leave it "
@@ -976,6 +994,12 @@ msgid ""
 msgstr ""
 "Un breve testo mostrato sopra i prodotti di questa categoria o etichetta. Se non ne aggiungi, la "
 "pagina parte direttamente dai prodotti."
+
+#: apps/manager/templates/manager/platform/ingest_sources.html
+msgid ""
+"A source reads one supplier's price list or feed. Add a new vendor from a sample file without "
+"writing code."
+msgstr "Una fonte legge il listino o il flusso di un fornitore. Aggiunga un nuovo venditore da un file campione, senza scrivere codice."
 
 #: apps/manager/money_views.py
 msgid "A statement needs a start and an end date. The current month is shown."
@@ -1156,6 +1180,7 @@ msgid "Actions"
 msgstr "Azioni"
 
 #: apps/fitment/templates/fitment/garage_account.html apps/manager/fitment_forms.py
+#: apps/manager/templates/manager/platform/ingest_sources.html
 #: themes/ride/templates/fitment/garage_account.html
 msgid "Active"
 msgstr "Attivo"
@@ -1902,6 +1927,11 @@ msgstr "Torna ai prodotti"
 msgid "Back to the site"
 msgstr "Torna al sito"
 
+#: apps/manager/templates/manager/platform/ingest_source.html
+#: apps/manager/templates/manager/platform/ingest_source_new.html
+msgid "Back to the sources"
+msgstr "Torna alle fonti"
+
 #: apps/manager/templates/manager/platform/termination_detail.html
 msgid "Back to the terminations"
 msgstr "Torna alle cessazioni"
@@ -2364,6 +2394,10 @@ msgstr ""
 msgid "Check the rule."
 msgstr "Controlla la regola."
 
+#: apps/manager/templates/manager/platform/ingest_source_new.html
+msgid "Check the sample"
+msgstr "Verifica il campione"
+
 #: apps/catalog/templates/catalog/search.html themes/ride/templates/catalog/search.html
 msgid "Check the spelling, try fewer words or a part of the product code."
 msgstr "Controlla l'ortografia, prova con meno parole o con una parte del codice prodotto."
@@ -2375,6 +2409,10 @@ msgstr "Controlli la Sua email"
 #: apps/manager/templates/manager/platform/stray_payments.html
 msgid "Checked"
 msgstr "Verificato"
+
+#: apps/manager/templates/manager/platform/ingest_source.html
+msgid "Checklist"
+msgstr "Lista di controllo"
 
 #: apps/orders/models.py apps/orders/templates/orders/checkout.html
 #: themes/ride/templates/orders/checkout.html
@@ -2470,7 +2508,7 @@ msgid "Choose a vehicle while you browse the shop and save it: the shop then sho
 msgstr ""
 "Scegli un veicolo mentre sfogli il negozio e salvalo: il negozio ti mostrerà cosa è compatibile."
 
-#: apps/manager/sections.py apps/manager/site_map.py
+#: apps/manager/ingest_views.py apps/manager/sections.py apps/manager/site_map.py
 #: apps/manager/templates/manager/shop/vendor_picker.html
 msgid "Choose a vendor"
 msgstr "Scegli un venditore"
@@ -2530,6 +2568,10 @@ msgstr "Scegli come si ripete l'evento. I campi qui sotto dipendono dalla scelta
 #: apps/accounts/templates/accounts/mfa/setup.html themes/ride/templates/accounts/mfa/setup.html
 msgid "Choose how you will confirm it is you after your password."
 msgstr "Scelga come confermare la Sua identità dopo la password."
+
+#: apps/manager/ingest_views.py
+msgid "Choose it when the prices use a separator that is easy to misread."
+msgstr "La scelga quando i prezzi usano un separatore facile da fraintendere."
 
 #: apps/orders/ui/present.py
 msgid "Choose one of the shipping options."
@@ -2703,6 +2745,14 @@ msgstr "Colore"
 #: apps/themes/admin_views.py
 msgid "colour picker"
 msgstr "selettore di colore"
+
+#: apps/manager/templates/manager/platform/ingest_source_new.html
+msgid "Columns found:"
+msgstr "Colonne trovate:"
+
+#: apps/manager/ingest_views.py
+msgid "Comma"
+msgstr "Virgola"
 
 #: apps/events/templates/email/events/event_changes_requested/body.html
 #: apps/events/templates/email/events/event_changes_requested/body.txt
@@ -3004,6 +3054,10 @@ msgstr "Foro per gli acquirenti professionali"
 msgid "Court of %(court)s"
 msgstr "Foro di %(court)s"
 
+#: apps/manager/templates/manager/platform/ingest_source_new.html
+msgid "Create the source"
+msgstr "Crea la fonte"
+
 #: apps/manager/event_image_form.py
 msgid "Credit line"
 msgstr "Riga di credito"
@@ -3116,6 +3170,10 @@ msgstr "Addebiti"
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Decided"
 msgstr "Deciso"
+
+#: apps/manager/ingest_views.py
+msgid "Decimal separator of the numbers"
+msgstr "Separatore decimale dei numeri"
 
 #: apps/compliance/templates/email/compliance/notice_decision/body.html
 #: apps/compliance/templates/email/compliance/notice_decision/body.txt
@@ -3302,6 +3360,10 @@ msgstr "Descrizione del logo"
 msgid "Details"
 msgstr "Dati"
 
+#: apps/manager/ingest_views.py
+msgid "Detect it"
+msgstr "Rilevalo"
+
 #: apps/seo/site_links.py
 msgid "Developer and system"
 msgstr "Sviluppo e sistema"
@@ -3373,6 +3435,10 @@ msgstr "Non si ripete"
 #: apps/orders/customer_views.py
 msgid "done"
 msgstr "completato"
+
+#: apps/manager/templates/manager/platform/ingest_source.html
+msgid "Done:"
+msgstr "Fatto:"
 
 #: apps/compliance/templates/compliance/privacy_account.html
 #: themes/ride/templates/compliance/privacy_account.html
@@ -3793,6 +3859,10 @@ msgstr "Ogni anno, nelle stesse date"
 msgid "Every year."
 msgstr "Ogni anno."
 
+#: apps/manager/templates/manager/platform/ingest_source.html
+msgid "Everything needed is in place."
+msgstr "Tutto il necessario è a posto."
+
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Exact location"
 msgstr "Posizione esatta"
@@ -3963,6 +4033,10 @@ msgstr "Primo giorno di chiusura."
 #: apps/manager/event_forms.py
 msgid "First day"
 msgstr "Primo giorno"
+
+#: apps/manager/templates/manager/platform/ingest_source_new.html
+msgid "First rows"
+msgstr "Prime righe"
 
 #: apps/manager/product_views.py apps/manager/templates/manager/platform/product.html
 msgid "Fiscal category"
@@ -5591,6 +5665,10 @@ msgstr "Gruppi mancanti"
 msgid "Missing in %(language)s"
 msgstr "Mancante in %(language)s"
 
+#: apps/manager/templates/manager/platform/ingest_source.html
+msgid "Missing:"
+msgstr "Manca:"
+
 #: apps/compliance/templates/compliance/includes/product_safety.html
 msgid "Model or type"
 msgstr "Modello o tipo"
@@ -5683,6 +5761,10 @@ msgstr "Nome del/dei consumatore(i)"
 msgid "Name of the missing item"
 msgstr "Nome dell'elemento mancante"
 
+#: apps/manager/ingest_views.py apps/manager/templates/manager/platform/ingest_sources.html
+msgid "Name of the source"
+msgstr "Nome della fonte"
+
 #: apps/vendors/forms.py
 msgid "Name of your business or shop"
 msgstr "Nome della Sua attività o del Suo negozio"
@@ -5762,6 +5844,11 @@ msgstr "Nuova quantità di %(title)s (ora %(quantity)s)"
 msgid "New recovery codes"
 msgstr "Nuovi codici di recupero"
 
+#: apps/manager/templates/manager/platform/ingest_source_new.html
+#: apps/manager/templates/manager/platform/ingest_sources.html
+msgid "New source from a sample"
+msgstr "Nuova fonte da un campione"
+
 #: apps/orders/templates/orders/customer_order.html themes/ride/templates/orders/customer_order.html
 msgid "New total %(total)s."
 msgstr "Nuovo totale %(total)s."
@@ -5815,6 +5902,7 @@ msgstr "Diapositiva successiva"
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
 #: apps/manager/fitment_views.py apps/manager/templates/manager/platform/fitment_scheme.html
+#: apps/manager/templates/manager/platform/ingest_sources.html
 #: apps/manager/templates/manager/platform/stray_payments.html
 msgid "No"
 msgstr "No"
@@ -7566,6 +7654,10 @@ msgstr ""
 "PNG, JPEG, WebP o GIF (SVG non è accettato). L'immagine viene controllata e salvata di nuovo senza"
 " i dati nascosti. Obbligatorio."
 
+#: apps/manager/ingest_views.py
+msgid "Point"
+msgstr "Punto"
+
 #: apps/manager/templates/manager/shop/event_form.html
 msgid "Point on the map"
 msgstr "Punto sulla mappa"
@@ -7722,6 +7814,10 @@ msgstr "Versioni precedenti"
 #: apps/events/templates/events/event_page.html
 msgid "Previously"
 msgstr "Prima"
+
+#: apps/manager/templates/manager/platform/ingest_source_new.html
+msgid "Price"
+msgstr "Prezzo"
 
 #: apps/catalog/templates/catalog/includes/listing_filters.html
 #: themes/ride/templates/catalog/includes/listing_filters.html
@@ -8416,6 +8512,10 @@ msgstr "Limita e invia la motivazione"
 msgid "Restriction"
 msgstr "Restrizione"
 
+#: apps/manager/templates/manager/platform/ingest_source_new.html
+msgid "Result of the sample"
+msgstr "Risultato del campione"
+
 #: themes/base/templates/components/launch_countdown.html
 #: themes/ride/templates/components/launch_countdown.html
 msgid "Resume countdown"
@@ -8566,9 +8666,17 @@ msgstr "Ruoli"
 msgid "Row"
 msgstr "Riga"
 
+#: apps/manager/templates/manager/platform/ingest_source_new.html
+msgid "Row %(n)s:"
+msgstr "Riga %(n)s:"
+
 #: apps/manager/templates/manager/shop/fitment_report.html
 msgid "Rows waiting on an item that is not approved"
 msgstr "Righe in attesa di un elemento non approvato"
+
+#: apps/manager/templates/manager/platform/ingest_source_new.html
+msgid "Rows with errors"
+msgstr "Righe con errori"
 
 #: apps/events/templates/events/_subscribe.html
 msgid "RSS feed"
@@ -8614,6 +8722,10 @@ msgstr "Condizioni di vendita di %(name)s (versione %(number)s)"
 #: apps/catalog/taxonomy.py
 msgid "sameAs links"
 msgstr "Link sameAs"
+
+#: apps/manager/ingest_views.py
+msgid "Sample file"
+msgstr "File campione"
 
 #: apps/manager/event_forms.py
 msgid "Saturday"
@@ -9386,6 +9498,10 @@ msgstr ""
 "Qualcuno, probabilmente Lei, ha usato questo indirizzo email per candidarsi a vendere con noi. Per"
 " proseguire, apra questo link, confermi il Suo indirizzo email e scelga una password."
 
+#: apps/manager/templates/manager/platform/ingest_source.html
+msgid "Something is still missing. Fix the items marked as missing."
+msgstr "Manca ancora qualcosa. Corregga le voci segnate come mancanti."
+
 #: themes/base/templates/500.html themes/ride/templates/500.html
 msgid "Something went wrong"
 msgstr "Qualcosa è andato storto"
@@ -9628,6 +9744,11 @@ msgstr "Domenica"
 #: apps/orders/models.py
 msgid "Superseded"
 msgstr "Sostituito"
+
+#: apps/manager/sections.py apps/manager/site_map.py
+#: apps/manager/templates/manager/platform/ingest_sources.html
+msgid "Supplier sources"
+msgstr "Fonti dei fornitori"
 
 #: apps/orders/customer_views.py
 msgid "Support changed this cart after sending the link. Use the newest link we emailed you."
@@ -10169,6 +10290,10 @@ msgstr ""
 "La palette di colori dell'intero sito. Lasciala vuota per usare i colori del tema (Rosso per "
 "ride)."
 
+#: apps/manager/ingest_views.py
+msgid "The columns for the SKU and the title are mapped"
+msgstr "Le colonne di SKU e titolo sono associate"
+
 #: apps/catalog/taxonomy.py
 msgid ""
 "The company that makes the brand's products, when it is not the brand itself. It is shown on the "
@@ -10613,6 +10738,10 @@ msgstr "Il minimo di giorni per la consegna. È solo una stima. Non ancora mostr
 #: apps/ingest/models.py
 msgid "The fields this change sets, as true flags."
 msgstr "I campi che questa modifica imposta, come flag veri."
+
+#: apps/manager/ingest_views.py
+msgid "The file is larger than the allowed size."
+msgstr "Il file supera la dimensione consentita."
 
 #: apps/manager/event_forms.py
 msgid "The first day of an all-day event."
@@ -12459,6 +12588,14 @@ msgstr ""
 "Lo slug '%(slug)s' è riservato alle pagine di aiuto del sito e non può essere usato per una pagina"
 " direttamente sotto la home page. Scegli un altro slug."
 
+#: apps/manager/ingest_views.py
+msgid "The source is active"
+msgstr "La fonte è attiva"
+
+#: apps/manager/ingest_views.py
+msgid "The source is created. It stays inactive until the checklist is met."
+msgstr "La fonte è stata creata. Resta inattiva finché la lista di controllo non è soddisfatta."
+
 #: apps/shipping/models.py
 msgid "The special area this treatment is for. A method has one treatment per area."
 msgstr ""
@@ -12738,6 +12875,10 @@ msgstr "La traduzione è salvata come bozza. Inviala quando è pronta."
 msgid "The two passwords do not match."
 msgstr "Le due password non coincidono."
 
+#: apps/manager/ingest_views.py
+msgid "The type of file is one we can read"
+msgstr "Il tipo di file è uno che sappiamo leggere"
+
 #: apps/catalog/attributes.py
 msgid ""
 "The unit of a number attribute, for example cm, kg or ml. Leave it empty for choice and text "
@@ -12801,6 +12942,10 @@ msgstr ""
 "Il trattamento IVA del prodotto: Aliquota standard per la maggior parte dei beni, Aliquota ridotta"
 " per i beni che ne hanno diritto, Libri per i libri con il regime speciale. Se non sei sicuro di "
 "quale si applichi, chiedi al tuo commercialista."
+
+#: apps/manager/ingest_views.py
+msgid "The vendor is active"
+msgstr "Il venditore è attivo"
 
 #: apps/manager/templates/manager/platform/termination_detail.html
 msgid "The vendor is closed. %(count)s open orders and its payouts wait for review."
@@ -13088,6 +13233,10 @@ msgid ""
 msgstr ""
 "Per questo link non c’è nessuna candidatura in attesa: è stata annullata, confermata o è scaduta. "
 "Non c’è altro da fare."
+
+#: apps/manager/templates/manager/platform/ingest_sources.html
+msgid "There is no source yet."
+msgstr "Non c'è ancora nessuna fonte."
 
 #: apps/manager/templates/manager/shop/termination.html
 msgid "There is no termination notice for your shop."
@@ -13857,7 +14006,8 @@ msgstr "Gli orari qui sopra sono letti in questo fuso orario, per esempio Europe
 #: apps/catalog/templates/catalog/admin/rendition_monitor.html
 #: apps/cms/templates/cms/admin/image_review.html apps/manager/event_forms.py
 #: apps/manager/event_image_form.py apps/manager/fitment_shop_views.py apps/manager/media.py
-#: apps/manager/product_views.py apps/manager/templates/manager/platform/product.html
+#: apps/manager/product_views.py apps/manager/templates/manager/platform/ingest_source_new.html
+#: apps/manager/templates/manager/platform/product.html
 msgid "Title"
 msgstr "Titolo"
 
@@ -14134,6 +14284,10 @@ msgstr "Impostazioni della verifica in due passaggi"
 msgid "Type"
 msgstr "Tipo"
 
+#: apps/manager/ingest_views.py
+msgid "Type of file"
+msgstr "Tipo di file"
+
 #: apps/cms/choosers.py
 msgid "Type part of a product name, SKU, brand or vendor name."
 msgstr "Scrivi una parte del nome del prodotto, dello SKU, del marchio o del nome del venditore."
@@ -14392,7 +14546,8 @@ msgstr "Partita IVA o codice fiscale (TIN)"
 #: apps/compliance/templates/email/compliance/safety_case_overdue/body.txt
 #: apps/events/templates/events/_filters.html apps/events/templates/events/admin/policies.html
 #: apps/events/templates/events/admin/review.html apps/events/templates/events/event_page.html
-#: apps/manager/templates/manager/layout.html
+#: apps/manager/ingest_views.py apps/manager/templates/manager/layout.html
+#: apps/manager/templates/manager/platform/ingest_sources.html
 #: apps/manager/templates/manager/platform/terminations.html
 #: apps/manager/templates/manager/shop/dashboard.html
 #: themes/ride/templates/catalog/includes/listing_filters.html
@@ -15663,6 +15818,7 @@ msgstr "Riferimento del pagamento errato"
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
 #: apps/manager/fitment_views.py apps/manager/templates/manager/platform/fitment_scheme.html
+#: apps/manager/templates/manager/platform/ingest_sources.html
 #: apps/manager/templates/manager/platform/stray_payments.html
 msgid "Yes"
 msgstr "Sì"

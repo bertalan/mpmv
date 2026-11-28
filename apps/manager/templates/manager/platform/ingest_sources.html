@@ -1,0 +1,31 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+Supplier sources (ING.13): one row per source with its state and a link to its checklist.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{% translate "Supplier sources" %}</h1>
+  <p class="manager-lead">{% translate "A source reads one supplier's price list or feed. Add a new vendor from a sample file without writing code." %}</p>
+  {% if can_write %}<p><a class="button" href="{% url 'manager:platform:ingest_source_new' %}">{% translate "New source from a sample" %}</a></p>{% endif %}
+  {% if sources %}
+    <div class="table-scroll" role="region" aria-labelledby="sources-caption" tabindex="0">
+      <table class="table">
+        <caption id="sources-caption">{% translate "Supplier sources" %}</caption>
+        <thead><tr>
+          <th scope="col">{% translate "Vendor" %}</th>
+          <th scope="col">{% translate "Name of the source" %}</th>
+          <th scope="col">{% translate "Active" %}</th>
+        </tr></thead>
+        <tbody>
+          {% for source in sources %}<tr>
+            <th scope="row">{{ source.vendor }}</th>
+            <td><a href="{% url 'manager:platform:ingest_source' source.public_id %}">{{ source.code }}</a></td>
+            <td>{% if source.is_active %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}</td>
+          </tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p>{% translate "There is no source yet." %}</p>
+  {% endif %}
+{% endblock %}

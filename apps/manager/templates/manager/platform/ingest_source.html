@@ -1,0 +1,14 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+The checklist of one supplier source (ING.13): what is met and what is missing before activation.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{{ source.vendor }} / {{ source.code }}</h1>
+  <h2>{% translate "Checklist" %}</h2>
+  <ul class="checklist">
+    {% for item in items %}<li>{% if item.ok %}<span aria-hidden="true">&#10003;</span> <span class="visually-hidden">{% translate "Done:" %}</span>{% else %}<span aria-hidden="true">&#10007;</span> <span class="visually-hidden">{% translate "Missing:" %}</span>{% endif %} {{ item.label }}</li>{% endfor %}
+  </ul>
+  <p>{% if ready %}{% translate "Everything needed is in place." %}{% else %}{% translate "Something is still missing. Fix the items marked as missing." %}{% endif %}</p>
+  <p><a href="{{ list_url }}">{% translate "Back to the sources" %}</a></p>
+{% endblock %}

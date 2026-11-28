@@ -15,6 +15,7 @@ from . import (
     fitment_picker,
     fitment_shop_views,
     fitment_views,
+    ingest_views,
     media,
     money_views,
     notice_views,
@@ -279,6 +280,14 @@ platform = (
         ),
         # PAY.4: the open stray-payment alerts and their manual close (POST, a reason).
         path("stray-payments/", stray_views.StrayPaymentsView.as_view(), name="stray_payments"),
+        # ING.13: supplier sources, the checklist of one and the "new vendor from source" wizard.
+        path("sources/", ingest_views.SourcesView.as_view(), name="ingest_sources"),
+        path("sources/new/", ingest_views.SourceNewView.as_view(), name="ingest_source_new"),
+        path(
+            "sources/<uuid:public_id>/",
+            ingest_views.SourceChecklistView.as_view(),
+            name="ingest_source",
+        ),
         # ORD.32: a cart prepared from a past order, with its one-time link (Support, owner).
         path("order-drafts/", staff_draft_views.DraftListView.as_view(), name="order_drafts"),
         path(

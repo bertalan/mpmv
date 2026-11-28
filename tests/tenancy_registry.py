@@ -993,6 +993,15 @@ ENDPOINTS: dict[str, Access] = {
         "Finance answers 403, other roles and a vendor member 404 (test_stray_payments). The "
         "alerts span shops by design and show references and amounts only."
     ),
+    "manager:platform:ingest_sources": StaffOnly(
+        "Supplier sources (ING.13): staff only, across vendors by design."
+    ),
+    "manager:platform:ingest_source": StaffOnly(
+        "Checklist of one supplier source (ING.13): staff only.", kwargs={"public_id": NIL_UUID}
+    ),
+    "manager:platform:ingest_source_new": StaffOnly(
+        "New source from a sample (ING.13): Catalogue writes, Support and the owner get 403."
+    ),
     "manager:platform:order_drafts": StaffOnly(
         "Prepared carts (ORD.32): Support and the platform owner only; a vendor member gets the "
         "platform gate's refusal and other roles 404 (test_staff_drafts)."

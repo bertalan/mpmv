@@ -355,6 +355,19 @@ IDOR_REVIEWED: dict[str, str] = {
         "space only (CORE.18 row platform.stray_payments), and the service refuses anyone but "
         "Support or the platform owner; stray payments span shops by design (PAY.4)."
     ),
+    "manager:platform:ingest_sources": (
+        "Platform space only (CORE.18 row platform.ingest_sources); lists sources of every vendor "
+        "by design (ING.13)."
+    ),
+    "manager:platform:ingest_source": (
+        "Platform space only (CORE.18 row platform.ingest_sources); the checklist of a source of "
+        "any vendor, shown to staff by design (ING.13)."
+    ),
+    "manager:platform:ingest_source_new": (
+        "Platform space only; a POST needs the write cell of the row (Support and the owner get "
+        "403), the CORE.25 gate and the CSRF token; the sample is parsed in memory, never stored "
+        "(ING.13)."
+    ),
     "manager:platform:order_draft": (
         "Platform space, Support and the platform owner only (CORE.18 row platform.order_drafts); "
         "a prepared cart spans shops by design and shows no contact data of the customer."

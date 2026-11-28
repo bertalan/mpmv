@@ -90,6 +90,7 @@ PLATFORM_PAGES: Final[Pages] = (
     (gettext_noop("Products"), "manager:platform:catalog_products"),
     (gettext_noop("Order changes"), "manager:platform:orders"),
     (gettext_noop("Order drafts"), "manager:platform:order_drafts"),
+    (gettext_noop("Supplier sources"), "manager:platform:ingest_sources"),
     (gettext_noop("Stray payments"), "manager:platform:stray_payments"),
     (gettext_noop("Order change settings"), "manager:platform:amendment_settings"),
     (gettext_noop("Trust rules"), "manager:platform:trust_rules"),

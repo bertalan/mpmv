@@ -37,6 +37,7 @@ class TableParser:
         self.max_rows = max_rows
         self.max_columns = max_columns
         self.decimal = decimal
+        self.last_header: list[str] = []  # the header of the last file read, even if refused
 
     def check_size(self, data: bytes) -> None:
         if len(data) > self.max_bytes:
@@ -58,6 +59,7 @@ class TableParser:
     ) -> base.AdapterResult:
         if len(header) > self.max_columns:
             raise base.AdapterError("The file has more columns than allowed.")
+        self.last_header = [str(h) for h in header]
         fields = [self.field_for(h) for h in header]
         result = base.AdapterResult(encoding=encoding)
         result.unmapped_columns = [
