@@ -11,6 +11,7 @@ from apps.accounts.models import User
 from apps.accounts.tests.mfa import verified_login
 from apps.core.models import AuditLog
 from apps.ingest.models import VendorAIProvider
+from apps.ingest.tests.factories import VendorAIProviderFactory
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorMemberFactory
 
@@ -96,3 +97,15 @@ def test_a_new_key_together_with_remove_is_a_form_error(
     }
     assert client.post(URL, data).status_code == 200
     assert not VendorAIProvider.objects.exists()
+
+
+def test_a_saved_choice_shows_its_model_and_that_a_key_is_set_but_not_the_key(
+    client: Client, owner: User, vendor: Vendor
+) -> None:
+    row = VendorAIProviderFactory.create(vendor=vendor, model="model-shown")
+    _open(client, owner, vendor)
+    page = client.get(URL)
+    assert page.status_code == 200
+    assert page.context["has_key"] is True
+    assert page.context["form"].initial == {"provider": row.provider, "model": "model-shown"}
+    assert row.api_key.encode() not in page.content

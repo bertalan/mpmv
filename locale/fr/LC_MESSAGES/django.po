@@ -13995,6 +13995,10 @@ msgstr ""
 "Cochez cette case pour demander aux moteurs de recherche d'ignorer cette page. La page est aussi "
 "exclue des sitemaps et de llms.txt. Laissez-la décochée pour une page publique normale."
 
+#: apps/manager/forms.py
+msgid "Tick this to delete the key you saved. Texts are no longer written for you."
+msgstr "Cochez cette case pour supprimer la clé enregistrée. Les textes ne seront plus rédigés pour vous."
+
 #: apps/orders/ui/forms.py
 msgid ""
 "Tick this to enter your company and VAT number. A valid EU VAT number can remove the VAT on a "
