@@ -54,6 +54,7 @@ CATALOG_LOAD_RUN = "ingest.catalog_load.run"
 ENRICHMENT_ARCHIVED = "ingest.enrichment.archived"
 DRAFT_ENRICHED = "ingest.draft.enriched"
 REVIEW_REFRESHED = "ingest.review.refreshed"
+ENRICHMENT_FAILED = "ingest.enrichment.failed"
 RAW_ARCHIVE_LIMIT = 20_000  # characters of the provider answer kept in the archive
 
 
@@ -915,18 +916,20 @@ def enrich_draft(
         raise EnrichmentRefused(f"The product already has {lang!r} texts in the catalogue.")
     try:
         output = enricher.describe(_facts(draft), lang, policy)
-    except ProviderError:
+    except ProviderError as error:
+        if not dry_run:  # a trace for the usage count: the error class only, never the message
+            cause = error.__cause__ or error
+            record(
+                ctx,
+                ENRICHMENT_FAILED,
+                "ingest.productdraft",
+                str(draft.public_id),
+                None,
+                {"lang": lang, "provider": enricher.provider, "error": type(cause).__name__},
+            )
         return EnrichmentResult("provider_error", ChangeSet())
 
-    text, errors = enrich_engine.validate_schema(output.raw, lang)
-    violations = errors if text is None else enrich_engine.check_policy(text, policy)
-    outcome = (
-        EnrichmentVersion.Outcome.SCHEMA_INVALID
-        if text is None
-        else EnrichmentVersion.Outcome.OUT_OF_POLICY
-        if violations
-        else EnrichmentVersion.Outcome.ACCEPTED
-    )
+    text, outcome, violations = enrich_engine.gate(output.raw, lang, policy)
     version = EnrichmentVersion(
         draft=draft,
         lang=lang,
@@ -945,7 +948,7 @@ def enrich_draft(
         locked = (
             ProductDraft.objects.select_for_update().select_related("item__vendor").get(pk=draft.pk)
         )
-        if lang in locked.enriched:
+        if not enrich_engine.can_write_language(lang, policy, locked.enriched):
             raise EnrichmentRefused(f"Language {lang!r} got texts while the provider ran.")
         # The catalogue check is repeated under the lock, right before the write (Q-71): a
         # translation created while the provider ran (for example by the MIG.3 load) wins.
@@ -1024,6 +1027,7 @@ def enrich_draft(
                 record(ctx, REVIEW_OPENED, *_first(changes, "ingest.reviewitem"))
             elif refreshed is not None:
                 record(ctx, REVIEW_REFRESHED, *_first(changes, "ingest.reviewitem"))
+            # Only a real run: a dry run must not leave would-be texts on the caller's object.
             draft.enriched, draft.status = locked.enriched, locked.status
     return EnrichmentResult(outcome, changes, None if dry_run else version, review or refreshed)
 
