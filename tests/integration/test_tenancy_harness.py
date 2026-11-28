@@ -137,7 +137,8 @@ def test_vendor_b_is_seeded_with_every_vendor_owned_model(cross_tenant: CrossTen
     assert {type(obj) for obj in seeded} == set(OWNED_OBJECTS)
     assert all(obj.pk is not None for obj in seeded)
     markers = cross_tenant.markers(*seeded)
-    assert all(public_id_of(obj) in markers for obj in seeded)
+    # Child rows such as an event fitment have no public id; they are reached through their page.
+    assert all(public_id_of(obj) in markers for obj in seeded if hasattr(obj, "public_id"))
 
 
 def test_a_list_of_vendor_data_wrongly_declared_without_vendor_data_is_caught(
