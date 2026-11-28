@@ -124,7 +124,7 @@ msgid_plural "%(counter)s items"
 msgstr[0] "%(counter)s articolo"
 msgstr[1] "%(counter)s articoli"
 
-#: apps/themes/admin_views.py
+#: apps/themes/admin_views.py apps/themes/templates/themes/admin/palette_builder.html
 msgid "%(counter)s pair fails."
 msgid_plural "%(counter)s pairs fail."
 msgstr[0] "%(counter)s coppia non è conforme."
@@ -1973,6 +1973,10 @@ msgstr "blocco %(number)s, %(label)s"
 msgid "Blocked"
 msgstr "Bloccato"
 
+#: apps/themes/templates/themes/admin/palette_builder.html
+msgid "Body text with a %(link)s."
+msgstr "Testo del corpo con un %(link)s."
+
 #: apps/events/templates/events/event_page.html
 msgid "Booth %(booth)s"
 msgstr "Stand %(booth)s"
@@ -2349,6 +2353,10 @@ msgstr "Chat o messaggio"
 msgid "check"
 msgstr "da verificare"
 
+#: apps/themes/templates/themes/admin/palette_builder.html
+msgid "Check contrast"
+msgstr "Verifichi il contrasto"
+
 #: apps/manager/templates/manager/platform/stray_payments.html
 msgid "Check now"
 msgstr "Verifica ora"
@@ -2598,6 +2606,16 @@ msgstr ""
 msgid "Choose the shop the card leads to. A card to a shop that is not open is left out."
 msgstr ""
 "Scegli il negozio a cui porta la scheda. Una scheda verso un negozio non aperto viene omessa."
+
+#: apps/themes/templates/themes/admin/palette_builder.html
+msgid ""
+"Choose up to three base colours. Every other colour is derived from them, and every pair of text "
+"and background is checked against the contrast minimums of WCAG 2.2 AA. A palette that fails a "
+"pair cannot be saved."
+msgstr ""
+"Scelga fino a tre colori di base. Tutti gli altri colori ne derivano e ogni coppia di testo e "
+"sfondo viene verificata rispetto ai minimi di contrasto WCAG 2.2 AA. Una palette in cui una coppia"
+" non è conforme non può essere salvata."
 
 #: apps/events/models.py
 msgid ""
@@ -2940,6 +2958,14 @@ msgstr "Vai al riepilogo"
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid "Continue to your request"
 msgstr "Continua con la tua richiesta"
+
+#: apps/themes/templates/themes/admin/palette_builder.html
+msgid "Contrast checks"
+msgstr "Verifiche del contrasto"
+
+#: apps/themes/templates/themes/admin/palette_builder.html
+msgid "Contrast of every pair of colours"
+msgstr "Contrasto di ogni coppia di colori"
 
 #: apps/seo/templates/seo/consent/_categories.html
 msgid "Cookie categories"
@@ -3725,6 +3751,7 @@ msgstr "Viste degli eventi"
 
 #: apps/events/feeds.py apps/events/templates/events/_results.html apps/manager/sections.py
 #: apps/manager/site_map.py apps/manager/templates/manager/shop/events.html
+#: apps/themes/templates/themes/admin/palette_builder.html
 msgid "Events"
 msgstr "Eventi"
 
@@ -3773,7 +3800,7 @@ msgstr "Ogni mese, in un giorno"
 msgid "Every other session has ended. The platform staff were told."
 msgstr "Tutte le altre sessioni sono terminate. Lo staff della piattaforma è stato avvisato."
 
-#: apps/themes/admin_views.py
+#: apps/themes/admin_views.py apps/themes/templates/themes/admin/palette_builder.html
 msgid "Every pair passes."
 msgstr "Tutte le coppie sono conformi."
 
@@ -3876,7 +3903,7 @@ msgstr "Fatti e circostanze"
 msgid "Facts and circumstances relied on"
 msgstr "Fatti e circostanze su cui si fonda la decisione"
 
-#: apps/themes/admin_views.py
+#: apps/themes/admin_views.py apps/themes/templates/themes/admin/palette_builder.html
 msgid "Fail"
 msgstr "Non conforme"
 
@@ -4014,6 +4041,10 @@ msgstr "Si adatta a tutto"
 #: apps/catalog/templates/catalog/includes/product_fitment.html
 msgid "Fits everything."
 msgstr "Adatto a tutto."
+
+#: apps/themes/templates/themes/admin/palette_builder.html
+msgid "Fix"
+msgstr "Correzione"
 
 #: themes/base/templates/components/footer.html themes/ride/templates/components/footer.html
 msgid "Footer"
@@ -5339,6 +5370,10 @@ msgstr "Righe"
 msgid "Link"
 msgstr "Link"
 
+#: apps/themes/templates/themes/admin/palette_builder.html
+msgid "link"
+msgstr "link"
+
 #: apps/cms/blocks.py
 msgid "Link after the launch"
 msgstr "Link dopo il lancio"
@@ -5367,6 +5402,10 @@ msgstr "Link all'elenco completo"
 #: apps/seo/site_links.py
 msgid "Liveness probe"
 msgstr "Controllo di attività"
+
+#: apps/themes/templates/themes/admin/palette_builder.html
+msgid "Load colours"
+msgstr "Carichi i colori"
 
 #: themes/base/templates/components/button.html
 msgid "Loading"
@@ -5554,6 +5593,10 @@ msgstr "Prezzo massimo"
 msgid "Menu"
 msgstr "Menu"
 
+#: apps/themes/templates/themes/admin/palette_builder.html
+msgid "Menu on the band"
+msgstr "Menu sulla fascia"
+
 #: apps/catalog/templates/admin/catalog/brand/merge.html
 msgid "Merge"
 msgstr "Unisci"
@@ -5581,6 +5624,10 @@ msgstr "Unisci i marchi selezionati in un altro marchio"
 #: apps/orders/templates/orders/customer_order.html
 msgid "Messages we sent you about this package"
 msgstr "Messaggi che ti abbiamo inviato su questo pacco"
+
+#: apps/themes/templates/themes/admin/palette_builder.html
+msgid "Minimum"
+msgstr "Minimo"
 
 #: apps/catalog/templates/catalog/includes/listing_filters.html
 #: themes/ride/templates/catalog/includes/listing_filters.html
@@ -5736,6 +5783,7 @@ msgstr "Mai"
 msgid "never used"
 msgstr "mai usata"
 
+#: apps/themes/templates/themes/admin/palette_builder.html
 #: themes/base/templates/components/badge.html
 msgid "New"
 msgstr "Novità"
@@ -5852,7 +5900,7 @@ msgstr "Questo autore non ha ancora articoli."
 msgid "No articles have been published yet."
 msgstr "Non è ancora stato pubblicato nessun articolo."
 
-#: apps/themes/admin_views.py
+#: apps/themes/admin_views.py apps/themes/templates/themes/admin/palette_builder.html
 msgid "No base colour to change for this pair."
 msgstr "Nessun colore di base da modificare per questa coppia."
 
@@ -7133,6 +7181,10 @@ msgstr ""
 "Pacchi pagati non ancora spediti, dal più vecchio. I pacchi spediti o chiusi si trovano con il "
 "numero d'ordine qui sopra."
 
+#: apps/themes/templates/themes/admin/palette_builder.html
+msgid "Pair"
+msgstr "Coppia"
+
 #: apps/themes/admin_views.py
 msgid "Palette %(name)s saved."
 msgstr "Palette %(name)s salvata."
@@ -7149,7 +7201,7 @@ msgstr "Nome della palette"
 msgid "Partly refunded"
 msgstr "Rimborsato in parte"
 
-#: apps/themes/admin_views.py
+#: apps/themes/admin_views.py apps/themes/templates/themes/admin/palette_builder.html
 msgid "Pass"
 msgstr "Conforme"
 
@@ -7653,6 +7705,7 @@ msgstr "Carrelli preparati"
 #: apps/manager/templates/manager/platform/trust_rule_new.html
 #: apps/manager/templates/manager/shop/fitment_bulk.html
 #: apps/manager/templates/manager/shop/fitment_product.html
+#: apps/themes/templates/themes/admin/palette_builder.html
 msgid "Preview"
 msgstr "Anteprima"
 
@@ -7781,6 +7834,10 @@ msgstr "Prezzo con IVA"
 msgid "Primary"
 msgstr "Primario"
 
+#: apps/themes/templates/themes/admin/palette_builder.html
+msgid "Primary button"
+msgstr "Pulsante principale"
+
 #: apps/vendors/templates/vendors/terms/read.html
 msgid "Print"
 msgstr "Stampa"
@@ -7816,6 +7873,10 @@ msgstr "Produttore: realizziamo i prodotti"
 #: apps/manager/templates/manager/amendment.html apps/manager/templates/manager/shop/order.html
 msgid "Product"
 msgstr "Prodotto"
+
+#: apps/themes/templates/themes/admin/palette_builder.html
+msgid "Product card"
+msgstr "Scheda prodotto"
 
 #: apps/manager/event_block_forms.py
 msgid "Product cards"
@@ -8009,6 +8070,10 @@ msgstr "Preventivo richiesto"
 #: themes/base/templates/components/rating.html
 msgid "Rated %(value)s out of 5"
 msgstr "Valutazione %(value)s su 5"
+
+#: apps/themes/templates/themes/admin/palette_builder.html
+msgid "Ratio"
+msgstr "Rapporto"
 
 #: apps/seo/templates/seo/consent/banner.html themes/ride/templates/seo/consent/banner.html
 msgid "Read more and choose"
@@ -8440,6 +8505,10 @@ msgstr "Limita e invia la motivazione"
 msgid "Restriction"
 msgstr "Restrizione"
 
+#: apps/themes/templates/themes/admin/palette_builder.html
+msgid "Result"
+msgstr "Esito"
+
 #: themes/base/templates/components/launch_countdown.html
 #: themes/ride/templates/components/launch_countdown.html
 msgid "Resume countdown"
@@ -8655,7 +8724,7 @@ msgstr "Salva il blocco"
 msgid "Save draft"
 msgstr "Salva la bozza"
 
-#: apps/themes/admin_views.py
+#: apps/themes/admin_views.py apps/themes/templates/themes/admin/palette_builder.html
 msgid ""
 "Save is off while a pair fails. Use the suggested shade or pick another colour, then check again."
 msgstr ""
@@ -8670,6 +8739,10 @@ msgstr "Salva logo"
 #: themes/ride/templates/seo/consent/banner.html
 msgid "Save my choices"
 msgstr "Salva le mie scelte"
+
+#: apps/themes/templates/themes/admin/palette_builder.html
+msgid "Save palette"
+msgstr "Salvi la palette"
 
 #: apps/manager/templates/manager/shop/closure_form.html
 #: apps/manager/templates/manager/shop/closures.html
@@ -9053,6 +9126,7 @@ msgstr "Spedizione: %(shipping)s EUR"
 #: apps/manager/product_views.py apps/manager/templates/manager/amendment.html
 #: apps/manager/templates/manager/layout.html apps/manager/templates/manager/platform/orders.html
 #: apps/manager/templates/manager/platform/product.html
+#: apps/themes/templates/themes/admin/palette_builder.html
 msgid "Shop"
 msgstr "Negozio"
 
@@ -9472,9 +9546,9 @@ msgstr "Clausola tipo su legge applicabile e foro"
 msgid "Stars from which a review is shown"
 msgstr "Stelle da cui una recensione viene mostrata"
 
-#: apps/themes/admin_views.py
+#: apps/themes/admin_views.py apps/themes/templates/themes/admin/palette_builder.html
 msgid "Start from"
-msgstr "Parti da"
+msgstr "Parta da"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Start review"
@@ -14342,9 +14416,9 @@ msgstr "Usa il valore predefinito del negozio"
 msgid "Use this device's screen lock or a security key."
 msgstr "Usi il blocco schermo di questo dispositivo o una chiave di sicurezza."
 
-#: apps/themes/admin_views.py
+#: apps/themes/admin_views.py apps/themes/templates/themes/admin/palette_builder.html
 msgid "Use this: %(colour)s for %(field)s"
-msgstr "Usa questo: %(colour)s per %(field)s"
+msgstr "Usi questo: %(colour)s per %(field)s"
 
 #: apps/manager/fitment_views.py apps/manager/templates/manager/platform/fitment_node.html
 msgid "Used by"

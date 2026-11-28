@@ -79,6 +79,16 @@ def test_the_page_lists_every_pair_with_its_ratio_and_starts_valid(
     assert "disabled" not in html.split('value="save"')[1].split(">")[0]
 
 
+def test_the_preview_link_is_built_outside_the_translated_sentence(
+    client: Client, mfa_login: MfaLogin
+) -> None:
+    """The anchor is a placeholder in the msgid, so a translation cannot break the markup."""
+    mfa_login(client, builder_user())
+    html = client.get(reverse(URL)).content.decode()
+    assert re.search(r'<a class="pp-link" href="#palette-preview">[^<>]+</a>', html)
+    assert "&lt;a" not in html
+
+
 def test_a_get_and_a_check_write_nothing(client: Client, mfa_login: MfaLogin) -> None:
     mfa_login(client, builder_user())
     client.get(reverse(URL))
@@ -238,8 +248,8 @@ def test_the_page_loads_its_script_and_preview_container_without_inline_code(
     assert re.search(r'<script[^>]+src="[^"]*themes/palette-builder\.js"[^>]+nonce="[^"]+"', html)
     assert 'data-check-url="' in html
     assert 'data-preview-url="' in html
-    assert 'data-picker-label="colour picker"' in html
-    assert 'data-check-error="The check could not be reached.' in html
+    assert re.search(r'data-picker-label="[^"]+"', html)  # translated: no English match
+    assert re.search(r'data-check-error="[^"]+"', html)
     assert 'class="palette-preview"' in html
     assert 'id="palette-preview-css"' in html
 
