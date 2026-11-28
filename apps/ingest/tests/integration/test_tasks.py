@@ -200,3 +200,24 @@ def test_a_second_run_while_one_is_running_is_still_safe_and_the_job_is_locked()
     statuses = sorted(ImportRun.objects.filter(source=source).values_list("status", flat=True))
     assert statuses == ["running", "succeeded"]  # the stuck row is left alone, not corrupted
     assert tasks.stock_sync.queueing_lock == "ingest.stock_sync"  # one queued at a time
+
+
+def test_a_close_that_fails_after_a_committed_write_keeps_the_real_counters(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = SupplierSourceFactory.create(write_enabled=True)
+    product = _item_with_stock(source, 7)
+    real = services.transition_run
+
+    def flaky(run: ImportRun, target: str, **kwargs: Any) -> Any:
+        if target == "succeeded":
+            raise RuntimeError("cannot close")
+        return real(run, target, **kwargs)
+
+    monkeypatch.setattr("apps.ingest.sync.transition_run", flaky)
+    tasks.stock_sync.func(timestamp=0)  # does not raise
+    product.refresh_from_db()
+    run = ImportRun.objects.get()
+    assert product.stock_qty == 7  # the sync committed, the write stays applied
+    assert run.status == "failed"
+    assert run.updated == 1  # and the failed run says so

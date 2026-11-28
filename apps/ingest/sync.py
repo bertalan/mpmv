@@ -398,9 +398,12 @@ def run_sync(
     when it could not even be queued.
 
     The run states have no `partial`: a run is `succeeded` or `failed`. Each sync is one
-    transaction (all the plan or nothing), so a failure rolls the whole sync back and the failed
-    run honestly reports `errors=1` with nothing applied; no half-written run needs counting."""
+    transaction (all the plan or nothing), so a failure inside it rolls the whole sync back and
+    the failed run reports `errors=1` with nothing applied. Only when the close itself fails
+    after the sync committed are the writes real: the failed run then keeps the computed
+    counters."""
     run: ImportRun | None = None
+    counters: dict[str, int] | None = None
     try:
         run, _ = queue_run(source, kind, ctx=ctx, write=source.write_enabled)
         transition_run(run, engine.RUNNING, ctx=ctx)
@@ -433,16 +436,24 @@ def run_sync(
     except Exception as exc:
         logger.exception("ingest %s sync of source %s failed", kind, source.code)
         if run is not None:
-            _fail(run, exc, ctx)
+            _fail(run, exc, ctx, counters)
     return run
 
 
-def _fail(run: ImportRun, exc: Exception, ctx: AuditContext) -> None:
-    """End a started run as failed with the reason (the type and message, no row data)."""
+def _fail(
+    run: ImportRun, exc: Exception, ctx: AuditContext, counters: dict[str, int] | None = None
+) -> None:
+    """End a started run as failed with the reason (the type and message, no row data).
+
+    `counters` are the real counts when the sync had already committed before the close failed
+    (the writes stay applied, so the run must say so); without them the sync rolled back and the
+    run reports `errors=1`."""
     try:
         run.refresh_from_db()
         if not engine.is_terminal_run(run.status):
             reason = f"{type(exc).__name__}: {exc}"[:500]
-            transition_run(run, engine.FAILED, ctx=ctx, counters={"errors": 1}, log=reason)
+            transition_run(
+                run, engine.FAILED, ctx=ctx, counters=counters or {"errors": 1}, log=reason
+            )
     except Exception:
         logger.exception("ingest run %s could not be marked failed", run.public_id)
