@@ -57,15 +57,21 @@ def save_provider(
     remove_key: bool = False,
     actor: User,
     ctx: AuditContext,
+    passkey_confirmed: bool,
     dry_run: bool = False,
 ) -> ChangeSet:
     """Set the vendor's provider and model; a non-blank `api_key` sets or rotates the key.
 
     A blank key keeps the stored one, unless the provider changes (the old key is deleted, never
-    sent to the new provider); `remove_key` deletes it. Owners only (`profile`). Invalid
-    input raises `ValidationError` naming the field, never the key. The audit action tells what
+    sent to the new provider); `remove_key` deletes it. Owners only (`profile`), and only
+    with `passkey_confirmed`: the caller has passed the passkey window or a passkey "once" for
+    `ai_provider_key` (the service refuses without it). Invalid input raises
+    `ValidationError` naming the field, never the key. The audit action tells what
     happened: `saved` (choice only), `key_set`, `key_rotated`, `key_removed`.
     """
+    if not passkey_confirmed:
+        # The view gates it (CORE.25 `ai_provider_key`); a caller that skips the view says so.
+        raise PermissionDenied("Setting the AI provider needs a passkey confirmation.")
     if not has_vendor_permission(actor, vendor, "profile"):
         raise PermissionDenied("Only the vendor owner chooses the AI provider.")
     errors: dict[str, str] = {}
