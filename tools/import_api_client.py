@@ -7,7 +7,9 @@
 `feed.json` holds `{"products": [...], "stock": [...], "prices": [...]}` with the row shapes of
 `/api/v1/import/*` (see /api/v1/docs). By default every call is a dry run: it prints what would
 change and writes nothing. `--apply` repeats the calls for real, and only when the dry run
-reported no refused row. Standard library only; the key comes from the environment, never argv.
+reported no refused row. A stock or price dry run for a SKU the same feed would create answers 404 (it does not exist
+yet): put a new SKU's price and stock in `products` and keep `stock` and `prices` for known SKUs.
+Standard library only; the key comes from the environment, never argv.
 """
 
 import argparse
@@ -15,6 +17,7 @@ import json
 import os
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections.abc import Callable
 from typing import Any
@@ -29,7 +32,27 @@ STEPS = (
 )
 
 
+def check_base_url(base_url: str) -> str:
+    """The base URL, which must be https (the key travels in a header); plain http only for
+    localhost. Raises ValueError otherwise."""
+    parts = urllib.parse.urlsplit(base_url)
+    local = parts.hostname in {"localhost", "127.0.0.1", "::1"}
+    if parts.scheme != "https" and not (parts.scheme == "http" and local):
+        raise ValueError("The base URL must use https (http only for localhost).")
+    return base_url
+
+
+def _json(raw: bytes) -> dict[str, Any]:
+    try:
+        data = json.loads(raw or b"{}")
+    except ValueError:
+        return {"detail": raw[:200].decode("utf-8", "replace")}
+    return data if isinstance(data, dict) else {"detail": str(data)[:200]}
+
+
 def http_transport(base_url: str, api_key: str) -> Transport:
+    check_base_url(base_url)
+
     def send(method: str, path: str, body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
         request = urllib.request.Request(  # noqa: S310 (the operator names the https base URL)
             base_url.rstrip("/") + path,
@@ -39,9 +62,9 @@ def http_transport(base_url: str, api_key: str) -> Transport:
         )
         try:
             with urllib.request.urlopen(request, timeout=60) as response:  # noqa: S310
-                return response.status, json.loads(response.read())
+                return response.status, _json(response.read())
         except urllib.error.HTTPError as error:  # RFC 9457 problem details
-            return error.code, json.loads(error.read() or b"{}")
+            return error.code, _json(error.read())
 
     return send
 
@@ -77,6 +100,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("feed", help="JSON file with products, stock and prices")
     parser.add_argument("--apply", action="store_true", help="write for real after a clean dry run")
     args = parser.parse_args(argv)
+    try:
+        check_base_url(args.base_url)
+    except ValueError as error:
+        print(error, file=sys.stderr)
+        return 2
     api_key = os.environ.get("MPMV_API_KEY", "")
     if not api_key:
         print("Set MPMV_API_KEY.", file=sys.stderr)

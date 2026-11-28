@@ -101,3 +101,25 @@ def test_a_refused_row_stops_before_anything_is_applied(
     assert not Product.objects.filter(sku="NEW-1").exists()
     existing.refresh_from_db()
     assert existing.stock_qty == 0
+
+
+@pytest.mark.parametrize(
+    "url",
+    ["http://shop.example.org", "ftp://localhost", "shop.example.org", "http://localhost.evil.org"],
+)
+def test_a_non_https_base_url_is_refused(url: str) -> None:
+    with pytest.raises(ValueError, match="https"):
+        sample.check_base_url(url)
+
+
+@pytest.mark.parametrize(
+    "url", ["https://shop.example.org", "http://localhost:8000", "http://127.0.0.1"]
+)
+def test_https_and_localhost_are_accepted(url: str) -> None:
+    assert sample.check_base_url(url) == url
+
+
+def test_a_non_json_error_body_does_not_crash_the_client() -> None:
+    assert sample._json(b"<html>Bad gateway</html>") == {"detail": "<html>Bad gateway</html>"}
+    assert sample._json(b"") == {}
+    assert sample._json(b"[1]") == {"detail": "[1]"}
