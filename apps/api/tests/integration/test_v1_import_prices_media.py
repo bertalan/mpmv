@@ -172,3 +172,36 @@ def test_media_refuses_a_platform_key_a_bad_file_and_an_unknown_licence(
     assert bad.status_code == 422
     assert bad.headers["Content-Type"].startswith("application/problem+json")
     assert not Product.objects.filter(images__isnull=False).exists()
+
+
+def _upload_named(client: Client, vendor: Vendor, upload: SimpleUploadedFile) -> Any:
+    product = ProductFactory.create(vendor=vendor)
+    return client.post(
+        MEDIA,
+        {
+            "sku": product.sku,
+            "title": "t",
+            "author": "a",
+            "licence": ImageLicenceFactory.create(code="own-work", source_required=False).code,
+            "file": upload,
+        },
+        headers=_headers(vendor, ["catalog:write"]),
+    )
+
+
+def test_an_svg_with_a_script_is_refused(client: Client, vendor: Vendor) -> None:
+    svg = b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'
+    response = _upload_named(
+        client, vendor, SimpleUploadedFile("x.svg", svg, content_type="image/svg+xml")
+    )
+    assert response.status_code in {422, 413}, response.content
+    assert response["Content-Type"].startswith("application/problem+json")
+    assert not ProductImage.objects.exists()
+
+
+def test_an_oversize_upload_is_refused(client: Client, vendor: Vendor, settings: Any) -> None:
+    settings.WAGTAILIMAGES_MAX_UPLOAD_SIZE = 100
+    response = _upload_named(client, vendor, _png())
+    assert response.status_code in {422, 413}, response.content
+    assert response["Content-Type"].startswith("application/problem+json")
+    assert not ProductImage.objects.exists()
