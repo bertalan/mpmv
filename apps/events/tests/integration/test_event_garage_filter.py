@@ -77,7 +77,8 @@ def test_the_checkbox_is_off_by_default_and_the_list_shows_every_event(
     client = Client()
     _garage(client, "Roadster")
     html = _list(client)
-    assert f'{CHECKBOX} name="garage" value="1" checked' not in html
+    assert CHECKBOX in html
+    assert not re.search(r'<input[^>]*id="event-filter-garage"[^>]*\schecked', html)
     for title in ("Roadster meet", "Tourer meet", "Open meet"):
         assert title in html
 
@@ -89,7 +90,7 @@ def test_the_checkbox_keeps_only_the_events_for_the_garage(events: dict[str, Eve
     assert "Roadster meet" in html
     assert "Tourer meet" not in html
     assert "Open meet" not in html
-    assert 'name="garage" value="1" checked' in html
+    assert re.search(r'<input[^>]*id="event-filter-garage"[^>]*\schecked', html)
     assert "noindex" in html  # a personalised view is never indexed
 
 
