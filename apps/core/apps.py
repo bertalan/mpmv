@@ -56,6 +56,7 @@ class CoreConfig(AppConfig):
             check_field_encryption_keys,
             check_image_upload_limits,
             check_live_site_flags,
+            check_operator_zones_in_database,
             check_privacy_pepper,
             check_public_forms,
             check_trusted_proxy_for_deploy,
@@ -88,6 +89,7 @@ class CoreConfig(AppConfig):
         checks.register(check_privacy_pepper, checks.Tags.security)
         checks.register(check_avif_support)
         checks.register(check_business_time_zone)  # ARC.27
+        checks.register(check_operator_zones_in_database, checks.Tags.database)  # ORD.41
         checks.register(check_image_upload_limits)
         checks.register(check_live_site_flags, checks.Tags.security, deploy=True)
 

@@ -2,7 +2,8 @@
 
 It reads the operator version valid at `ts`; a moment before the first configuration reads the
 current one; with no operator it reads the configured zone, which every connection carries as
-`mpmv.business_time_zone`, and UTC when that is empty, as `configured_tz()` does."""
+`mpmv.business_time_zone`, and UTC when that is empty, as `configured_tz()` does. core.E932
+checks that PostgreSQL knows every operator zone."""
 
 import datetime as dt
 from typing import Any
@@ -11,6 +12,8 @@ from zoneinfo import ZoneInfo
 import pytest
 from django.db import connection
 
+from apps.core import migration_safety
+from apps.core.checks import check_operator_zones_in_database
 from apps.core.services import business_tz
 from apps.core.tests.factories import PlatformOperatorFactory, utc
 
@@ -83,3 +86,44 @@ def test_the_function_is_stable_not_immutable() -> None:
     with connection.cursor() as cursor:
         cursor.execute("SELECT provolatile FROM pg_proc WHERE proname = 'business_time_zone_at'")
         assert cursor.fetchall() == [("s",)]
+
+
+def test_the_function_keeps_its_own_search_path() -> None:
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT proconfig FROM pg_proc WHERE proname = 'business_time_zone_at'")
+        assert cursor.fetchall() == [(["search_path=pg_catalog, public"],)]
+
+
+# --- core.E932: every operator zone is one PostgreSQL knows ------------------------------------
+
+
+def database_zone_errors() -> list[str]:
+    return [m.id or "" for m in check_operator_zones_in_database(None, databases=["default"])]
+
+
+def test_known_operator_zones_pass_the_database_check(versions: None) -> None:
+    assert database_zone_errors() == []
+
+
+def test_a_zone_the_database_does_not_know_stops_the_release(versions: None) -> None:
+    """A past row counts too: an old order's retention reads the zone valid then."""
+    PlatformOperatorFactory.create(
+        valid_from=utc(2010), valid_to=utc(2011), business_time_zone="Europe/Atlantis"
+    )
+    [message] = check_operator_zones_in_database(None, databases=["default"])
+    assert (message.id, message.is_serious()) == ("core.E932", True)
+    assert "Europe/Atlantis" in message.msg
+
+
+def test_the_database_check_waits_for_pending_migrations(
+    versions: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    PlatformOperatorFactory.create(
+        valid_from=utc(2010), valid_to=utc(2011), business_time_zone="Europe/Atlantis"
+    )
+    monkeypatch.setattr(migration_safety, "migrations_pending", lambda *a, **k: True)
+    assert database_zone_errors() == []
+
+
+def test_the_database_check_runs_only_with_the_database() -> None:
+    assert check_operator_zones_in_database(None, databases=None) == []
