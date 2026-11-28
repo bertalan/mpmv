@@ -14,6 +14,7 @@ never loops and never chains (one hop), and a 410 answers "gone".
 """
 
 import datetime as dt
+import unicodedata
 from io import StringIO
 from pathlib import Path
 from typing import Any
@@ -693,10 +694,6 @@ def test_a_prefix_rule_cannot_cover_reserved_paths(source: str) -> None:
 
 
 def test_a_redirect_map_note_is_stored_in_nfc() -> None:
-    import unicodedata
-
-    from apps.catalog.models import Redirect
-
     note = unicodedata.normalize("NFD", "Café")
     row = {"source_path": "/old-nfc", "target_kind": "path", "target": "/new", "note": note}
     import_redirects([row], ctx=CTX)

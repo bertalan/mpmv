@@ -53,6 +53,7 @@ from apps.core.changeset import ChangeSet
 from apps.core.i18n import configured_languages, hreflang_alternates, primary_language
 from apps.core.image_licences import Credit
 from apps.core.money import CURRENCY
+from apps.core.nfc_forms import nfc_stream_value
 from apps.core.services import business_tz, run_mutation
 from apps.core.site_url import absolute_url
 from apps.core.text import nfc_deep
@@ -855,12 +856,14 @@ class ArticleData:
 
 
 def nfc_article(article: ArticleData) -> ArticleData:
-    """`article` with its texts (and the strings inside the body) in NFC (I18N.10)."""
+    """`article` with its text fields in NFC (I18N.10).
+
+    The body is normalised block-aware once built (`nfc_stream_value`): URLs, ids and choices
+    stay byte-exact, as in the page forms."""
     return replace(
         article,
         title=nfc_deep(article.title),
         slug=nfc_deep(article.slug),
-        body=nfc_deep(article.body),
         summary=nfc_deep(article.summary),
         author=nfc_deep(article.author),
         seo_title=nfc_deep(article.seo_title),
@@ -946,6 +949,7 @@ def import_article(
             search_description=article.search_description,
             live=False,
         )
+        post.body = nfc_stream_value(post.body)
         index.add_child(instance=post)
         post.save_revision(user=user, log_action=True).publish(user=user)
         post = _current(post)

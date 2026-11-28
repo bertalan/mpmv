@@ -10,6 +10,7 @@ whose target is not public is left out.
 
 import datetime as dt
 import json
+import unicodedata
 from typing import Any
 
 import pytest
@@ -332,8 +333,6 @@ def test_the_worker_applies_the_schedules_every_five_minutes(blog: BlogIndexPage
 
 
 def test_an_imported_article_is_stored_in_nfc(blog: BlogIndexPage) -> None:
-    import unicodedata
-
     def nfd(text: str) -> str:
         return unicodedata.normalize("NFD", text)
 
@@ -345,3 +344,15 @@ def test_an_imported_article_is_stored_in_nfc(blog: BlogIndexPage) -> None:
     assert post.summary == unicodedata.normalize("NFC", "Più")
     assert post.author is not None
     assert post.author.name == unicodedata.normalize("NFC", "Zoë")
+
+
+def test_an_imported_article_body_keeps_urls_exact_and_text_in_nfc(blog: BlogIndexPage) -> None:
+    url = "https://example.org/café?q=é"  # raw non-ASCII, mixed forms: stays as given
+    heading = unicodedata.normalize("NFD", "Café")
+    body = [("cta", {"heading": heading, "link": {"url": url, "label": heading}})]
+    import_article(blog, _legacy_article(body=body))
+
+    post = BlogPostPage.objects.get(slug="a-visit-to-the-workshop")
+    raw = post.body.get_prep_value()[0]["value"]
+    assert raw["heading"] == unicodedata.normalize("NFC", heading)
+    assert raw["link"]["url"] == url

@@ -2,6 +2,7 @@
 extraction service on top of them (50 sample products, PostgreSQL)."""
 
 import json
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -184,8 +185,6 @@ def test_a_vendor_mapping_overrides_the_platform_one_and_other_vendors_are_isola
 
 
 def test_import_stores_mapping_text_in_nfc() -> None:
-    import unicodedata
-
     def nfd(text: str) -> str:
         return unicodedata.normalize("NFD", text)
 
