@@ -38,9 +38,9 @@ from django.db import connection, transaction
 from django.utils import timezone
 
 from apps.accounts.models import User
-from apps.core.audit import AuditContext
+from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
-from apps.core.models import Throttle
+from apps.core.models import AuditLog, Throttle
 from apps.core.services import run_mutation
 from apps.core.throttling import ip_bucket
 from apps.vendors import engine as vendor_engine
@@ -588,14 +588,48 @@ def purge_expired_refused_keys(*, now: dt.datetime | None = None) -> int:
 MUTATION_LOG_RETENTION_MONTHS = 12
 
 
+MUTATION_LOG_PURGED = "api.mutation_log.retention_purged"
+MUTATION_LOG_BATCH_SIZE = 2000
+#: A run deletes at most this many batches (about 1M rows); the next night continues.
+MUTATION_LOG_MAX_BATCHES = 500
+PURGE_CTX = AuditContext(actor_label="task:api.purge_mutation_log", source=AuditLog.Source.TASK)
+
+
 def purge_mutation_log(*, now: dt.datetime | None = None) -> int:
     """Delete the API mutation log rows older than 12 months; return how many were deleted.
 
     Run nightly by `api.purge_mutation_log`. The table is append-only; its trigger lets a
     DELETE through only for a row past the same 12 months (migration `api/0008`), so this is
-    the one way a row leaves, and never a recent one.
+    the one way a row leaves, and never a recent one. A row exactly at the cutoff is kept.
+
+    Rows go in batches of `MUTATION_LOG_BATCH_SIZE`, each in its own transaction, so a first
+    run after downtime never holds one huge DELETE. A run is bounded by
+    `MUTATION_LOG_MAX_BATCHES`. One audit entry per run that deleted something holds the count
+    and the cutoff, never a row.
     """
     now = now or timezone.now()
     cutoff = months_before(now, MUTATION_LOG_RETENTION_MONTHS)
-    deleted, _ = ApiMutationLog.objects.filter(created_at__lt=cutoff).delete()
-    return deleted
+    total = 0
+    for _ in range(MUTATION_LOG_MAX_BATCHES):
+        with transaction.atomic():
+            ids = list(
+                ApiMutationLog.objects.filter(created_at__lt=cutoff)
+                .order_by("pk")
+                .values_list("pk", flat=True)[:MUTATION_LOG_BATCH_SIZE]
+            )
+            if not ids:
+                break
+            deleted, _ = ApiMutationLog.objects.filter(pk__in=ids).delete()
+        total += deleted
+        if len(ids) < MUTATION_LOG_BATCH_SIZE:
+            break
+    if total:
+        record(
+            PURGE_CTX,
+            MUTATION_LOG_PURGED,
+            "api.apimutationlog",
+            now.date().isoformat(),
+            None,
+            {"deleted": total, "cutoff": cutoff.isoformat()},
+        )
+    return total

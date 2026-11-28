@@ -16,6 +16,7 @@ from apps.api.engine import months_before
 from apps.api.models import ApiMutationLog
 from apps.api.services import MUTATION_LOG_RETENTION_MONTHS, purge_mutation_log
 from apps.api.tests.factories import ApiMutationLogFactory
+from apps.core.models import AuditLog
 from apps.core.tasks import schedules
 
 pytestmark = pytest.mark.django_db
@@ -126,3 +127,67 @@ def test_a_row_just_inside_12_months_stays_and_one_just_outside_goes() -> None:
 
     assert list(ApiMutationLog.objects.values_list("pk", flat=True)) == [inside.pk]
     assert not ApiMutationLog.objects.filter(pk=outside.pk).exists()
+
+
+def test_a_row_exactly_at_the_cutoff_stays_and_one_microsecond_older_goes() -> None:
+    # The purge filters with `created_at < cutoff`: a row stamped exactly at the cutoff is kept.
+    now = dt.datetime.now(dt.UTC)
+    cutoff = months_before(now, 12)
+    at_cutoff = _logged_at(cutoff)
+    older = _logged_at(cutoff - dt.timedelta(microseconds=1))
+
+    assert purge_mutation_log(now=now) == 1
+
+    assert list(ApiMutationLog.objects.values_list("pk", flat=True)) == [at_cutoff.pk]
+    assert not ApiMutationLog.objects.filter(pk=older.pk).exists()
+
+
+def _old_rows(count: int) -> list[ApiMutationLog]:
+    old = timezone.now() - dt.timedelta(days=400)
+    return [_logged_at(old) for _ in range(count)]
+
+
+def test_the_purge_deletes_in_batches_each_in_its_own_transaction() -> None:
+    _old_rows(5)
+    recent = ApiMutationLogFactory.create()
+    with (
+        mock.patch("apps.api.services.MUTATION_LOG_BATCH_SIZE", 2),
+        mock.patch("apps.api.services.transaction.atomic", wraps=transaction.atomic) as atomic,
+    ):
+        assert purge_mutation_log() == 5
+    # 5 rows in batches of 2: three batches that delete (2, 2, 1); the last one is short, so the
+    # loop ends without a fourth look.
+    assert atomic.call_count == 3
+    assert list(ApiMutationLog.objects.values_list("pk", flat=True)) == [recent.pk]
+
+
+def test_one_run_is_bounded_and_the_next_run_continues() -> None:
+    _old_rows(5)
+    with (
+        mock.patch("apps.api.services.MUTATION_LOG_BATCH_SIZE", 2),
+        mock.patch("apps.api.services.MUTATION_LOG_MAX_BATCHES", 2),
+    ):
+        assert purge_mutation_log() == 4
+        assert ApiMutationLog.objects.count() == 1
+        assert purge_mutation_log() == 1
+    assert ApiMutationLog.objects.count() == 0
+
+
+def test_a_run_that_deletes_rows_writes_one_audit_entry_with_counts_only() -> None:
+    now = dt.datetime.now(dt.UTC)
+    _old_rows(3)
+    ApiMutationLogFactory.create()
+    with mock.patch("apps.api.services.MUTATION_LOG_BATCH_SIZE", 2):
+        assert purge_mutation_log(now=now) == 3
+    entry = AuditLog.objects.get(action="api.mutation_log.retention_purged")
+    assert entry.after == {"deleted": 3, "cutoff": months_before(now, 12).isoformat()}
+    assert entry.before is None
+    assert entry.target_model == "api.apimutationlog"
+    assert entry.source == AuditLog.Source.TASK
+    assert entry.ip in (None, "")
+
+
+def test_a_run_that_deletes_nothing_writes_no_audit_entry() -> None:
+    ApiMutationLogFactory.create()
+    assert purge_mutation_log() == 0
+    assert not AuditLog.objects.filter(action="api.mutation_log.retention_purged").exists()
