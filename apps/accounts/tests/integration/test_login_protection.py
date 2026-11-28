@@ -206,6 +206,20 @@ def _wait_message(minutes: int) -> str:
         ) % {"minutes": minutes}
 
 
+@pytest.mark.parametrize("language", ["it", "de", "fr", "es"])
+def test_the_waiting_text_plural_is_translated_through_the_compiled_catalog(language: str) -> None:
+    singular = "Too many attempts. Please try again in %(minutes)s minute."
+    plural = "Too many attempts. Please try again in %(minutes)s minutes."
+    with translation.override(language):
+        one = ngettext(singular, plural, 1)
+        many = ngettext(singular, plural, 5)
+    assert one != singular
+    assert many != plural
+    assert one != many
+    assert "%(minutes)s" in one
+    assert "%(minutes)s" in many
+
+
 def test_a_locked_login_shows_the_waiting_time_the_same_for_known_and_unknown_emails(
     client: Client, staff: User, password: str
 ) -> None:
