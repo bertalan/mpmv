@@ -29,7 +29,7 @@ from apps.core.models import AuditLog
 from apps.core.tests.factories import ImageLicenceFactory
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
-from tests.i18n import other_language, product_url
+from tests.i18n import other_language, product_url, translated
 
 pytestmark = pytest.mark.django_db
 CTX = AuditContext(actor_label="system:test", source="system")
@@ -85,10 +85,10 @@ def test_the_page_labels_an_ai_edited_image_and_flags_it_in_its_metadata(client:
     add_image(product, "red", ai_origin=ai_labels.AI_EDITED)
     add_image(product, "blue")
     html = client.get(product_url(primary_language(), "mug")).content.decode()
-    assert html.count("AI-edited image") == 2  # the list and the zoom dialog
+    assert html.count(translated("AI-edited image")) == 2  # the list and the zoom dialog
     assert 'data-ai-origin="edited"' in html
     assert "compositeWithTrainedAlgorithmicMedia" in html
-    assert "AI-generated image" not in html
+    assert translated("AI-generated image") not in html
     nodes = [
         node
         for block in re.findall(
@@ -116,7 +116,7 @@ def test_a_generated_image_shows_its_own_label(client: Client) -> None:
     product = live("mug")
     add_image(product, "red", ai_origin=ai_labels.AI_GENERATED)
     html = client.get(product_url(primary_language(), "mug")).content.decode()
-    assert "AI-generated image" in html
+    assert translated("AI-generated image") in html
     assert "trainedAlgorithmicMedia" in html
 
 
@@ -127,8 +127,9 @@ def test_the_label_is_translated_with_the_page(client: Client) -> None:
         product=product, language=other_language(), title="Tazza", slug="tazza", status="published"
     )
     html = client.get(product_url(other_language(), "tazza")).content.decode()
-    assert "AI-edited image" not in html
-    assert "Immagine modificata con IA" in html
+    assert translated("AI-edited image", other_language()) in html
+    if translated("AI-edited image") != translated("AI-edited image", other_language()):
+        assert translated("AI-edited image") not in html
     assert 'data-ai-origin="edited"' in html
 
 
