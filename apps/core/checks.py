@@ -10,7 +10,9 @@
 - Field-level encryption (SEC.3): a valid key is configured (core.E301, E302) and, when a
   database is checked (`migrate`, `check --database default`), every stored value decrypts with
   the configured keys (core.E303, E304); values in clear or on an older key are warnings
-  (core.W302, W301) that `manage.py rotate_field_keys` fixes.
+  (core.W302, W301) that `manage.py rotate_field_keys` fixes. The vendors' AI provider keys use
+  their own keyring (`MPMV_AI_KEY_ENCRYPTION_KEYS`, ING.14): when set it must be valid
+  (core.E306), and with a stored vendor key it must be set (core.E305).
 - Feature flags (ARC.8): every environment default names a registered flag (core.E401).
 - Transactional email (ARC.16): settings that hold live data (`LIVE_DATA`) send through a real
   provider adapter, not the console or test sender (core.E501), from a real address
@@ -422,6 +424,11 @@ def check_field_encryption_keys(
         encryption.configured_keyring()
     except ImproperlyConfigured as exc:
         return [checks.Error(str(exc), id="core.E302")]
+    if getattr(settings, encryption.AI_KEYS_SETTING, None):
+        try:
+            encryption.configured_keyring(encryption.AI_KEYS_SETTING)
+        except ImproperlyConfigured as exc:
+            return [checks.Error(str(exc), id="core.E306")]
     return []
 
 
@@ -439,25 +446,52 @@ def check_encrypted_data(
     """
     if not databases:
         return []
-    try:
-        keyring = encryption.configured_keyring()
-    except ImproperlyConfigured:
-        return []  # reported by check_field_encryption_keys
     messages: list[checks.CheckMessage] = []
     for alias in databases:
         connection = connections[alias]
         for column in encryption.encrypted_columns():
+            try:
+                keyring = encryption.configured_keyring(column.keyring_setting)
+            except ImproperlyConfigured:
+                keyring = None  # no usable keyring: only stored values matter, below
             if migrations_pending(column.model._meta.app_label, database=alias):
                 continue  # CORE.27: `migrate` checks first; the column may not exist yet
             try:
                 with transaction.atomic(using=alias):
                     usage = encryption.key_usage(
-                        connection, column.model._meta.db_table, column.column
+                        connection,
+                        column.model._meta.db_table,
+                        column.column,
+                        column.bound_column,
                     )
             except DatabaseError:
                 continue  # not migrated yet
-            messages += _column_messages(column, usage, keyring)
+            if keyring is None:
+                messages += _missing_keyring_messages(column, usage)
+            else:
+                messages += _column_messages(column, usage, keyring)
     return messages
+
+
+def _missing_keyring_messages(
+    column: encryption.EncryptedColumn, usage: Mapping[str, list[Any]]
+) -> list[checks.CheckMessage]:
+    """Stored values with no usable keyring. The SEC.3 field keys are reported by
+    `check_field_encryption_keys` (core.E301, E302, whatever is stored); a dedicated keyring
+    (ING.14) is only required once it holds a value: core.E305 (an invalid one is core.E306)."""
+    if column.keyring_setting == encryption.KEYS_SETTING:
+        return []
+    stored = sum(count for count, *_ in usage.values())
+    setting = column.keyring_setting
+    if not stored or getattr(settings, setting, None):
+        return []  # nothing stored, or an invalid keyring that core.E306 reports
+    return [
+        checks.Error(
+            f"{stored} value(s) of {column.context} are stored, but its keyring is not configured.",
+            hint=encryption.keys_help(setting),
+            id="core.E305",
+        )
+    ]
 
 
 def _column_messages(
@@ -465,8 +499,10 @@ def _column_messages(
 ) -> list[checks.CheckMessage]:
     label = column.context
     rotate = "Run `manage.py rotate_field_keys`."
+    if column.keyring_setting != encryption.KEYS_SETTING:
+        rotate = "Run `manage.py rotate_field_keys --keyring ai`."
     messages: list[checks.CheckMessage] = []
-    for key_id, (count, sample) in usage.items():
+    for key_id, (count, sample, bound) in usage.items():
         if key_id == encryption.CLEARTEXT:
             messages.append(
                 checks.Warning(
@@ -483,13 +519,13 @@ def _column_messages(
             )
         else:
             try:
-                keyring.decrypt(sample, context=label)
+                keyring.decrypt(sample, context=column.context_for(bound))
             except DecryptionError:
                 messages.append(
                     checks.Error(
                         f"Key {key_id!r} does not decrypt {label}: it is not the key the data "
                         "was encrypted with.",
-                        hint=encryption.KEYS_HELP,
+                        hint=encryption.keys_help(column.keyring_setting),
                         id="core.E304",
                     )
                 )
