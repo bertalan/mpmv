@@ -283,3 +283,19 @@ def legal_anchors(body: Any) -> dict[str, str]:
 def anchor_of(anchors: dict[str, str], block_id: Any) -> str:
     """The anchor of one block ('' when it has none)."""
     return anchors.get(str(block_id), "")
+
+
+@register.simple_tag(takes_context=True)
+def language_fallback_notice(context: dict[str, Any]) -> str:
+    """The language of the text shown in place of a missing translation (I18N.21), or "".
+
+    The notice itself is rendered by the layout, in the visitor's language, with the endonym of
+    this one (`language_fallback_endonym`)."""
+    request: HttpRequest | None = context.get("request")
+    return str(getattr(request, "language_fallback", "") or "")
+
+
+@register.simple_tag
+def language_fallback_endonym(code: str) -> str:
+    """The language's own name ("Italiano"), for the fallback notice."""
+    return str(translation.get_language_info(code)["name_local"])

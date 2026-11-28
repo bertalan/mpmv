@@ -47,7 +47,9 @@ state; fixed to the bottom of the viewport, last in reading order like in the ta
   {% endblock %}
   {% include "components/garage_merge_notice.html" %}
   {% block messages %}{% if messages %}<div class="site-messages">{% for message in messages %}{% include "components/alert.html" with level=message.level_tag message=message live="polite" only %}{% endfor %}</div>{% endif %}{% endblock %}
-  <main id="main" class="site-main" tabindex="-1">
+  {# I18N.21: a page shown in its primary language in place of a missing translation. #}
+  {% language_fallback_notice as fallback_language %}{% if fallback_language %}{% language_fallback_endonym fallback_language as endonym %}<div class="site-messages">{% blocktranslate asvar fallback_message %}Not yet available in this language; shown in {{ endonym }}{% endblocktranslate %}{% include "components/alert.html" with level="info" message=fallback_message live="polite" only %}</div>{% endif %}
+  <main id="main" class="site-main" tabindex="-1"{% if fallback_language %} lang="{{ fallback_language }}"{% endif %}>
     {% block content %}{% endblock %}
     {% block image_credits %}{% if page %}{% page_image_credits page as image_credits %}{% image_credits_disclosure image_credits %}{% endif %}{% endblock %}
   </main>

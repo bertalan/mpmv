@@ -71,12 +71,13 @@ def test_the_italian_home_shows_italian_content(client: Client, seeded: SeedRepo
     assert _text_of(seed_text(primary_language()).home.body) not in html
 
 
-# Every About slug asked in the tree of every other language, and a slug that exists nowhere.
+# Every About slug of a non-primary language asked in the tree of every other language (the
+# primary language's slugs fall back, I18N.21), and a slug that exists nowhere.
 FOREIGN_PATHS = [
     f"{_prefix(asked_in)}{seed_text(owner).about.slug}/"
     for asked_in in configured_languages()
     for owner in configured_languages()
-    if owner != asked_in
+    if owner != asked_in and owner != primary_language()
 ] + ["/missing/"]
 
 

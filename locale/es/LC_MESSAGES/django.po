@@ -6173,6 +6173,10 @@ msgstr ""
 msgid "not yet"
 msgstr "todavía no"
 
+#: themes/base/templates/layouts/base.html
+msgid "Not yet available in this language; shown in %(endonym)s"
+msgstr "Aún no disponible en este idioma; se muestra en %(endonym)s"
+
 #: apps/manager/fitment_shop_forms.py apps/manager/staff_draft_views.py
 #: apps/manager/templates/manager/platform/trust_rule_preview.html
 #: apps/manager/templates/manager/platform/trust_rules.html
