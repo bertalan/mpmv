@@ -1984,6 +1984,11 @@ msgstr "Block %(number)s, %(label)s"
 msgid "Blocked"
 msgstr "Gesperrt"
 
+#: apps/ingest/templates/email/ingest/daily_report/body.html
+#: apps/ingest/templates/email/ingest/daily_report/body.txt
+msgid "blocking"
+msgstr "blockierend"
+
 #: apps/events/templates/events/event_page.html
 msgid "Booth %(booth)s"
 msgstr "Stand %(booth)s"
@@ -3708,6 +3713,11 @@ msgstr "Löschanträge"
 msgid "Error"
 msgstr "Fehler"
 
+#: apps/ingest/templates/email/ingest/daily_report/body.html
+#: apps/ingest/templates/email/ingest/daily_report/body.txt
+msgid "errors"
+msgstr "Fehler"
+
 #: apps/events/templates/events/admin/review.html apps/manager/templates/manager/shop/events.html
 msgid "Event"
 msgstr "Veranstaltung"
@@ -3874,6 +3884,11 @@ msgstr "Zugrunde gelegte Tatsachen und Umstände"
 #: apps/themes/admin_views.py
 msgid "Fail"
 msgstr "Nicht bestanden"
+
+#: apps/ingest/templates/email/ingest/daily_report/body.html
+#: apps/ingest/templates/email/ingest/daily_report/body.txt
+msgid "failed"
+msgstr "fehlgeschlagen"
 
 #: apps/catalog/templates/catalog/admin/rendition_monitor.html
 msgid "Failed render jobs"
@@ -4729,6 +4744,11 @@ msgstr ""
 "Hiermit widerrufe(n) ich/wir (*) den von mir/uns (*) abgeschlossenen Vertrag über den Kauf der "
 "folgenden Waren (*)"
 
+#: apps/ingest/templates/email/ingest/daily_report/body.html
+#: apps/ingest/templates/email/ingest/daily_report/body.txt
+msgid "Identity anomalies"
+msgstr "Identitätsanomalien"
+
 #: apps/vendors/templates/vendors/apply/sent.html
 msgid ""
 "If the details were valid, we sent you an email. Open the link in it to confirm your address; the "
@@ -4922,6 +4942,15 @@ msgstr "Unverbindlicher Preis. Endbetrag an der Kasse."
 msgid "Information"
 msgstr "Information"
 
+#: apps/ingest/templates/email/ingest/daily_report/body.html
+#: apps/ingest/templates/email/ingest/daily_report/body.txt
+msgid "Ingest report for %(day)s"
+msgstr "Importbericht vom %(day)s"
+
+#: apps/ingest/templates/email/ingest/daily_report/subject.txt
+msgid "Ingest report for %(day)s: %(runs_total)s runs, %(anomaly_count)s identity anomalies"
+msgstr "Importbericht vom %(day)s: %(runs_total)s Läufe, %(anomaly_count)s Identitätsanomalien"
+
 #: apps/manager/templates/manager/shop/link_dialog.html
 msgid "Insert link"
 msgstr "Link einfügen"
@@ -5032,9 +5061,19 @@ msgstr "Artikel zu den heutigen Preisen (netto)"
 msgid "Items in the current version"
 msgstr "Artikel in der aktuellen Version"
 
+#: apps/ingest/templates/email/ingest/daily_report/body.html
+#: apps/ingest/templates/email/ingest/daily_report/body.txt
+msgid "Items missing from the feed"
+msgstr "Im Feed fehlende Artikel"
+
 #: apps/manager/fitment_forms.py
 msgid "Items reveal sensitive information"
 msgstr "Artikel enthüllen sensible Informationen"
+
+#: apps/ingest/templates/email/ingest/daily_report/body.html
+#: apps/ingest/templates/email/ingest/daily_report/body.txt
+msgid "Items seen"
+msgstr "Gelesene Artikel"
 
 #: apps/orders/templates/email/orders/vendor_amendment_applied/body.html
 #: apps/orders/templates/email/orders/vendor_amendment_applied/body.txt
@@ -8505,6 +8544,16 @@ msgstr "Übersicht und Zahlung"
 msgid "Review excerpt length"
 msgstr "Länge des Bewertungsauszugs"
 
+#: apps/ingest/templates/email/ingest/daily_report/body.html
+#: apps/ingest/templates/email/ingest/daily_report/body.txt
+msgid "Review items opened today"
+msgstr "Heute eröffnete Prüfvorgänge"
+
+#: apps/ingest/templates/email/ingest/daily_report/body.html
+#: apps/ingest/templates/email/ingest/daily_report/body.txt
+msgid "Review items still open"
+msgstr "Noch offene Prüfvorgänge"
+
 #: apps/manager/product_views.py
 msgid "reviewed"
 msgstr "geprüft"
@@ -8553,6 +8602,16 @@ msgstr "Zeilen, die auf einen nicht freigegebenen Artikel warten"
 #: apps/events/templates/events/_subscribe.html
 msgid "RSS feed"
 msgstr "RSS-Feed"
+
+#: apps/ingest/templates/email/ingest/daily_report/body.html
+#: apps/ingest/templates/email/ingest/daily_report/body.txt
+msgid "Runs"
+msgstr "Läufe"
+
+#: apps/ingest/templates/email/ingest/daily_report/body.html
+#: apps/ingest/templates/email/ingest/daily_report/body.txt
+msgid "Runs with errors"
+msgstr "Läufe mit Fehlern"
 
 #: apps/compliance/templates/compliance/subprocessors.html
 msgid "Safeguard"
@@ -9242,6 +9301,11 @@ msgstr "Karte überspringen"
 msgid "Skip to main content"
 msgstr "Zum Hauptinhalt springen"
 
+#: apps/ingest/templates/email/ingest/daily_report/body.html
+#: apps/ingest/templates/email/ingest/daily_report/body.txt
+msgid "skipped"
+msgstr "übersprungen"
+
 #: apps/catalog/templates/catalog/product.html apps/manager/fitment_shop_views.py
 #: apps/manager/product_views.py apps/manager/templates/manager/platform/product.html
 #: apps/manager/templates/manager/shop/order.html themes/ride/templates/catalog/product.html
@@ -9375,6 +9439,11 @@ msgstr "quelle"
 msgid "Source address"
 msgstr "Quelladresse"
 
+#: apps/ingest/templates/email/ingest/daily_report/body.html
+#: apps/ingest/templates/email/ingest/daily_report/body.txt
+msgid "Sources that could not be read"
+msgstr "Quellen, die nicht gelesen werden konnten"
+
 #: apps/orders/templates/orders/_legal_boxes.html themes/ride/templates/orders/_legal_boxes.html
 msgid "Specific approval of onerous clauses (articles 1341 and 1342 of the Italian Civil Code)"
 msgstr ""
@@ -9409,6 +9478,11 @@ msgid ""
 msgstr ""
 "Nur für das Personal: die Benutzernummer des Verkäufers im alten System, aufbewahrt, um migrierte "
 "Daten zu verknüpfen. Belassen Sie sie unverändert."
+
+#: apps/ingest/templates/email/ingest/daily_report/body.html
+#: apps/ingest/templates/email/ingest/daily_report/body.txt
+msgid "Stale review items"
+msgstr "Veraltete Prüfvorgänge"
 
 #: apps/manager/templates/manager/shop/sales_terms.html
 msgid "Standard clause on applicable law and court"
@@ -14148,6 +14222,11 @@ msgstr "Geben Sie die Wörter genau wie angezeigt ein."
 msgid "Type the words shown above, in capitals, to end every session."
 msgstr "Geben Sie die oben angezeigten Wörter in Großbuchstaben ein, um alle Sitzungen zu beenden."
 
+#: apps/ingest/templates/email/ingest/daily_report/body.html
+#: apps/ingest/templates/email/ingest/daily_report/body.txt
+msgid "unchanged"
+msgstr "unverändert"
+
 #: apps/manager/fitment_views.py
 msgid "Under"
 msgstr "Unter"
@@ -14255,6 +14334,11 @@ msgstr "Warenkorb aktualisieren"
 #: apps/orders/templates/orders/_review_body.html themes/ride/templates/orders/_review_body.html
 msgid "Update shipping"
 msgstr "Versand aktualisieren"
+
+#: apps/ingest/templates/email/ingest/daily_report/body.html
+#: apps/ingest/templates/email/ingest/daily_report/body.txt
+msgid "updated"
+msgstr "aktualisiert"
 
 #: apps/manager/media.py apps/manager/templates/manager/shop/event_images.html
 msgid "Upload"

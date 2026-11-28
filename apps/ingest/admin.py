@@ -5,15 +5,20 @@ and review items are written by the pipeline and the review screens, so the admi
 them.
 """
 
+import datetime as dt
 from typing import Any
 
 from django.contrib import admin
+from django.core.exceptions import PermissionDenied
 from django.db.models import QuerySet
-from django.http import HttpRequest
+from django.http import HttpRequest, HttpResponse
+from django.template.response import TemplateResponse
+from django.urls import URLPattern, path
+from django.utils import timezone
 
 from apps.core.audit import audit_context
 
-from . import services
+from . import engine, reports, services
 from .models import (
     ImportRun,
     MappingTable,
@@ -82,6 +87,31 @@ class ImportRunAdmin(_ReadOnly, admin.ModelAdmin[ImportRun]):
     list_display = ("source", "kind", "status", "dry_run", "seen", "created", "updated", "errors")
     list_filter = ("kind", "status", "dry_run")
     list_select_related = ("source__vendor",)
+
+    def get_urls(self) -> list[URLPattern]:
+        prefix = f"{self.opts.app_label}_{self.opts.model_name}"
+        extra = path(
+            "daily-report/",
+            self.admin_site.admin_view(self.daily_report_view),
+            name=f"{prefix}_daily_report",
+        )
+        return [extra, *super().get_urls()]
+
+    def daily_report_view(self, request: HttpRequest) -> HttpResponse:
+        """The daily report (ING.10) in the admin: same content as the email, any day."""
+        if not self.has_view_permission(request):
+            raise PermissionDenied
+        today = timezone.now().astimezone(dt.UTC).date()
+        try:
+            day = dt.date.fromisoformat(request.GET.get("day", ""))
+        except ValueError:
+            day = today
+        context = {
+            **self.admin_site.each_context(request),
+            "title": "Ingest daily report",
+            "report": engine.report_context(reports.gather_daily_report(day)),
+        }
+        return TemplateResponse(request, "admin/ingest/daily_report.html", context)
 
 
 @admin.register(ReviewItem)

@@ -5,7 +5,7 @@ import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Final, Literal, TypeIs
 from urllib.parse import urlsplit, urlunsplit
@@ -502,3 +502,153 @@ def plan_price_actions(
                 else:
                     plan.append(PriceAction(obs.ref, pid, SET_PRICE, "within_limit", new, old, pct))
     return plan
+
+
+# --- Daily report (ING.10)
+
+REVIEW_KINDS: Final = ("price_jump", "sale", "identity_change", "stale", "duplicate_sku")
+IDENTITY_KINDS: Final = ("duplicate_sku", "identity_change")
+REPORT_ERROR_CHARS: Final = 200
+_COUNTERS: Final = ("seen", "created", "updated", "unchanged", "skipped", "errors")
+
+
+@dataclass(frozen=True)
+class ReportRun:
+    """One import run of the day, as the report sees it."""
+
+    source: str
+    vendor: str
+    kind: str
+    status: str
+    dry_run: bool
+    seen: int
+    updated: int
+    unchanged: int
+    skipped: int
+    errors: int
+    error_text: str = ""
+    created: int = 0
+
+
+@dataclass(frozen=True)
+class ReportReview:
+    """One review item: opened on the report day, still open, or both."""
+
+    source: str
+    vendor: str
+    kind: str
+    sku: str
+    open: bool
+    opened_today: bool
+    blocking: bool
+
+
+@dataclass(frozen=True)
+class ReportCollision:
+    """Several feed rows of one vendor share one SKU match key."""
+
+    vendor: str
+    sku_key: str
+    items: int
+
+
+@dataclass(frozen=True)
+class Anomaly:
+    """An identity anomaly: an ambiguous SKU, an identity change or a SKU used by several rows."""
+
+    kind: str
+    vendor: str
+    sku: str
+    detail: str = ""
+
+
+@dataclass
+class DailyReport:
+    day: date
+    runs: list[ReportRun]
+    runs_total: int
+    runs_failed: int
+    totals: dict[str, int]
+    error_runs: list[ReportRun]
+    opened_by_kind: dict[str, int]
+    open_total: int
+    open_blocking: int
+    stale_open: int
+    missing_items: int
+    anomalies: list[Anomaly]
+    unavailable: list[str]
+    needs_attention: bool = False
+
+
+def build_daily_report(
+    day: date,
+    *,
+    runs: Sequence[ReportRun],
+    reviews: Sequence[ReportReview],
+    collisions: Sequence[ReportCollision],
+    missing_items: int,
+    unavailable: Sequence[str],
+) -> DailyReport:
+    """The day's report from plain rows: run counters, errors, review items opened and still open,
+    stale items and identity anomalies. Vendors are never merged: the same SKU at two vendors is
+    two lines, and only rows of one vendor can collide."""
+    totals = {name: sum(getattr(r, name) for r in runs) for name in _COUNTERS}
+    error_runs = [
+        ReportRun(**{**r.__dict__, "error_text": r.error_text[:REPORT_ERROR_CHARS]})
+        for r in runs
+        if r.status == FAILED or r.errors
+    ]
+    opened = {kind: 0 for kind in REVIEW_KINDS}
+    for review in reviews:
+        if review.opened_today and review.kind in opened:
+            opened[review.kind] += 1
+    anomalies = [
+        Anomaly(r.kind, r.vendor, r.sku)
+        for r in reviews
+        if r.kind in IDENTITY_KINDS and (r.open or r.opened_today)
+    ]
+    anomalies += [
+        Anomaly("sku_collision", c.vendor, c.sku_key, f"{c.items} rows") for c in collisions
+    ]
+    order = {"duplicate_sku": 0, "identity_change": 1, "sku_collision": 2}
+    anomalies.sort(key=lambda a: (order[a.kind], a.vendor, a.sku))
+    failed = sum(1 for r in runs if r.status == FAILED)
+    open_reviews = [r for r in reviews if r.open]
+    report = DailyReport(
+        day=day,
+        runs=list(runs),
+        runs_total=len(runs),
+        runs_failed=failed,
+        totals=totals,
+        error_runs=error_runs,
+        opened_by_kind=opened,
+        open_total=len(open_reviews),
+        open_blocking=sum(1 for r in open_reviews if r.blocking),
+        stale_open=sum(1 for r in open_reviews if r.kind == "stale"),
+        missing_items=missing_items,
+        anomalies=anomalies,
+        unavailable=list(unavailable),
+    )
+    report.needs_attention = bool(failed or totals["errors"] or anomalies or unavailable)
+    return report
+
+
+def report_context(report: DailyReport) -> dict[str, Any]:
+    """The report as plain JSON-ready values, for the email context and the admin page."""
+    return {
+        "day": report.day.isoformat(),
+        "runs": [r.__dict__ for r in report.runs],
+        "runs_total": report.runs_total,
+        "runs_failed": report.runs_failed,
+        "totals": report.totals,
+        "error_runs": [r.__dict__ for r in report.error_runs],
+        "opened_by_kind": report.opened_by_kind,
+        "open_total": report.open_total,
+        "open_blocking": report.open_blocking,
+        "stale_open": report.stale_open,
+        "missing_items": report.missing_items,
+        "anomalies": [a.__dict__ for a in report.anomalies],
+        "anomaly_count": len(report.anomalies),
+        "unavailable": report.unavailable,
+        "needs_attention": report.needs_attention,
+    }
