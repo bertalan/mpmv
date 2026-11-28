@@ -13877,8 +13877,8 @@ msgstr ""
 "normal."
 
 #: apps/manager/forms.py
-msgid "Tick this to delete the key you saved. Texts are no longer written for you."
-msgstr "Marque esta casilla para eliminar la clave guardada. Los textos ya no se redactarán por usted."
+msgid "Tick this to delete the key you saved. The platform default applies again."
+msgstr "Marque esta casilla para eliminar la clave guardada. Vuelve a aplicarse la opción predeterminada de la plataforma."
 
 #: apps/orders/ui/forms.py
 msgid ""

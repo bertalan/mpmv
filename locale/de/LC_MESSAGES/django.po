@@ -14037,8 +14037,8 @@ msgstr ""
 "Seite ohne Häkchen."
 
 #: apps/manager/forms.py
-msgid "Tick this to delete the key you saved. Texts are no longer written for you."
-msgstr "Setzen Sie hier ein Häkchen, um den gespeicherten Schlüssel zu löschen. Die Texte werden dann nicht mehr für Sie geschrieben."
+msgid "Tick this to delete the key you saved. The platform default applies again."
+msgstr "Setzen Sie hier ein Häkchen, um den gespeicherten Schlüssel zu löschen. Danach gilt wieder die Voreinstellung der Plattform."
 
 #: apps/orders/ui/forms.py
 msgid ""

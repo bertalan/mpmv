@@ -13996,8 +13996,8 @@ msgstr ""
 "exclue des sitemaps et de llms.txt. Laissez-la décochée pour une page publique normale."
 
 #: apps/manager/forms.py
-msgid "Tick this to delete the key you saved. Texts are no longer written for you."
-msgstr "Cochez cette case pour supprimer la clé enregistrée. Les textes ne seront plus rédigés pour vous."
+msgid "Tick this to delete the key you saved. The platform default applies again."
+msgstr "Cochez cette case pour supprimer la clé enregistrée. Le réglage par défaut de la plateforme s'applique de nouveau."
 
 #: apps/orders/ui/forms.py
 msgid ""

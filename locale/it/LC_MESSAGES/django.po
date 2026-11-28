@@ -13873,8 +13873,8 @@ msgstr ""
 " fuori anche dalle sitemap e da llms.txt. Lasciala senza spunta per una normale pagina pubblica."
 
 #: apps/manager/forms.py
-msgid "Tick this to delete the key you saved. Texts are no longer written for you."
-msgstr "Spunti questa casella per eliminare la chiave salvata. I testi non verranno più scritti per Lei."
+msgid "Tick this to delete the key you saved. The platform default applies again."
+msgstr "Spunti questa casella per eliminare la chiave salvata. Torna ad applicarsi quella predefinita della piattaforma."
 
 #: apps/orders/ui/forms.py
 msgid ""
