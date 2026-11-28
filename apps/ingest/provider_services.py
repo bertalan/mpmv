@@ -61,7 +61,8 @@ def save_provider(
 ) -> ChangeSet:
     """Set the vendor's provider and model; a non-blank `api_key` sets or rotates the key.
 
-    A blank key keeps the stored one; `remove_key` deletes it. Owners only (`profile`). Invalid
+    A blank key keeps the stored one, unless the provider changes (the old key is deleted, never
+    sent to the new provider); `remove_key` deletes it. Owners only (`profile`). Invalid
     input raises `ValidationError` naming the field, never the key. The audit action tells what
     happened: `saved` (choice only), `key_set`, `key_rotated`, `key_removed`.
     """
@@ -85,6 +86,7 @@ def save_provider(
         row = VendorAIProvider.objects.select_for_update().filter(vendor=vendor).first()
         before = _snapshot(vendor, row)
         had_key = bool(row and row.has_key)
+        changed_provider = row is not None and row.provider != provider
         target = row or VendorAIProvider(vendor=vendor)
         target.provider, target.model = provider, model
         if api_key:
@@ -92,7 +94,8 @@ def save_provider(
             target.api_key = api_key
             target.key_version += 1
             target.key_set_at = timezone.now()
-        elif remove_key and had_key:
+        elif had_key and (remove_key or changed_provider):
+            # A key belongs to the provider that issued it: a new provider never receives it.
             action = KEY_REMOVED
             target.api_key = ""
         else:

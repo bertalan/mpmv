@@ -82,15 +82,38 @@ def test_a_blank_key_keeps_the_stored_one_and_remove_deletes_it() -> None:
     actor = owner_of(vendor)
     key = secrets.token_urlsafe(24)
     svc.save_provider(vendor, provider="gemini", model="m-1", api_key=key, actor=actor, ctx=CTX)
-    svc.save_provider(vendor, provider="claude", model="m-2", api_key="", actor=actor, ctx=CTX)
+    svc.save_provider(vendor, provider="gemini", model="m-2", api_key="", actor=actor, ctx=CTX)
     row = VendorAIProvider.objects.get(vendor=vendor)
-    assert (row.provider, row.model, row.api_key) == ("claude", "m-2", key)
+    assert (row.provider, row.model, row.api_key) == ("gemini", "m-2", key)
     assert AuditLog.objects.filter(action="ingest.provider.saved").count() == 1
-    svc.save_provider(vendor, provider="claude", model="m-2", remove_key=True, actor=actor, ctx=CTX)
+    svc.save_provider(vendor, provider="gemini", model="m-2", remove_key=True, actor=actor, ctx=CTX)
     row.refresh_from_db()
     assert not row.has_key
     assert AuditLog.objects.filter(action="ingest.provider.key_removed").count() == 1
     assert key not in audit_text()
+
+
+def test_a_provider_change_without_a_new_key_clears_the_old_key() -> None:
+    vendor = VendorFactory.create()
+    actor = owner_of(vendor)
+    key = secrets.token_urlsafe(24)
+    svc.save_provider(vendor, provider="gemini", model="m-1", api_key=key, actor=actor, ctx=CTX)
+    svc.save_provider(vendor, provider="claude", model="m-2", api_key="", actor=actor, ctx=CTX)
+    row = VendorAIProvider.objects.get(vendor=vendor)
+    assert (row.provider, row.has_key, row.api_key) == ("claude", False, "")
+    assert svc.key_for(vendor) is None
+    assert AuditLog.objects.filter(action="ingest.provider.key_removed").count() == 1
+    assert key not in raw_column(row)
+    assert key not in audit_text()
+
+
+def test_a_provider_change_with_a_new_key_keeps_only_the_new_key() -> None:
+    vendor = VendorFactory.create()
+    actor = owner_of(vendor)
+    old, new = secrets.token_urlsafe(24), secrets.token_urlsafe(24)
+    svc.save_provider(vendor, provider="gemini", model="m-1", api_key=old, actor=actor, ctx=CTX)
+    svc.save_provider(vendor, provider="claude", model="m-2", api_key=new, actor=actor, ctx=CTX)
+    assert svc.key_for(vendor) == new
 
 
 def test_dry_run_changes_and_audits_nothing() -> None:
