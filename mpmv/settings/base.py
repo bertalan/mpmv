@@ -644,6 +644,14 @@ GEOCODING_USER_WINDOW = 60  # seconds
 # does not import the vendors app.
 GEOCODING_ACCESS_POLICIES: list[str] = ["apps.vendors.services.is_vendor_member"]
 
+# AI text enrichment (ING.5, D-13): which `TextEnricher` runs. "fake" (the default, also in tests
+# and local runs) never leaves the machine; "gemini" calls the API with the key from the
+# environment only. Other providers are ING.14.
+INGEST_ENRICHER = env_str("MPMV_INGEST_ENRICHER", "fake")
+INGEST_GEMINI_API_KEY = env_str("MPMV_INGEST_GEMINI_API_KEY", "")
+INGEST_GEMINI_MODEL = env_str("MPMV_INGEST_GEMINI_MODEL", "gemini-2.0-flash")
+INGEST_ENRICH_TIMEOUT = 20.0  # seconds per provider call
+
 # Maps (EVT.13, spec 15 "Maps"): the Leaflet tile URL template, its attribution and the view of
 # a map without a point (latitude, longitude, zoom). The tiles come from the EVT.14 proxy on the
 # site itself (`/maps/tiles/{z}/{x}/{y}.png`, the default). An absolute https URL is allowed in
