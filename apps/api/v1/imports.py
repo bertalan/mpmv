@@ -1,15 +1,16 @@
 """Import API for external vendors (ING.12): upsert products and set stock, by SKU.
 
 Thin adapters over `apps.catalog.services` (`upsert_products`, `update_by_sku`). Every operation
-is scoped to the key's own vendor: a platform key is refused (403 `vendor_key_required`), a row
-naming another vendor or a SKU the vendor does not have answers 404, as for a resource that does
-not exist. `?dry_run=true` returns the ChangeSet and writes nothing. Batches are capped at
-`MAX_ITEMS` rows; the request body size and the per-key rate limit are the API-wide ones.
+is scoped to the key's own vendor: a platform key is refused (403 `vendor_key_required`), the
+vendor comes from the key only (a row has no vendor field), and a SKU the vendor does not have
+answers 404, as for a resource that does not exist. `?dry_run=true` returns the ChangeSet and
+writes nothing. Batches are capped at `MAX_ITEMS` rows; the request body size and the per-key
+rate limit are the API-wide ones.
 
 Prices are net `Decimal` amounts (EUR, VAT excluded; the tax position stays with the tax app) set
-through the audited price services, all or nothing. Media is a multipart upload attached through
-`catalog.media.upload_image` (licence and author required); fetching a URL is a follow-up that
-needs the SSRF-guarded client.
+through the audited price services, all or nothing. There is no media operation: API v1 takes no
+file upload (tests/integration/test_upload_paths.py); media by URL through the SSRF-guarded client
+is a follow-up.
 
 Rows of an upsert are independent (partial apply, no all-or-nothing mode): a refused row is
 listed in `errors` and in `rows` (index and SKU) and the others apply.
@@ -22,18 +23,16 @@ from typing import Any, Literal
 
 from django.db import transaction
 from django.http import HttpRequest
-from django.utils import timezone
-from ninja import File, Form, Router, Schema, Status, UploadedFile
+from ninja import Router, Schema
 from pydantic import Field
 
 from apps.api.auth import api_client_of
-from apps.api.v1.catalog import ProductIn
+from apps.api.v1.catalog import ProductBody
 from apps.api.v1.errors import ApiProblem
-from apps.catalog import media, services
+from apps.catalog import services
 from apps.catalog.engine import MAX_STOCK, SKU_MAX_LENGTH, sku_match_key
 from apps.catalog.models import Variant
 from apps.core.changeset import ChangeSet
-from apps.core.models import ImageLicence
 from apps.vendors.models import Vendor
 from apps.vendors.services import ensure_vendor_can_write
 
@@ -55,17 +54,6 @@ def _own_vendor(request: HttpRequest) -> Vendor:
             detail="The import API is for a vendor's own key; a platform key is refused.",
         )
     return vendor
-
-
-def _vendor_key(request: HttpRequest) -> media.VendorKey:
-    client = api_client_of(request)
-    return media.VendorKey(
-        vendor_id=client.vendor_id,
-        scopes=frozenset(client.scopes),
-        active=client.is_active
-        and client.revoked_at is None
-        and client.expires_at > timezone.now(),
-    )
 
 
 def _not_found() -> ApiProblem:
@@ -97,7 +85,7 @@ class UpsertOut(ChangeSetOut):
 
 
 class UpsertIn(Schema):
-    items: list[ProductIn] = Field(min_length=1, max_length=MAX_ITEMS)
+    items: list[ProductBody] = Field(min_length=1, max_length=MAX_ITEMS)
 
 
 @router.post(
@@ -110,11 +98,9 @@ def upsert_products(
     request: HttpRequest, payload: UpsertIn, dry_run: DryRun = False
 ) -> dict[str, Any]:
     """Create new SKUs as drafts and update known ones (fields, net price, texts per language,
-    variants' own fields); a payload equal to the stored data changes nothing. A row naming
-    another vendor answers 404 for the whole request."""
+    variants' own fields); a payload equal to the stored data changes nothing. The vendor
+    comes from the key only: rows have no vendor field."""
     vendor = _own_vendor(request)
-    if any(item.vendor not in (None, vendor.public_id) for item in payload.items):
-        raise _not_found()
     report = services.upsert_products(
         vendor,
         [item.to_engine() for item in payload.items],
@@ -256,59 +242,3 @@ def set_prices(request: HttpRequest, payload: PricesIn, dry_run: DryRun = False)
                 )
             changes.changes.extend(done.changes)
     return changeset_out(changes, dry_run=dry_run)
-
-
-class MediaForm(Schema):
-    sku: PlainText = Field(min_length=1, max_length=SKU_MAX_LENGTH)
-    title: PlainText = Field(min_length=1, max_length=255)
-    author: PlainText = Field(min_length=1, max_length=255)
-    licence: PlainText = Field(description="Code of an entry of the image licence allow list.")
-    language: PlainText | None = Field(None, description="Dedicated to this language; or all.")
-    alt_text: PlainText = Field("", max_length=255)
-
-
-@router.post(
-    "/media",
-    response={200: ChangeSetOut, 201: ChangeSetOut},
-    auth=ApiKey("catalog:write"),
-    summary="Attach an uploaded image to a product or variant by SKU",
-)
-def attach_media(
-    request: HttpRequest,
-    data: Form[MediaForm],
-    file: File[UploadedFile],
-    dry_run: DryRun = False,
-) -> Status[dict[str, Any]]:
-    """Add an image (multipart `file`) to the gallery of the product or variant with this SKU.
-    The file is checked like every image upload (type, size, pixels). 201 when added; 200 with
-    the ChangeSet on `?dry_run=true`."""
-    vendor = _own_vendor(request)
-    item = services.match_skus(vendor, [data.sku])[data.sku]
-    if item is None:
-        raise _not_found()
-    licence = ImageLicence.objects.filter(code=data.licence).first()
-    if licence is None:
-        raise ApiProblem(
-            422,
-            code="validation_error",
-            detail="The request is not valid.",
-            errors=[{"loc": ["body", "licence"], "msg": "Unknown licence.", "type": "invalid"}],
-        )
-    product, variant = (item.product, item) if isinstance(item, Variant) else (item, None)
-    with transaction.atomic():
-        # A vendor suspended since the key was authenticated writes nothing (CORE.14).
-        ensure_vendor_can_write(vendor)
-        changes = media.upload_image(
-            product,
-            file=file,
-            title=data.title,
-            licence=licence,
-            author=data.author,
-            ctx=audit_context(request),
-            variant=variant,
-            language=data.language,
-            alt_text=data.alt_text,
-            dry_run=dry_run,
-            key=_vendor_key(request),
-        )
-    return Status(200 if dry_run else 201, changeset_out(changes, dry_run=dry_run))

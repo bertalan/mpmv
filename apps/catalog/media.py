@@ -14,7 +14,6 @@ into the vendor's own Wagtail collection (D-34).
 
 import hashlib
 from collections.abc import Sequence
-from dataclasses import dataclass
 from typing import Any
 
 from django.contrib.auth import get_user_model
@@ -97,45 +96,13 @@ def _check_language(language: str | None) -> None:
 PIPELINE_SOURCES = (AuditLog.Source.SYSTEM, AuditLog.Source.TASK, AuditLog.Source.COMMAND)
 
 
-@dataclass(frozen=True)
-class VendorKey:
-    """The authenticated API key of a vendor, as the import API presents it (ING.12).
-
-    Built by the adapter from the stored key (`vendor_id`, `scopes`, and `active`: not revoked,
-    not expired). `catalog` never imports the `api` app, so the facts are passed in; `_authorise`
-    still checks them against the product's vendor."""
-
-    vendor_id: int | None
-    scopes: frozenset[str]
-    active: bool
-
-
-WRITE_SCOPE = "catalog:write"
-
-
-def _authorise(vendor: Vendor, ctx: AuditContext, *, key: VendorKey | None = None) -> None:
+def _authorise(vendor: Vendor, ctx: AuditContext) -> None:
     """The actor of `ctx` must be a member of `vendor` allowed to manage products, or platform
     staff; a pipeline (`PIPELINE_SOURCES`, no actor) is trusted. Adapters (the Manager, the
     API, the admin) build `ctx` from the signed-in user and so pass; they still do their own
     request-level checks. Platform staff also need the catalog write right (CAT.30). Raises
-    PermissionDenied.
-
-    `key` is for the import API (ING.12): an actor-less call on behalf of an API key passes only
-    when `ctx.source` is the API source and the key is active, holds `catalog:write` and belongs
-    to this very `vendor` (a platform key, `vendor_id=None`, never passes). Otherwise
     PermissionDenied."""
     require_catalog_editor(ctx)
-    if key is not None:
-        if (
-            ctx.actor_id is None
-            and ctx.source == AuditLog.Source.API
-            and key.active
-            and WRITE_SCOPE in key.scopes
-            and key.vendor_id is not None
-            and key.vendor_id == vendor.pk
-        ):
-            return
-        raise PermissionDenied("This API key cannot change this vendor's product images.")
     if ctx.actor_id is None:
         if ctx.source in PIPELINE_SOURCES:
             return
@@ -170,7 +137,6 @@ def upload_image(
     caption: str = "",
     ai_origin: str = ai_labels.AI_NONE,
     dry_run: bool = False,
-    key: VendorKey | None = None,
 ) -> ChangeSet:
     """Add an uploaded image to the product's gallery (or `variant`'s own), with renditions.
 
@@ -179,7 +145,7 @@ def upload_image(
     in one gallery and language is refused. `alt_text` and `caption` are in the source language.
     Returns the `ChangeSet`; the new row is `ProductImage.objects.filter(product=...)`'s latest.
     """
-    _authorise(product.vendor, ctx, key=key)
+    _authorise(product.vendor, ctx)
     _check_language(language)
     _check_ai_origin(ai_origin)
     if variant is not None and variant.product_id != product.pk:

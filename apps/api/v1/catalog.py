@@ -139,10 +139,9 @@ class VariantIn(Schema):
     mpn: PlainText = Field("", max_length=engine.MPN_MAX_LENGTH)
 
 
-class ProductIn(Schema):
-    vendor: uuid.UUID | None = Field(
-        None, description="Required with a platform key; a vendor key may only name its own."
-    )
+class ProductBody(Schema):
+    """A product's own fields, with no vendor: the import API takes the vendor from the key only."""
+
     sku: PlainText = Field(min_length=1, max_length=engine.SKU_MAX_LENGTH)
     kind: Literal["simple", "variable"] = "simple"
     sales_mode: Literal["buy", "catalog_only", "on_request"] = "buy"
@@ -195,6 +194,12 @@ class ProductIn(Schema):
                 for v in self.variants
             ),
         )
+
+
+class ProductIn(ProductBody):
+    vendor: uuid.UUID | None = Field(
+        None, description="Required with a platform key; a vendor key may only name its own."
+    )
 
 
 def _vendor(request: HttpRequest, requested: uuid.UUID | None) -> Vendor:
