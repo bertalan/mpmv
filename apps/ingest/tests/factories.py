@@ -10,6 +10,7 @@ from factory.django import DjangoModelFactory
 from apps.catalog import engine as catalog_engine
 from apps.ingest import engine
 from apps.ingest.models import (
+    EnrichmentVersion,
     ImportRun,
     ItemChange,
     MappingTable,
@@ -162,3 +163,15 @@ def make_stale(item: SourceItem, days: int = 3) -> SourceItem:
     item.last_seen_at = timezone.now() - dt.timedelta(days=days)
     item.save(update_fields=["last_seen_at"])
     return item
+
+
+class EnrichmentVersionFactory(DjangoModelFactory[EnrichmentVersion]):
+    class Meta:
+        model = EnrichmentVersion
+
+    draft = factory.SubFactory(ProductDraftFactory)
+    lang = "en"
+    provider = "fake"
+    model = "fake-1"
+    prompt_version = "v1"
+    outcome = EnrichmentVersion.Outcome.ACCEPTED

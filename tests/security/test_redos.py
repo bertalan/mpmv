@@ -78,7 +78,7 @@ DYNAMIC: dict[str, tuple[str, list[tuple[str, int, str]]]] = {
             (r"lt\.?\s*(\d+)(?:\s*[/-]\s*(\d+))?", 0, "search"),
         ],
     ),
-    "apps/ingest/enrich_engine.py:47": (
+    "apps/ingest/enrich_engine.py:48": (
         "an escaped literal term (spaces become \\s+) between two lookarounds; input is a "
         "product text",
         [(r"(?<![^\W_])eco\s+friendly(?![^\W_])", 0, "search")],

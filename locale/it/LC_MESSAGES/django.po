@@ -9863,6 +9863,10 @@ msgid "The alert is closed. Support gets no more reminders."
 msgstr "L'avviso è chiuso. Il Supporto non riceverà altri promemoria."
 
 #: apps/ingest/models.py
+msgid "The answer of the provider, as it came."
+msgstr "La risposta del fornitore, così come è arrivata."
+
+#: apps/ingest/models.py
 msgid "The answer, e.g. 404."
 msgstr "La risposta, ad esempio 404."
 
@@ -10513,6 +10517,10 @@ msgstr ""
 msgid "The draft is discarded. Nothing changed in the order."
 msgstr "La bozza è scartata. Nell'ordine non è cambiato nulla."
 
+#: apps/ingest/models.py
+msgid "The draft this text was written for."
+msgstr "La bozza per cui è stato scritto questo testo."
+
 #: apps/events/models.py
 msgid ""
 "The east-west position of the place, a number from -180 to 180, for example 9.190000. Click the "
@@ -10887,6 +10895,10 @@ msgstr ""
 #: apps/vendors/models.py
 msgid "The language of the text that was shown when the contract was accepted."
 msgstr "La lingua del testo mostrato al momento dell'accettazione del contratto."
+
+#: apps/ingest/models.py
+msgid "The language of the text."
+msgstr "La lingua del testo."
 
 #: apps/manager/event_forms.py
 msgid "The language of the translation. Required."
@@ -12902,6 +12914,10 @@ msgstr "Il numero di versione di queste condizioni per questo venditore: 1, 2, 3
 #: apps/vendors/models.py
 msgid "The version number of this policy for this seller: 1, 2, 3 and so on."
 msgstr "Il numero di versione di questa politica per questo venditore: 1, 2, 3 e così via."
+
+#: apps/ingest/models.py
+msgid "The version of the instructions the model was given."
+msgstr "La versione delle istruzioni date al modello."
 
 #: apps/vendors/models.py
 msgid "The version of the seller's sales terms that is in force."
@@ -14952,6 +14968,10 @@ msgstr "Che cosa è il negozio per i suoi prodotti"
 msgid "What the supplier published for the item, as it was read."
 msgstr "Quello che il fornitore ha pubblicato per l'articolo, così come è stato letto."
 
+#: apps/ingest/models.py
+msgid "What the text broke, as a list. Empty if accepted."
+msgstr "Che cosa il testo ha violato, come elenco. Vuoto se accettato."
+
 #: apps/cms/models.py
 msgid ""
 "What the text is for: one screen, every page of one page type, or every screen that has no text of"
@@ -15346,6 +15366,10 @@ msgstr ""
 "Se il territorio è fuori dall'area IVA dell'UE, dentro con aliquote proprie, oppure speciale e "
 "gestito da una regola a parte. Se non sei sicuro, chiedi al tuo commercialista."
 
+#: apps/ingest/models.py
+msgid "Whether the text was accepted, outside the policy or not in the right shape."
+msgstr "Se il testo è stato accettato, è fuori dalle regole o non ha la forma giusta."
+
 #: apps/core/models.py
 msgid ""
 "Whether VAT is added to the platform's commissions and fees. Ask your accountant if you are not "
@@ -15364,6 +15388,10 @@ msgstr ""
 " motori di ricerca e gli assistenti IA lo vedono nei dati del prodotto. Lo lasci vuoto se non è "
 "sicuro: non diremo mai che realizza il prodotto. Un singolo prodotto può avere un valore diverso."
 
+#: apps/ingest/models.py
+msgid "Which AI provider wrote the text."
+msgstr "Quale fornitore di IA ha scritto il testo."
+
 #: apps/tax/models.py
 msgid "Which kind of goods the rate is for: standard, reduced, super-reduced, zero or books."
 msgstr "Per quale tipo di merce è l'aliquota: ordinaria, ridotta, super ridotta, zero o libri."
@@ -15375,6 +15403,10 @@ msgid ""
 msgstr ""
 "Quale testo legale è questa pagina, per esempio 'Informativa sulla privacy'. Il sito la collega "
 "nei punti in cui serve quel testo."
+
+#: apps/ingest/models.py
+msgid "Which model of the provider wrote it."
+msgstr "Quale modello del fornitore l'ha scritto."
 
 #: apps/cms/blocks.py
 msgid ""

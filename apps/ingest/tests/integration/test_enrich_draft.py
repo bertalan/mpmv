@@ -1,0 +1,244 @@
+"""ING.5 2/3: running an enricher on a draft (archive, review, EN-only, IT protection)."""
+
+from typing import Any
+
+import pytest
+from django.db import IntegrityError
+
+from apps.catalog.tests.factories import ProductFactory, ProductTranslationFactory
+from apps.core.audit import AuditContext
+from apps.core.models import AuditLog
+from apps.ingest import services
+from apps.ingest.enrichment import FakeEnricher, TextPolicy
+from apps.ingest.models import EnrichmentVersion, ImportRun, ProductDraft, ReviewItem
+from apps.ingest.tests.factories import (
+    EnrichmentVersionFactory,
+    ImportRunFactory,
+    ProductDraftFactory,
+    ReviewItemFactory,
+)
+
+pytestmark = pytest.mark.django_db
+
+CTX = AuditContext(actor_label="staff:ingest", source="admin", ip="127.0.0.1")
+
+
+def make_draft(**kwargs: Any) -> tuple[ProductDraft, ImportRun]:
+    draft = ProductDraftFactory.create(extracted={"title": "Ceramic mug"}, **kwargs)
+    run = ImportRunFactory.create(source=draft.item.source)
+    return draft, run
+
+
+def test_in_policy_output_is_applied_archived_and_audited() -> None:
+    draft, run = make_draft()
+    result = services.enrich_draft(draft, FakeEnricher(), run=run, ctx=CTX)
+    assert result.outcome == "accepted"
+    draft.refresh_from_db()
+    assert draft.enriched["en"]["title"] == "Ceramic mug"
+    assert draft.enriched["en"]["origin"] == "machine"
+    version = EnrichmentVersion.objects.get()
+    assert (version.provider, version.model, version.prompt_version) == ("fake", "fake-1", "v1")
+    assert version.outcome == "accepted"
+    assert AuditLog.objects.filter(action=services.DRAFT_ENRICHED).count() == 1
+    assert AuditLog.objects.filter(action=services.ENRICHMENT_ARCHIVED).count() == 1
+    assert not ReviewItem.objects.exists()
+
+
+def test_out_of_policy_output_goes_to_review_and_is_not_applied() -> None:
+    draft, run = make_draft()
+    fake = FakeEnricher({"description": "An eco-friendly mug"})
+    result = services.enrich_draft(draft, fake, run=run, ctx=CTX)
+    assert result.outcome == "out_of_policy"
+    draft.refresh_from_db()
+    assert draft.enriched == {}
+    assert draft.status == ProductDraft.Status.NEEDS_REVIEW
+    review = ReviewItem.objects.get()
+    assert review.kind == ReviewItem.Kind.TEXT_POLICY
+    assert review.blocking is False
+    assert review.item == draft.item
+    assert any("environmental" in v for v in review.payload["violations"])
+    assert EnrichmentVersion.objects.get().outcome == "out_of_policy"
+
+
+def test_schema_invalid_output_goes_to_review() -> None:
+    draft, run = make_draft()
+    result = services.enrich_draft(draft, FakeEnricher({"extra": "x"}), run=run, ctx=CTX)
+    assert result.outcome == "schema_invalid"
+    draft.refresh_from_db()
+    assert draft.enriched == {}
+    assert ReviewItem.objects.get().kind == ReviewItem.Kind.TEXT_POLICY
+
+
+def test_dry_run_changes_nothing_and_returns_the_changeset() -> None:
+    draft, run = make_draft()
+    result = services.enrich_draft(draft, FakeEnricher(), run=run, ctx=CTX, dry_run=True)
+    assert not result.changes.is_empty
+    assert not EnrichmentVersion.objects.exists()
+    assert not AuditLog.objects.filter(action=services.DRAFT_ENRICHED).exists()
+    draft.refresh_from_db()
+    assert draft.enriched == {}
+
+
+def test_a_dry_run_leaves_the_callers_draft_object_untouched() -> None:
+    for enricher in (FakeEnricher(), FakeEnricher({"description": "An eco-friendly mug"})):
+        draft, run = make_draft()
+        status = draft.status
+        services.enrich_draft(draft, enricher, run=run, ctx=CTX, dry_run=True)
+        assert draft.enriched == {}  # no refresh_from_db: this is the caller's own object
+        assert draft.status == status
+
+
+def test_provider_error_leaves_the_text_unchanged_and_a_trace() -> None:
+    draft, run = make_draft()
+    result = services.enrich_draft(draft, FakeEnricher(error="quota"), run=run, ctx=CTX)
+    assert result.outcome == "provider_error"
+    draft.refresh_from_db()
+    assert draft.enriched == {}
+    assert not EnrichmentVersion.objects.exists()
+    entry = AuditLog.objects.get(action=services.ENRICHMENT_FAILED)
+    assert entry.target_key == str(draft.public_id)
+    assert entry.after == {"lang": "en", "provider": "fake", "error": "ProviderError"}
+    assert "quota" not in str(entry.after)  # the message never goes into the audit
+
+
+def test_a_dry_run_provider_error_leaves_no_trace() -> None:
+    draft, run = make_draft()
+    services.enrich_draft(draft, FakeEnricher(error="quota"), run=run, ctx=CTX, dry_run=True)
+    assert not AuditLog.objects.filter(action=services.ENRICHMENT_FAILED).exists()
+
+
+def test_only_english_is_written() -> None:
+    draft, run = make_draft()
+    fake = FakeEnricher()
+    with pytest.raises(services.EnrichmentRefused):
+        services.enrich_draft(draft, fake, run=run, ctx=CTX, lang="it")
+    assert fake.calls == []  # the provider is not even called
+
+
+def test_existing_texts_in_a_language_are_never_overwritten() -> None:
+    migrated = {"it": {"title": "Tazza"}}
+    draft, run = make_draft(enriched=migrated)
+    fake = FakeEnricher()
+    policy = TextPolicy(languages=("en", "it"))  # even if a policy allowed IT
+    with pytest.raises(services.EnrichmentRefused):
+        services.enrich_draft(draft, fake, run=run, ctx=CTX, lang="it", policy=policy)
+    draft.refresh_from_db()
+    assert draft.enriched == migrated
+    assert fake.calls == []
+
+
+def test_an_existing_catalog_translation_blocks_the_language() -> None:
+    product = ProductFactory.create()
+    language = ProductTranslationFactory.create(product=product).language
+    draft, run = make_draft(item__product=product, item__source__vendor=product.vendor)
+    fake = FakeEnricher()
+    policy = TextPolicy(languages=(language,))
+    with pytest.raises(services.EnrichmentRefused):
+        services.enrich_draft(draft, fake, run=run, ctx=CTX, lang=language, policy=policy)
+    assert fake.calls == []
+
+
+def test_a_migrated_italian_translation_is_never_touched_q71() -> None:
+    product = ProductFactory.create()
+    migrated = ProductTranslationFactory.create(
+        product=product,
+        language="it",
+        title="Tazza",
+        short_description="Breve",
+        description="Lunga",
+    )
+    draft, run = make_draft(item__product=product, item__source__vendor=product.vendor)
+    fake = FakeEnricher()
+    both = TextPolicy(languages=("en", "it"))
+    with pytest.raises(services.EnrichmentRefused):
+        services.enrich_draft(draft, fake, run=run, ctx=CTX, lang="it", policy=both)
+    assert fake.calls == []  # refused before any provider call
+    services.enrich_draft(draft, fake, run=run, ctx=CTX, lang="en", policy=both)
+    assert len(fake.calls) == 1
+    migrated.refresh_from_db()
+    assert (migrated.title, migrated.short_description, migrated.description) == (
+        "Tazza",
+        "Breve",
+        "Lunga",
+    )
+    assert product.translations.filter(language="it").count() == 1
+
+
+def test_run_of_another_vendor_is_refused() -> None:
+    draft, _ = make_draft()
+    other = ImportRunFactory.create()
+    with pytest.raises(services.EnrichmentRefused):
+        services.enrich_draft(draft, FakeEnricher(), run=other, ctx=CTX)
+
+
+def test_archive_lists_the_newest_version_first() -> None:
+    draft, _ = make_draft()
+    older = EnrichmentVersionFactory.create(draft=draft, outcome="out_of_policy")
+    newer = EnrichmentVersionFactory.create(draft=draft)
+    assert list(draft.enrichment_versions.all()) == [newer, older]
+
+
+def test_a_translation_created_while_the_provider_runs_is_never_overwritten() -> None:
+    product = ProductFactory.create()
+    draft, run = make_draft(item__product=product, item__source__vendor=product.vendor)
+    language = TextPolicy().languages[0]
+
+    class Racing(FakeEnricher):
+        def describe(self, facts: Any, lang: str, policy: TextPolicy) -> Any:
+            ProductTranslationFactory.create(product=product, language=lang)  # appears mid-call
+            return super().describe(facts, lang, policy)
+
+    with pytest.raises(services.EnrichmentRefused):
+        services.enrich_draft(draft, Racing(), run=run, ctx=CTX, lang=language)
+    draft.refresh_from_db()
+    assert draft.enriched == {}
+    assert not EnrichmentVersion.objects.exists()
+
+
+def test_a_rerun_refreshes_the_open_review_instead_of_opening_another() -> None:
+    draft, run = make_draft()
+    services.enrich_draft(
+        draft, FakeEnricher({"description": "An eco-friendly mug"}), run=run, ctx=CTX
+    )
+    result = services.enrich_draft(
+        draft, FakeEnricher({"description": "A sustainable mug"}), run=run, ctx=CTX
+    )
+    review = ReviewItem.objects.get()
+    assert result.review == review
+    assert any("sustainable" in v for v in review.payload["violations"])
+    assert EnrichmentVersion.objects.count() == 2  # every output stays archived
+    assert AuditLog.objects.filter(action=services.REVIEW_REFRESHED).count() == 1
+
+
+def test_an_integrity_error_on_the_review_means_already_open(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    draft, run = make_draft()
+    existing = ReviewItemFactory.create(
+        run=run, item=draft.item, kind=ReviewItem.Kind.TEXT_POLICY, payload={"violations": []}
+    )
+    lookups = iter([None, existing])
+    monkeypatch.setattr(services, "_open_text_review", lambda item: next(lookups))
+
+    real_save = ReviewItem.save
+
+    def clash(self: ReviewItem, *args: Any, **kwargs: Any) -> None:
+        if self._state.adding:
+            raise IntegrityError("one open review per product and kind")
+        real_save(self, *args, **kwargs)
+
+    monkeypatch.setattr(ReviewItem, "save", clash)
+    result = services.enrich_draft(
+        draft, FakeEnricher({"description": "An eco-friendly mug"}), run=run, ctx=CTX
+    )
+    assert result.outcome == "out_of_policy"
+    assert result.review == existing
+    assert EnrichmentVersion.objects.count() == 1
+
+
+def test_an_oversized_provider_answer_is_truncated_in_the_archive() -> None:
+    draft, run = make_draft()
+    huge = "x" * (services.RAW_ARCHIVE_LIMIT + 10)
+    services.enrich_draft(draft, FakeEnricher({"description": huge}), run=run, ctx=CTX)
+    raw = EnrichmentVersion.objects.get().raw
+    assert raw["truncated"] is True
