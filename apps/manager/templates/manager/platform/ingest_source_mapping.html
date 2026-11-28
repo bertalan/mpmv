@@ -27,6 +27,7 @@ Map the columns of a supplier source (ING.13, step 2). The sample gives the colu
         {% include "components/button.html" with label=_("Save the mapping") type="submit" only %}
       </form>
     {% else %}
+      <p>{% translate "The sample is not kept. Choose the file again to list its columns." %}</p>
       {% include "components/error_summary.html" with form=form autofocus=True only %}
       <form method="post" enctype="multipart/form-data" class="manager-form" novalidate>
         {% csrf_token %}

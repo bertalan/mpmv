@@ -165,7 +165,10 @@ class _SourceView(WriteGate, ManagerView):
 
 
 class SampleForm(forms.Form):
-    sample = forms.FileField(label=gettext_lazy("Sample file"))
+    sample = forms.FileField(
+        label=gettext_lazy("Sample file"),
+        error_messages={"required": gettext_lazy("The sample is not kept. Choose the file again.")},
+    )
 
     def clean_sample(self) -> Any:
         return SourceForm.clean_sample(self)  # type: ignore[arg-type]
@@ -239,13 +242,26 @@ class SourceMappingView(_SourceView):
                 name = request.POST.get(f"field_{i}", "")
                 if name:
                     pairs[header[:200]] = name
+            if request.POST.get("header_0") is None:
+                messages.error(
+                    request,
+                    _(
+                        "No column was received. The sample is not kept: choose the file again "
+                        "to list its columns."
+                    ),
+                )
+                return self.render_to_response(self.get_context_data(), status=400)
             try:
                 onboarding.save_column_mappings(source.vendor, pairs, ctx=audit_context(request))
             except ValidationError as error:
                 messages.error(request, " ".join(error.messages))
                 return self.render_to_response(self.get_context_data(), status=400)
             messages.success(
-                request, _("The mapping is saved. Read the sample again to confirm it.")
+                request,
+                _(
+                    "The mapping is saved. The sample is not kept: choose the file again on this "
+                    "page and read it to confirm the mapping."
+                ),
             )
             return self.back()
         form = SampleForm(request.POST, request.FILES)

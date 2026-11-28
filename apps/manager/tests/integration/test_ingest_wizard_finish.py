@@ -3,6 +3,7 @@ demo vendor goes from nothing to an active source through the pages only, no cod
 Language agnostic. Pseudonymised data. Ingest and access code: needs human review."""
 
 import pytest
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client
 
@@ -62,11 +63,14 @@ def test_a_demo_vendor_is_activated_without_code() -> None:
     assert AuditLog.objects.filter(action=services.MAPPING_CREATED).count() == 3
     # Step 3: re-check the sample with the mapping, then activate.
     assert client.post(base, {"action": "check", "sample": sample()}).status_code == 302
+    assert not AuditLog.objects.filter(action=services.SOURCE_ACTIVATED).exists()
     assert client.post(base, {"action": "activate"}).status_code == 302
     source.refresh_from_db()
     assert source.is_active
     assert not source.write_enabled  # writing stays a separate, later decision
-    assert AuditLog.objects.filter(action=services.SOURCE_UPDATED).exists()
+    assert AuditLog.objects.filter(action=services.SOURCE_UPDATED).exists()  # the sample result
+    activated = AuditLog.objects.get(action=services.SOURCE_ACTIVATED)  # the activation itself
+    assert activated.target_key == str(source.public_id)
     assert all(i.ok for i in onboarding.checklist(source))
 
 
@@ -133,3 +137,31 @@ def test_a_refused_sample_shows_the_reason_on_the_mapping_page() -> None:
     response = staff().post(url, {"action": "headers", "sample": sample(b"not a workbook")})
     assert response.status_code == 400
     assert b'role="alert"' in response.content
+
+
+def test_the_activation_refusal_names_the_missing_items_by_label_not_by_key() -> None:
+    source = SupplierSourceFactoryCreate()
+    with pytest.raises(ValidationError) as caught:
+        onboarding.activate_source(source, ctx=_ctx())
+    text = " ".join(caught.value.messages)
+    for item in onboarding.checklist(source):
+        if not item.ok and item.key != "source_active":
+            assert item.label in text
+        assert item.key not in text
+
+
+def test_a_mapping_save_without_any_column_asks_for_the_sample_again() -> None:
+    source = SupplierSourceFactoryCreate()
+    response = staff().post(
+        f"/manager/platform/sources/{source.public_id}/mapping/", {"action": "save"}
+    )
+    assert response.status_code == 400
+    assert not MappingTable.objects.exists()
+    assert [m.level_tag for m in response.context["messages"]] == ["error"]
+
+
+def test_reading_the_sample_again_without_a_file_is_refused_with_a_reason() -> None:
+    source = SupplierSourceFactoryCreate()
+    response = staff().post(f"/manager/platform/sources/{source.public_id}/", {"action": "check"})
+    assert response.status_code == 400
+    assert response.context["form"].errors["sample"]

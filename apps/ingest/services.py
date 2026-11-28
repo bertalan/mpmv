@@ -46,6 +46,7 @@ MAPPING_UPDATED = "ingest.mapping.updated"
 MAPPING_DELETED = "ingest.mapping.deleted"
 SOURCE_CREATED = "ingest.source.created"
 SOURCE_UPDATED = "ingest.source.updated"
+SOURCE_ACTIVATED = "ingest.source.activated"  # a source switched on (ING.13)
 CATALOG_LOAD_RUN = "ingest.catalog_load.run"
 
 
@@ -125,8 +126,15 @@ def mapping_snapshot(entry: MappingTable) -> dict[str, Any]:
 # --- Sources
 
 
-def save_source(source: SupplierSource, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
-    """Create or update a supplier source (the admin and setup call this)."""
+def save_source(
+    source: SupplierSource,
+    *,
+    ctx: AuditContext,
+    dry_run: bool = False,
+    updated: str = SOURCE_UPDATED,
+) -> ChangeSet:
+    """Create or update a supplier source (the admin and setup call this). `updated` is the audit
+    action of a change to a stored source, for a change that has its own (activation)."""
     source.full_clean(validate_unique=False)
     return save_audited(
         source,
@@ -134,7 +142,7 @@ def save_source(source: SupplierSource, *, ctx: AuditContext, dry_run: bool = Fa
         key=str(source.public_id),
         ctx=ctx,
         created=SOURCE_CREATED,
-        updated=SOURCE_UPDATED,
+        updated=updated,
         dry_run=dry_run,
     )
 

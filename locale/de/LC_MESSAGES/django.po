@@ -239,6 +239,10 @@ msgstr[1] "%(n)s Zeilen gelesen."
 msgid "%(name)s is deleted."
 msgstr "%(name)s wurde gelöscht."
 
+#: apps/ingest/onboarding.py
+msgid "%(name)s is not a field a column can map to."
+msgstr "%(name)s ist kein Feld, dem eine Spalte zugeordnet werden kann."
+
 #: apps/fitment/garage_views.py apps/fitment/views.py
 msgid "%(name)s is now your active vehicle."
 msgstr "%(name)s ist jetzt dein aktives Fahrzeug."
@@ -471,6 +475,10 @@ msgstr ""
 #: apps/manager/templates/manager/shop/closures.html
 msgid "A closure that has ended stays here as history and cannot be changed."
 msgstr "Eine beendete Schließung bleibt hier als Verlauf stehen und kann nicht geändert werden."
+
+#: apps/ingest/onboarding.py
+msgid "A column name cannot be empty."
+msgstr "Ein Spaltenname darf nicht leer sein."
 
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
@@ -6029,6 +6037,10 @@ msgstr "Keine Änderung"
 msgid "No closure is planned."
 msgstr "Es ist keine Schließung geplant."
 
+#: apps/manager/ingest_views.py
+msgid "No column was received. The sample is not kept: choose the file again to list its columns."
+msgstr "Es wurde keine Spalte empfangen. Die Beispieldatei wird nicht gespeichert: Wählen Sie die Datei erneut aus, um ihre Spalten aufzulisten."
+
 #: apps/manager/event_block_forms.py
 msgid "No event"
 msgstr "Keine Veranstaltung"
@@ -10384,6 +10396,10 @@ msgstr "Die Änderung wurde rückgängig gemacht und die Inhaber wurden informie
 msgid "The check could not be reached. Save is off until it works again."
 msgstr "Die Prüfung ist nicht erreichbar. Speichern bleibt gesperrt, bis sie wieder funktioniert."
 
+#: apps/ingest/onboarding.py
+msgid "The checklist is not met: %(missing)s."
+msgstr "Die Checkliste ist nicht erfüllt: %(missing)s."
+
 #: apps/vendors/models.py
 msgid ""
 "The city of the court that decides disputes with business buyers. Empty means the court of your "
@@ -11505,13 +11521,16 @@ msgstr "Die Postanschrift des Herstellers, mit Straße, Ort und Land."
 msgid "The map shows the typed point."
 msgstr "Die Karte zeigt den eingegebenen Punkt."
 
+#: apps/manager/templates/manager/platform/ingest_source.html
 #: apps/manager/templates/manager/platform/ingest_source_mapping.html
 msgid "The mapping belongs to the vendor: it applies to all of this vendor's sources."
 msgstr "Die Zuordnung gehört zum Verkäufer: Sie gilt für alle Quellen dieses Verkäufers."
 
 #: apps/manager/ingest_views.py
-msgid "The mapping is saved. Read the sample again to confirm it."
-msgstr "Die Zuordnung ist gespeichert. Lesen Sie die Probe erneut, um sie zu bestätigen."
+msgid ""
+"The mapping is saved. The sample is not kept: choose the file again on this page and read it to "
+"confirm the mapping."
+msgstr "Die Zuordnung ist gespeichert. Die Beispieldatei wird nicht gespeichert: Wählen Sie die Datei auf dieser Seite erneut aus und lesen Sie sie ein, um die Zuordnung zu bestätigen."
 
 #: apps/compliance/models.py
 msgid ""
@@ -12517,6 +12536,18 @@ msgstr "Der Bericht des Laufs, als einfacher Text."
 #: apps/manager/templates/manager/shop/sales_terms.html
 msgid "The sales terms of %(vendor)s. Buyers read them before they pay."
 msgstr "Die Verkaufsbedingungen von %(vendor)s. Käufer lesen sie, bevor sie bezahlen."
+
+#: apps/manager/templates/manager/platform/ingest_source.html
+msgid "The sample is not kept. Choose the file again each time you read it."
+msgstr "Die Beispieldatei wird nicht gespeichert. Wählen Sie die Datei bei jedem Einlesen erneut aus."
+
+#: apps/manager/templates/manager/platform/ingest_source_mapping.html
+msgid "The sample is not kept. Choose the file again to list its columns."
+msgstr "Die Beispieldatei wird nicht gespeichert. Wählen Sie die Datei erneut aus, um ihre Spalten aufzulisten."
+
+#: apps/manager/ingest_views.py
+msgid "The sample is not kept. Choose the file again."
+msgstr "Die Beispieldatei wird nicht gespeichert. Wählen Sie die Datei erneut aus."
 
 #: apps/manager/ingest_views.py
 msgid "The sample was read again with the current mapping."
@@ -14363,6 +14394,10 @@ msgstr ""
 #: apps/orders/customer_views.py apps/vendors/views.py
 msgid "Too many attempts. Please try again later."
 msgstr "Zu viele Versuche. Bitte versuche es später erneut."
+
+#: apps/ingest/onboarding.py
+msgid "Too many columns."
+msgstr "Zu viele Spalten."
 
 #: apps/manager/termination_views.py
 msgid "Too many downloads. Try again later."
