@@ -699,3 +699,12 @@ def test_a_redirect_map_note_is_stored_in_nfc() -> None:
     import_redirects([row], ctx=CTX)
     stored = Redirect.objects.get(source_path="/old-nfc").note
     assert stored == unicodedata.normalize("NFC", note)
+
+
+def test_a_redirect_map_target_and_code_stay_byte_exact() -> None:
+    target = "/" + unicodedata.normalize("NFD", "caf\u00e9")
+    row = {"source_path": "/old-bytes", "target_kind": "path", "target": target, "code": "301"}
+    import_redirects([row], ctx=CTX)
+    stored = Redirect.objects.get(source_path="/old-bytes")
+    assert stored.target_path == target
+    assert stored.target_path != unicodedata.normalize("NFC", target)

@@ -27,7 +27,7 @@ from apps.accounts.tests.mfa import verified_login
 from apps.catalog.models import Product
 from apps.catalog.tests.factories import ProductFactory, ProductTranslationFactory
 from apps.cms.models import BlogAuthor, BlogIndexPage, BlogPostPage, HomePage
-from apps.cms.services import ArticleData, SeedReport, import_article
+from apps.cms.services import ArticleData, SeedReport, import_article, nfc_article
 from apps.cms.tests.factories import (
     BlogAuthorFactory,
     BlogIndexPageFactory,
@@ -95,6 +95,15 @@ def _html(path: str) -> BeautifulSoup:
 
 
 # --- Import (Done when: "Migrated article published")
+
+
+def test_the_article_normaliser_leaves_the_slug_byte_exact() -> None:
+    """The slug is an identifier and a URL part (I18N.10): only the prose fields are NFC."""
+    slug = unicodedata.normalize("NFD", "caf\u00e9")
+    title = unicodedata.normalize("NFD", "Caf\u00e9")
+    article = nfc_article(_legacy_article(slug=slug, title=title))
+    assert article.slug == slug
+    assert article.title == unicodedata.normalize("NFC", title)
 
 
 def test_a_migrated_article_is_published_with_its_date_and_author(blog: BlogIndexPage) -> None:

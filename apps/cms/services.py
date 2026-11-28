@@ -863,7 +863,6 @@ def nfc_article(article: ArticleData) -> ArticleData:
     return replace(
         article,
         title=nfc_deep(article.title),
-        slug=nfc_deep(article.slug),
         summary=nfc_deep(article.summary),
         author=nfc_deep(article.author),
         seo_title=nfc_deep(article.seo_title),
