@@ -13,7 +13,9 @@ from django.test import Client
 from apps.api.models import ApiMutationLog
 from apps.api.tests.factories import ApiClientFactory
 from apps.catalog.models import Product
+from apps.catalog.services import rename_product_sku
 from apps.catalog.tests.factories import ProductFactory
+from apps.core.audit import AuditContext
 from apps.core.i18n import primary_language
 from apps.core.models import AuditLog
 from apps.vendors.models import Vendor
@@ -253,3 +255,38 @@ def test_a_mixed_batch_says_which_rows_applied_and_which_did_not(
         (3, "SAME-1", "unchanged"),
     ]
     assert str(Product.objects.get(vendor=vendor, sku="OLD-1").price_net) == "99.00"
+
+
+def test_stock_refuses_a_sku_given_twice_in_one_batch(client: Client, vendor: Vendor) -> None:
+    product = ProductFactory.create(vendor=vendor, stock_qty=1)
+    body = {
+        "items": [
+            {"sku": product.sku, "stock_qty": 2},
+            {"sku": product.sku.lower(), "stock_qty": 3},
+        ]
+    }
+    response = _put(client, STOCK, body, _headers(vendor, ["stock:write"]))
+
+    assert response.status_code == 400
+    assert response["Content-Type"].startswith("application/problem+json")
+    assert response.json()["code"] == "duplicate_sku"
+    assert len(response.json()["skus"]) == 2
+    product.refresh_from_db()
+    assert product.stock_qty == 1
+
+
+def test_an_ambiguous_sku_stops_the_request_and_writes_nothing(
+    client: Client, vendor: Vendor
+) -> None:
+    old = ProductFactory.create(vendor=vendor, sku="BAG-100", stock_qty=1)
+    rename_product_sku(old, "BAG-200", ctx=AuditContext(actor_label="system:t", source="system"))
+    ProductFactory.create(vendor=vendor, sku="BAG-100", stock_qty=1)
+    headers = _headers(vendor, ["catalog:write", "stock:write"])
+
+    stock = _put(client, STOCK, {"items": [{"sku": "BAG-100", "stock_qty": 9}]}, headers)
+    upsert = _post(client, UPSERT, {"items": [_row("BAG-100", price_net="1.00")]}, headers)
+
+    assert stock.status_code == 422
+    assert upsert.status_code == 422
+    assert not Product.objects.filter(stock_qty=9).exists()
+    assert not Product.objects.filter(price_net="1.00").exists()
