@@ -1360,6 +1360,19 @@ API_OPERATIONS: dict[str, Access] = {
     "GET /api/v1/catalog/products/{public_id}": VendorScoped(
         make=lambda vendor: ProductFactory.create(vendor=vendor)
     ),
+    # ING.12
+    "POST /api/v1/import/products": NoVendorData(
+        "Upserts products of the caller's own vendor only; a platform key is refused and a row "
+        "naming another vendor gets 404. Shows only the ChangeSet of what it writes."
+    ),
+    "PUT /api/v1/import/stock": NoVendorData(
+        "Sets stock of the caller's own vendor's SKUs only; another vendor's SKU gets 404 and "
+        "nothing is written. A platform key is refused. Shows only the ChangeSet."
+    ),
+    "PUT /api/v1/import/prices": NoVendorData(
+        "Sets net prices of the caller's own vendor's SKUs only; another vendor's SKU gets 404 "
+        "and nothing is written. A platform key is refused. Shows only the ChangeSet."
+    ),
     # CAT.15
     "GET /api/v1/catalog/products/{public_id}/other-sellers": VendorScoped(
         make=lambda vendor: ProductFactory.create(vendor=vendor)

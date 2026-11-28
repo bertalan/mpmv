@@ -19,6 +19,7 @@ from .closures import router as closures_router
 from .endpoints import router as v1_router
 from .errors import install_problem_handlers
 from .events import router as events_router
+from .imports import router as import_router
 from .mutations import track_calls
 from .openapi import ApiV1Schema
 
@@ -66,3 +67,4 @@ api.add_router("", v1_router)
 api.add_router("/catalog", catalog_router)
 api.add_router("/events", events_router)
 api.add_router("/vendors", closures_router)
+api.add_router("/import", import_router)
