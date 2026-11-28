@@ -854,3 +854,46 @@ def test_a_vendor_members_staff_flag_does_not_open_the_admin_or_other_vendors(
     theirs = EventPageFactory.create()
     with pytest.raises(Http404):
         save_event_draft(owner, {"title": "Mine now"}, theirs)
+
+
+# --- SEO.6 2/3: the vendor storefront lists its events, so these services purge the page cache
+
+
+@pytest.fixture
+def purges(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    from django.db import transaction
+
+    from apps.core import public_cache
+
+    seen: list[str] = []
+    monkeypatch.setattr(transaction, "on_commit", lambda f, **_k: f())
+    monkeypatch.setattr(public_cache, "_listeners", [seen.append])
+    return seen
+
+
+def test_publish_cancel_and_hide_purge_the_public_pages(owner: User, purges: list[str]) -> None:
+    page = _published(owner)  # submit_event published it
+    assert purges
+    purges.clear()
+    cancel_event(owner, page)
+    assert purges
+    purges.clear()
+    hide_event(UserFactory.create(platform_staff=True), _fresh(page), "Misleading offer")
+    assert purges
+
+
+def test_restore_purges_the_public_pages(owner: User, purges: list[str]) -> None:
+    staff = UserFactory.create(platform_staff=True)
+    page = _published(owner)
+    hide_event(staff, page, "Misleading offer")
+    purges.clear()
+    services.restore_event(staff, _fresh(page))
+    assert purges
+
+
+def test_a_dry_run_event_service_purges_nothing(owner: User, purges: list[str]) -> None:
+    page = _published(owner)
+    purges.clear()
+    cancel_event(owner, page, dry_run=True)
+    hide_event(UserFactory.create(platform_staff=True), page, "x", dry_run=True)
+    assert purges == []

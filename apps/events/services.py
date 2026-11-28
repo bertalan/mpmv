@@ -83,6 +83,7 @@ from apps.core.geocoding import AddressQuery, GeocodeResult
 from apps.core.geocoding import services as geocoding
 from apps.core.i18n import configured_languages
 from apps.core.models import AuditLog, ImageLicence, MediaImage
+from apps.core.public_cache import purge_public_pages
 from apps.core.services import business_tz, consume_rate_limit, save_audited
 from apps.core.text import nfc_deep
 from apps.vendors.engine import VendorAction
@@ -986,6 +987,8 @@ def submit_event(
         after = _state(_fresh(stored)) | {"submission": outcome}
         changes.update(EVENT, _key(stored), before, after)
         _record(ctx, f"events.event_{outcome}", stored, before, after)
+        if outcome == "published" and not dry_run:
+            purge_public_pages("event published")  # the vendor storefront lists it (SEO.6)
     return changes
 
 
@@ -1036,6 +1039,8 @@ def hide_event(
         after = _state(_fresh(stored)) | {"languages": len(pages)}
         changes.update(EVENT, _key(stored), before, after)
         _record(ctx, "events.event_hidden", stored, before, after)
+        if not dry_run:
+            purge_public_pages("event hidden")  # the vendor storefront lists it (SEO.6)
         fresh = _fresh(stored)
         notifications.notify_vendor(
             fresh,
@@ -1095,6 +1100,8 @@ def restore_event(
         after = _state(_fresh(stored)) | {"languages": len(pages)}
         changes.update(EVENT, _key(stored), before, after)
         _record(ctx, "events.event_restored", stored, before, after)
+        if not dry_run:
+            purge_public_pages("event restored")  # the vendor storefront lists it (SEO.6)
         fresh = _fresh(stored)
         notifications.notify_vendor(fresh, notifications.RESTORED, fresh.sequence)
     return changes
@@ -1141,6 +1148,8 @@ def cancel_event(
         after = _state(_fresh(stored)) | {"languages": len(pages)}
         changes.update(EVENT, _key(stored), before, after)
         _record(ctx, "events.event_cancelled", stored, before, after)
+        if not dry_run:
+            purge_public_pages("event cancelled")  # the vendor storefront lists it (SEO.6)
     return changes
 
 

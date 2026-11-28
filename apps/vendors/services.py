@@ -58,6 +58,7 @@ from apps.core.models import (
     PlatformOperator,
     resolve_translation,
 )
+from apps.core.public_cache import purge_public_pages
 from apps.core.services import (
     NoPlatformOperator,
     allowed_vendor_countries,
@@ -415,6 +416,7 @@ def change_status(
         run_mutation(changes, apply, ctx=ctx, action=STATUS_CHANGED, dry_run=dry_run)
         if not dry_run:
             bump_sitemap_version()  # I18N.16: the vendor's products enter or leave the sitemaps
+            purge_public_pages("vendor status")  # the storefront and its pages appear or go
         if target == engine.CLOSED:
             _run_closure_hooks(current, changes, ctx=ctx, dry_run=dry_run)
 
@@ -2515,6 +2517,7 @@ def save_storefront_profile(
         except IntegrityError as error:  # two first saves of one language at once
             raise ValidationError("The profile was changed at the same time: try again.") from error
         audit_changes(changes, ctx=ctx, action=PROFILE_CHANGED)
+        purge_public_pages("vendor storefront profile")
         _audit_stale_translations(vendor, language, siblings, ctx=ctx)
         _notify_profile_changed(vendor, language, changed)
     return changes
@@ -2728,6 +2731,7 @@ def set_vendor_logo(
                 logo=image, logo_alt=alt, updated_at=timezone.now()
             )
             audit_changes(changes, ctx=ctx, action=LOGO_CHANGED)
+            purge_public_pages("vendor logo")
             # The previous file stays until the review window closes or staff confirm the change,
             # so a revert can put it back (owner decision Q1; `purge_retained_logos`).
             _notify_profile_changed(vendor, "all languages", ["logo"])
@@ -2774,6 +2778,7 @@ def remove_vendor_logo(
             logo=None, logo_alt="", updated_at=timezone.now()
         )
         audit_changes(changes, ctx=ctx, action=LOGO_CHANGED)
+        purge_public_pages("vendor logo")
         # The image file stays, like a replaced one (see `set_vendor_logo`).
     vendor.logo, vendor.logo_alt = None, ""
     return changes
@@ -3693,6 +3698,7 @@ def revert_profile_change(
         row.full_clean()
         row.save()
         audit_changes(changes, ctx=ctx, action=PROFILE_REVERTED)
+        purge_public_pages("vendor storefront profile reverted")
         # As an edit of the source text: reviewed and published translations go back to review.
         _audit_stale_translations(vendor, language, siblings, ctx=ctx)
         _notify_profile_reverted(vendor, language, fields, reason)
@@ -4111,6 +4117,7 @@ def _saving(closure: VendorClosure) -> Callable[[], None]:
     def write() -> None:
         closure.save()
         drop_closure_cache(closure.vendor_id)
+        purge_public_pages("vendor closure")  # the storefront shows the closure (SEO.6)
 
     return write
 
@@ -4119,6 +4126,7 @@ def _deleting(closure: VendorClosure) -> Callable[[], None]:
     def write() -> None:
         closure.delete()
         drop_closure_cache(closure.vendor_id)
+        purge_public_pages("vendor closure")
 
     return write
 

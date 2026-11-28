@@ -4,9 +4,9 @@ Public CMS pages can be served to anonymous visitors from a cache, so a hit rend
 cache is **off by default** (`MPMV_PAGE_CACHE=1` turns it on, after a STAGE soak). Signed-in
 visitors never touch it. This page is the SEO.6 decision record and the contract for templates.
 
-SEO.6 ships in slices: 1/3 the rules, the store and the middleware (this one); 2/3 the purges
-(publish, unpublish, move, locale, view restrictions, vendor storefronts and events); 3/3 the GET
-language links in the switcher, the production volume and the switch-on. Until 3/3 every real page
+SEO.6 ships in slices: 1/3 the rules, the store and the middleware; 2/3 the purges (publish,
+unpublish, move, locale, view restrictions, vendor storefronts and events); 3/3 the language
+switcher without a form (held, see below), the production volume and the switch-on. Until 3/3 every real page
 carries a CSRF token from the switcher form, so the rules below store nothing: that is the safe
 direction, and the test `test_a_real_page_with_a_form_token_is_served_and_never_stored` pins it.
 
@@ -102,13 +102,45 @@ anonymous page and stores nothing. A cache that cannot be read or written is a m
 | `PAGE_CACHE_SECONDS` | `MPMV_PAGE_CACHE_SECONDS` | 300 |
 | `CACHES["pagecache"]["LOCATION"]` | `MPMV_PAGE_CACHE_DIR` | `var/page-cache` |
 
+## Purges
+
+One global generation, not per-URL purging: a page's HTML depends on its parents (menus,
+breadcrumbs, translations), its site settings and its theme, and a wrong guess is a stale page.
+`page_cache.invalidate()` runs through `transaction.on_commit` (never at the signal: a page
+rendered between the signal and the commit would be stored under the new generation). It runs on:
+
+- Wagtail `page_published`, `page_unpublished` and `post_page_move`;
+- save or delete of a live page, a `Site`, a `Locale`, every site or generic setting (theme,
+  events, the SEO panel), and a `PageViewRestriction` or `CollectionViewRestriction`;
+- `apps.core.public_cache.purge_public_pages(reason)`, called by the **vendors** services (closure
+  add, update and delete; storefront profile save, revert and logo; vendor status change) and the **events**
+  services (publish, cancel, hide, restore). `vendors` and `events` do not import `seo`: the SEO app
+  registers its listener in `AppConfig.ready`. A dry run purges nothing (the commit never happens).
+
+An editor's autosave (`save_revision` on a live page, which writes only revision bookkeeping
+fields) does not purge: publishing does. A change of the platform operator (a new row) purges too,
+because its legal and tax text shows in the footer. The vendor and event purges also cover storefront
+and catalog routes that are not in `PAGE_CACHE_URL_NAMES` yet: forward looking, they only matter now
+for storefront content embedded in Wagtail pages. A listener that fails is logged and the page
+stays stale until its 300 s lifetime ends.
+
+Signals are connected per content model, never without a `sender`: a sender-less `post_delete`
+receiver makes Django load every row before a delete and changes unrelated SQL.
+
+Things that change a page without one of these calls **rely on the lifetime** (300 s): snippets,
+menus and the footer, products and categories shown in a block, images replaced in place,
+translations edited without publishing.
+
 ## Not here yet
 
-Purges (slice 2). The LCP target (< 2.5 s on a product page) is measured on STAGE after switch-on:
-a follow-up note, not part of the code slices.
+The language switcher without a form (3/3, held for I18N.22 and a lane-a decision) and the
+production volume. The LCP target (< 2.5 s on a product page) is measured on STAGE after
+switch-on: a follow-up note, not part of the code slices.
 
 ## Tests
 
 `apps/seo/tests/unit/test_page_cache_engine.py` (pure rules) and
 `apps/seo/tests/integration/test_page_cache.py` (middleware: nonce, CSRF, cookie and session never
-stored, bypass cases, countdown, restriction mark, key taken before the render).
+stored, bypass cases, countdown, restriction mark, key taken before the render),
+`apps/seo/tests/integration/test_page_cache_purge.py` (every purge trigger, on commit only, vendors
+closures) and `apps/core/tests/integration/test_public_cache_purge.py` (the registry).
