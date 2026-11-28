@@ -139,3 +139,26 @@ def test_real_numbers_need_no_separator_guess() -> None:
     assert row.product.stock_quantity == 3
     bad = base.build_row(1, {"sku": "a", "title": "b", "price": True})
     assert isinstance(bad, base.RowError)
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [("1,234,567", "1234567"), ("-1.234.567", "-1234567")],
+)
+def test_grouped_numbers_parse_without_a_regex(text: str, expected: str) -> None:
+    assert str(base.parse_decimal(text, decimal=None)) == expected
+
+
+@pytest.mark.parametrize("text", ["1,23,456", "1234,567,890", ",123,456", "1,234,56a", "+,123,456"])
+def test_bad_grouping_is_rejected(text: str) -> None:
+    with pytest.raises(ValueError, match="grouping"):
+        base.parse_decimal(text)
+
+
+def test_a_long_hostile_cell_is_rejected_fast() -> None:
+    import time
+
+    start = time.monotonic()
+    with pytest.raises(ValueError, match=r"grouping|number"):
+        base.parse_decimal("1," + "123," * 20_000 + "x")
+    assert time.monotonic() - start < 2.0
