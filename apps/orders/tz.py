@@ -4,7 +4,7 @@ Numbering years, the fiscal retention date and the scrub dates all go through `b
 which reads the operator configuration through `core.services.business_tz()` (ARC.27).
 
 The order guard trigger reads the same zone through `business_time_zone_at(ts)`, its database
-twin (ORD.41, orders migration 0024), so Python and the database always put an order's tax
+twin (ORD.41, orders migration 0025), so Python and the database always put an order's tax
 retention end and its scrub dates on the same days, whatever zone the operator chooses.
 """
 

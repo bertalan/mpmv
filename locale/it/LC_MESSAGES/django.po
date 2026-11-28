@@ -2450,6 +2450,14 @@ msgstr ""
 "Scelga un testo riutilizzabile. Quando viene modificato e approvato, ogni pagina che lo usa mostra"
 " il nuovo testo. Non viene mostrato nulla finché il frammento non è pubblicato."
 
+#: apps/manager/templates/manager/platform/shop_closures.html
+msgid ""
+"Choose a shop to see, add, change or remove its holidays and closures. A closure that has ended "
+"cannot be changed."
+msgstr ""
+"Scelga un negozio per vederne, aggiungerne, modificarne o rimuoverne le ferie e le chiusure. Una "
+"chiusura già terminata non può essere modificata."
+
 #: apps/themes/admin_views.py
 msgid "Choose a site to switch it to this palette when you save."
 msgstr "Scelga un sito da passare a questa palette quando salva."
@@ -2494,6 +2502,10 @@ msgstr "Scegli un evento oppure indica un indirizzo web."
 #: apps/manager/event_block_forms.py
 msgid "Choose an image"
 msgstr "Scegli un'immagine"
+
+#: apps/manager/templates/manager/shop/closures.html
+msgid "Choose another shop"
+msgstr "Scelga un altro negozio"
 
 #: apps/manager/amendment_forms.py
 msgid "Choose at least one change."
@@ -3698,6 +3710,14 @@ msgstr "Richieste di cancellazione"
 #: themes/ride/templates/components/field.html themes/ride/templates/manager/login.html
 msgid "Error"
 msgstr "Errore"
+
+#: apps/orders/ui/present.py
+msgid "estimated delivery from %(first)s to %(last)s"
+msgstr "consegna prevista dal %(first)s al %(last)s"
+
+#: apps/orders/ui/present.py
+msgid "estimated delivery on %(day)s"
+msgstr "consegna prevista il %(day)s"
 
 #: apps/events/templates/events/admin/review.html apps/manager/templates/manager/shop/events.html
 msgid "Event"
@@ -5808,6 +5828,10 @@ msgstr "Elementi successivi"
 msgid "Next month"
 msgstr "Mese successivo"
 
+#: apps/manager/templates/manager/platform/shop_closures.html
+msgid "Next page"
+msgstr "Pagina successiva"
+
 #: themes/ride/templates/components/carousel_controls.html
 msgid "Next slide"
 msgstr "Diapositiva successiva"
@@ -5980,6 +6004,10 @@ msgstr "Il venditore non ha pubblicato condizioni di vendita."
 #: themes/ride/templates/accounts/sessions/list.html
 msgid "No session is recorded yet."
 msgstr "Nessuna sessione registrata."
+
+#: apps/manager/templates/manager/platform/shop_closures.html
+msgid "No shop matches."
+msgstr "Nessun negozio corrisponde."
 
 #: apps/manager/templates/manager/platform/profile_changes.html
 msgid "No storefront changes yet."
@@ -7707,6 +7735,10 @@ msgstr "Elementi precedenti"
 msgid "Previous month"
 msgstr "Mese precedente"
 
+#: apps/manager/templates/manager/platform/shop_closures.html
+msgid "Previous page"
+msgstr "Pagina precedente"
+
 #: themes/ride/templates/components/carousel_controls.html
 msgid "Previous slide"
 msgstr "Diapositiva precedente"
@@ -8726,9 +8758,9 @@ msgid "screen or page type"
 msgstr "schermata o tipo di pagina"
 
 #: apps/catalog/templates/catalog/search.html apps/manager/fitment_shop_views.py
-#: apps/manager/product_views.py apps/seo/page_builders.py
-#: themes/base/templates/components/search_form.html themes/ride/templates/catalog/search.html
-#: themes/ride/templates/components/header.html
+#: apps/manager/product_views.py apps/manager/templates/manager/platform/shop_closures.html
+#: apps/seo/page_builders.py themes/base/templates/components/search_form.html
+#: themes/ride/templates/catalog/search.html themes/ride/templates/components/header.html
 msgid "Search"
 msgstr "Cerca"
 
@@ -8739,6 +8771,10 @@ msgstr "Cerca per nome"
 #: apps/cms/blocks.py
 msgid "Search by name, SKU, brand or vendor, then click the product."
 msgstr "Cerca per nome, SKU, marchio o venditore, poi clicca sul prodotto."
+
+#: apps/manager/templates/manager/platform/shop_closures.html
+msgid "Search by shop name"
+msgstr "Cerchi per nome del negozio"
 
 #: themes/base/templates/components/search_form.html themes/ride/templates/404.html
 msgid "Search products"
@@ -9035,6 +9071,11 @@ msgstr "Acquista per categoria"
 #: apps/shipping/templates/shipping/closure_notice.html
 msgid "Shop closure"
 msgstr "Chiusura del negozio"
+
+#: apps/manager/sections.py apps/manager/site_map.py
+#: apps/manager/templates/manager/platform/shop_closures.html
+msgid "Shop closures"
+msgstr "Chiusure dei negozi"
 
 #: apps/manager/amendment_views.py
 msgid "Shop frozen"
@@ -12277,6 +12318,11 @@ msgid ""
 msgstr ""
 "Il venditore ti dirà come restituire la merce. Conserva questo messaggio come prova del tuo "
 "recesso."
+
+#: apps/orders/templates/email/orders/order_confirmation/body.html
+#: apps/orders/templates/email/orders/order_confirmation/body.txt
+msgid "The seller's shop is closed: your package will be dispatched from %(dispatch_on)s."
+msgstr "Il negozio del venditore è chiuso: il tuo pacco sarà spedito a partire dal %(dispatch_on)s."
 
 #: apps/vendors/models.py
 msgid "The seller."
@@ -16234,6 +16280,14 @@ msgstr ""
 "Il Suo negozio non ha un numero di telefono. Chi vende a consumatori deve indicarlo: gli "
 "acquirenti lo vedono nelle informazioni sul recesso e nella conferma d’ordine. Lo invii allo staff"
 " della piattaforma; fino ad allora non può pubblicare prodotti."
+
+#: apps/orders/templates/email/orders/vendor_new_order/body.html
+#: apps/orders/templates/email/orders/vendor_new_order/body.txt
+msgid ""
+"Your shop is closed: the buyer was told that the package will be dispatched from %(dispatch_on)s."
+msgstr ""
+"Il Suo negozio è chiuso: all'acquirente è stato comunicato che il pacco sarà spedito a partire dal"
+" %(dispatch_on)s."
 
 #: apps/manager/event_views.py
 msgid "Your shop is not active yet, so events cannot be changed."

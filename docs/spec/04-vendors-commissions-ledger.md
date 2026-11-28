@@ -741,7 +741,11 @@ class VendorClosure(Model):                     # vendor-scoped (CORE.3)
   accept `dry_run=True`, return a `ChangeSet` and write an `AuditLog` entry (actor, before and
   after, source: vendor area, admin or API).
 - **Vendor area** (CORE.9, `/manager/shop/settings/closures/`): list of current and upcoming ranges,
-  add, edit and delete forms, a preview of the notice. Staff use a Wagtail admin ViewSet. **API**:
+  add, edit and delete forms, a preview of the notice. Staff (Support and the platform owner, CORE.18 row
+  `platform.shop_closures`) manage any shop's closures in the Manager platform space, at
+  `/manager/platform/shop-closures/`: pick a shop, then the same list and forms, with audit source
+  `admin`; there is no Wagtail ViewSet, and an ended range stays immutable for staff too (owner
+  decision 2026-11-26). **API**:
   `/api/v1/vendors/{id}/closures` (list, create, update, delete, `?dry_run=true`, RFC 9457 errors);
   a vendor-scoped key (CORE.13) reaches only its own vendor, anything else is a 404.
 
@@ -777,8 +781,10 @@ def closure_notice(vendor_id, today: date) -> ClosureNotice | None   # merged pe
   templates use the `shipping` template tag library (`{% load dispatch %}`) inside theme
   templates, which adds no Python import to `vendors` or `catalog`. The notice is a `role="region"`
   landmark with a heading (not an alert: it does not interrupt) and does not rely on colour.
-- **Checkout.** `cart.build_checkout` (ORD.3) asks `vendor_closed_periods` for the vendors in the
-  cart (today to 180 days ahead) and passes each package's periods to `earliest_dispatch_date`.
+- **Checkout.** `cart.build_checkout` (ORD.3) reads the closures of the vendors in the cart once
+  (`closure_outlooks`) and gives each package its dispatch date through `earliest_dispatch_date`.
+  The look-ahead follows the chain of closures that holds the day to its end, capped at ten years,
+  and the notice and the dispatch date come from the same rules, so they never disagree.
   The delivery estimate counts from the dispatch date (the method's indicative delivery time of
   SHP.12 and any extra days of a special area of SHP.14 on top). Ordering stays possible, with no
   extra confirmation step.

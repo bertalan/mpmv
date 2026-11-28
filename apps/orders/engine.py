@@ -286,6 +286,8 @@ class PackageSummary:
     selected_shipping: str = ""
     shipping_portions: tuple[TaxPortion, ...] = ()
     totals: Totals | None = None
+    # VEN.20: the first day the package can leave (a vendor closure moves it past today).
+    dispatch_on: dt.date | None = None
 
 
 def price_package(

@@ -49,7 +49,7 @@ def _reading_the_operator(sql: str) -> str:
 class Migration(migrations.Migration):
     dependencies = [
         ("core", "0036_business_time_zone_at"),
-        ("orders", "0023_alter_order_state_alter_orderamendment_state"),
+        ("orders", "0024_ven20_expected_dispatch_on"),
     ]
 
     operations = [

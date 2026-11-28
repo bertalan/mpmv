@@ -44,6 +44,7 @@ def test_the_closure_query_count_is_the_same_for_one_and_for_three_vendors(
     add(cart, _closed_vendor("Beta Shop"), "20.00", "Red cup")
     add(cart, _closed_vendor("Gamma Shop"), "10.00", "Green jug")
     three, html = _closure_queries(client)
+    # One read gives the checkout's dispatch dates and the notices (VEN.20 slice 3a).
     assert one == three == 1
     assert html.count("closure-notice__text") == 3
 

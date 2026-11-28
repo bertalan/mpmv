@@ -1065,3 +1065,41 @@ def delivery_window(dispatch_on: date, min_days: int, max_days: int) -> tuple[da
     if min_days < 0 or max_days < min_days:
         raise ValueError("delivery days must satisfy 0 <= min_days <= max_days")
     return dispatch_on + timedelta(days=min_days), dispatch_on + timedelta(days=max_days)
+
+
+# A chain of closures may run past the first look-ahead: the dispatch date follows it this far at
+# most (two yearly ranges that cover the whole year would never end).
+MAX_DISPATCH_LOOKAHEAD_DAYS = 3660
+
+
+def dispatch_date_for(rules: Sequence[ClosureRule], ordered_on: date) -> date:
+    """`earliest_dispatch_date` over the periods of `rules`, looking further ahead while the
+    closure that holds `ordered_on` reaches the end of the window, up to the cap."""
+    window_end = ordered_on + timedelta(days=NOTICE_LOOKAHEAD_DAYS)
+    limit = ordered_on + timedelta(days=MAX_DISPATCH_LOOKAHEAD_DAYS)
+    while True:
+        periods = expand_closures(rules, ordered_on, window_end)
+        dispatch = earliest_dispatch_date(ordered_on, periods)
+        # Ending before the window does, the chain is whole: a touching period starts in it.
+        if dispatch <= window_end or window_end >= limit:
+            return dispatch
+        window_end = min(limit, dispatch + timedelta(days=NOTICE_LOOKAHEAD_DAYS))
+
+
+@dataclass(frozen=True)
+class ClosureOutlook:
+    """A vendor's schedule seen on one day: the notice to show and the first dispatch day."""
+
+    notice: ClosureNotice | None
+    dispatch_on: date
+
+
+def closure_outlook(rules: Sequence[tuple[ClosureRule, int]], today: date) -> ClosureOutlook:
+    """The notice and the dispatch date from the same `(rule, notice_days)` pairs, so the page
+    and the checkout never disagree. The notice's period runs to the end of its whole chain."""
+    bare = [rule for rule, _ in rules]
+    notice = closure_notice_for(rules, today)
+    if notice is not None:
+        leaves = dispatch_date_for(bare, notice.start)
+        notice = ClosureNotice(notice.start, leaves - timedelta(days=1), leaves)
+    return ClosureOutlook(notice, dispatch_date_for(bare, today))
