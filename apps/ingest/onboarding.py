@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any, Final
 
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.utils import timezone
 
 from apps.core.audit import AuditContext
@@ -177,3 +178,38 @@ def checklist(source: SupplierSource) -> list[CheckItem]:
         ),
         CheckItem("source_active", source.is_active),
     ]
+
+
+def save_column_mappings(
+    vendor: Vendor, columns: Mapping[str, str], *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Map file headers to generic fields (`MappingTable` kind `other`): add or update one row per
+    header, all or none, audited by `services.save_mapping`. A known field is required."""
+    if len(columns) > MAX_HEADERS:
+        raise ValidationError("Too many columns.")
+    for header, name in columns.items():
+        if name not in base.FIELDS:
+            raise ValidationError({"field": f"{name!r} is not a field a column can map to."})
+        if not engine.mapping_key(header):
+            raise ValidationError({"header": "A column name cannot be empty."})
+    changes = ChangeSet()
+    with transaction.atomic():
+        for header, name in columns.items():
+            entry = MappingTable.objects.filter(
+                vendor=vendor, kind=COLUMN_KIND, key_norm=engine.mapping_key(header)
+            ).first() or MappingTable(vendor=vendor, kind=COLUMN_KIND, key=header[:200])
+            entry.target_value = name
+            changes.changes.extend(services.save_mapping(entry, ctx=ctx, dry_run=dry_run).changes)
+    return changes
+
+
+def activate_source(
+    source: SupplierSource, *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Turn the source on once everything but the activation itself is in place. It does not
+    enable writing: runs stay dry until that flag is set on purpose."""
+    missing = [i.key for i in checklist(source) if not i.ok and i.key != "source_active"]
+    if missing:
+        raise ValidationError("The checklist is not met: " + ", ".join(missing) + ".")
+    source.is_active = True
+    return services.save_source(source, ctx=ctx, dry_run=dry_run)

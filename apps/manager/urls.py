@@ -288,6 +288,11 @@ platform = (
             ingest_views.SourceChecklistView.as_view(),
             name="ingest_source",
         ),
+        path(
+            "sources/<uuid:public_id>/mapping/",
+            ingest_views.SourceMappingView.as_view(),
+            name="ingest_source_mapping",
+        ),
         # ORD.32: a cart prepared from a past order, with its one-time link (Support, owner).
         path("order-drafts/", staff_draft_views.DraftListView.as_view(), name="order_drafts"),
         path(

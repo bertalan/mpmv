@@ -999,6 +999,10 @@ ENDPOINTS: dict[str, Access] = {
     "manager:platform:ingest_source": StaffOnly(
         "Checklist of one supplier source (ING.13): staff only.", kwargs={"public_id": NIL_UUID}
     ),
+    "manager:platform:ingest_source_mapping": StaffOnly(
+        "Column mapping of one supplier source (ING.13): staff only.",
+        kwargs={"public_id": NIL_UUID},
+    ),
     "manager:platform:ingest_source_new": StaffOnly(
         "New source from a sample (ING.13): Catalogue writes, Support and the owner get 403."
     ),

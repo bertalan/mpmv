@@ -761,6 +761,8 @@ msgstr "Un periodo terminado queda en el historial."
 #: apps/manager/ingest_views.py
 msgid "A real export of the supplier. It is read once to show you the result and is not kept."
 msgstr "Una exportación real del proveedor. Se lee una sola vez para mostrarle el resultado y no se conserva."
+"Una exportación real del proveedor. Se lee una sola vez para mostrarle el resultado y no se "
+"conserva."
 
 #: apps/manager/amendment_views.py
 msgid "a refund to the customer"
@@ -999,6 +1001,8 @@ msgid ""
 "A source reads one supplier's price list or feed. Add a new vendor from a sample file without "
 "writing code."
 msgstr "Una fuente lee la lista de precios o el flujo de un proveedor. Añada un vendedor nuevo a partir de un archivo de muestra, sin escribir código."
+"Una fuente lee la lista de precios o el flujo de un proveedor. Añada un vendedor nuevo a partir de"
+" un archivo de muestra, sin escribir código."
 
 #: apps/manager/money_views.py
 msgid "A statement needs a start and an end date. The current month is shown."
@@ -1177,6 +1181,10 @@ msgstr "Medida adoptada"
 #: apps/manager/templates/manager/shop/events.html
 msgid "Actions"
 msgstr "Acciones"
+
+#: apps/manager/templates/manager/platform/ingest_source.html
+msgid "Activate the source"
+msgstr "Activar la fuente"
 
 #: apps/fitment/templates/fitment/garage_account.html apps/manager/fitment_forms.py
 #: apps/manager/templates/manager/platform/ingest_sources.html
@@ -1870,6 +1878,10 @@ msgstr "Volver al carrito"
 #: apps/manager/templates/manager/amendment_passkey.html
 msgid "Back to the change"
 msgstr "Volver al cambio"
+
+#: apps/manager/templates/manager/platform/ingest_source_mapping.html
+msgid "Back to the checklist"
+msgstr "Volver a la lista de comprobación"
 
 #: apps/manager/templates/manager/shop/closure_form.html
 msgid "Back to the closures"
@@ -2746,9 +2758,17 @@ msgstr "Color"
 msgid "colour picker"
 msgstr "selector de color"
 
+#: apps/manager/templates/manager/platform/ingest_source_mapping.html
+msgid "Column"
+msgstr "Columna"
+
 #: apps/manager/templates/manager/platform/ingest_source_new.html
 msgid "Columns found:"
 msgstr "Columnas encontradas:"
+
+#: apps/manager/templates/manager/platform/ingest_source_mapping.html
+msgid "Columns of the sample"
+msgstr "Columnas de la muestra"
 
 #: apps/manager/ingest_views.py
 msgid "Comma"
@@ -3951,6 +3971,7 @@ msgstr "Procesos de imagen fallidos"
 msgid "Featured products"
 msgstr "Productos destacados"
 
+#: apps/manager/templates/manager/platform/ingest_source_mapping.html
 #: apps/manager/templates/manager/platform/profile_changes.html
 msgid "Field"
 msgstr "Campo"
@@ -4891,6 +4912,10 @@ msgstr ""
 "usted para la transacción inicial, a no ser que haya dispuesto expresamente lo contrario; en todo "
 "caso, no incurrirá en ningún gasto como consecuencia del reembolso."
 
+#: apps/manager/templates/manager/platform/ingest_source_mapping.html
+msgid "Ignore this column"
+msgstr "Ignorar esta columna"
+
 #: apps/compliance/templates/email/compliance/termination_notice/body.html
 #: apps/compliance/templates/email/compliance/termination_notice/body.txt
 msgid "illegal content"
@@ -5574,6 +5599,11 @@ msgstr "Referencia del fabricante"
 #: apps/events/templates/events/_index_map.html
 msgid "Map of the listed events"
 msgstr "Mapa de los eventos de la lista"
+
+#: apps/manager/templates/manager/platform/ingest_source.html
+#: apps/manager/templates/manager/platform/ingest_source_mapping.html
+msgid "Map the columns"
+msgstr "Asignar las columnas"
 
 #: apps/events/templates/events/_event_map.html
 msgid "Map: %(name)s"
@@ -8093,6 +8123,10 @@ msgstr "Valorado con %(value)s sobre 5"
 msgid "Read more and choose"
 msgstr "Más información y elegir"
 
+#: apps/manager/templates/manager/platform/ingest_source_mapping.html
+msgid "Read the columns"
+msgstr "Leer las columnas"
+
 #: apps/cms/templates/cms/legal_page_version.html themes/ride/templates/cms/legal_page_version.html
 msgid "Read the current version"
 msgstr "Lee la versión actual"
@@ -8104,6 +8138,10 @@ msgstr "Lee la política de devoluciones"
 #: apps/compliance/templates/compliance/includes/destination_notice.html
 msgid "Read the safety warnings in:"
 msgstr "Lee las advertencias de seguridad en:"
+
+#: apps/manager/templates/manager/platform/ingest_source.html
+msgid "Read the sample again"
+msgstr "Volver a leer la muestra"
 
 #: apps/events/templates/email/events/event_hidden/body.html
 #: apps/events/templates/email/events/event_hidden/body.txt
@@ -8774,6 +8812,10 @@ msgstr "Guardar el cierre"
 #: apps/manager/templates/manager/shop/event_form.html
 msgid "Save the event first: then you can add text, pictures and other blocks to its page."
 msgstr "Guarde primero el evento: después podrá añadir texto, imágenes y otros bloques a su página."
+
+#: apps/manager/templates/manager/platform/ingest_source_mapping.html
+msgid "Save the mapping"
+msgstr "Guardar la asignación"
 
 #: apps/manager/templates/manager/platform/fitment_node.html
 msgid "Save the name"
@@ -11328,6 +11370,10 @@ msgstr "La dirección postal del fabricante, con calle, ciudad y país."
 msgid "The map shows the typed point."
 msgstr "El mapa muestra el punto escrito."
 
+#: apps/manager/ingest_views.py
+msgid "The mapping is saved. Read the sample again to confirm it."
+msgstr "La asignación está guardada. Vuelva a leer la muestra para confirmarla."
+
 #: apps/compliance/models.py
 msgid ""
 "The model, type or reference that identifies the product, for example the number printed on the "
@@ -12324,6 +12370,10 @@ msgstr "El informe de la ejecución, en texto sin formato."
 msgid "The sales terms of %(vendor)s. Buyers read them before they pay."
 msgstr "Las condiciones de venta de %(vendor)s. Los compradores las leen antes de pagar."
 
+#: apps/manager/ingest_views.py
+msgid "The sample was read again with the current mapping."
+msgstr "La muestra se volvió a leer con la asignación actual."
+
 #: apps/manager/fitment_views.py
 msgid "The scheme is updated."
 msgstr "El esquema se ha actualizado."
@@ -12588,6 +12638,10 @@ msgstr ""
 #: apps/manager/ingest_views.py
 msgid "The source is active"
 msgstr "La fuente está activa"
+
+#: apps/manager/ingest_views.py
+msgid "The source is active. Runs stay dry until writing is enabled."
+msgstr "La fuente está activa. Las ejecuciones siguen siendo de prueba hasta que se habilite la escritura."
 
 #: apps/manager/ingest_views.py
 msgid "The source is created. It stays inactive until the checklist is met."

@@ -1,0 +1,38 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+Map the columns of a supplier source (ING.13, step 2). The sample gives the column names only.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{% translate "Map the columns" %}</h1>
+  <p>{{ source.vendor }} / {{ source.code }}</p>
+  {% if can_write %}
+    {% if columns %}
+      <form method="post" class="manager-form" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="action" value="save">
+        <table class="table">
+          <caption>{% translate "Columns of the sample" %}</caption>
+          <thead><tr><th scope="col">{% translate "Column" %}</th><th scope="col">{% translate "Field" %}</th></tr></thead>
+          <tbody>{% for column in columns %}<tr>
+            <th scope="row">{{ column.header }}<input type="hidden" name="header_{{ forloop.counter0 }}" value="{{ column.header }}"></th>
+            <td><select name="field_{{ forloop.counter0 }}" aria-label="{{ column.header }}">
+              <option value="">{% translate "Ignore this column" %}</option>
+              {% for name in fields %}<option value="{{ name }}"{% if name == column.field %} selected{% endif %}>{{ name }}</option>{% endfor %}
+            </select></td>
+          </tr>{% endfor %}</tbody>
+        </table>
+        {% include "components/button.html" with label=_("Save the mapping") type="submit" only %}
+      </form>
+    {% else %}
+      {% include "components/error_summary.html" with form=form autofocus=True only %}
+      <form method="post" enctype="multipart/form-data" class="manager-form" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="action" value="headers">
+        {% for field in form.visible_fields %}{% include "components/field.html" with field=field only %}{% endfor %}
+        {% include "components/button.html" with label=_("Read the columns") type="submit" only %}
+      </form>
+    {% endif %}
+  {% endif %}
+  <p><a href="{% url 'manager:platform:ingest_source' source.public_id %}">{% translate "Back to the checklist" %}</a></p>
+{% endblock %}

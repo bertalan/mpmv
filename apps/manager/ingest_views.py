@@ -145,26 +145,125 @@ class SourceNewView(WriteGate, ManagerView):
         return self.render_to_response(self.get_context_data(form=form, report=report))
 
 
-class SourceChecklistView(ManagerView):
-    """What is missing before this source can be activated."""
-
+class _SourceView(WriteGate, ManagerView):
     section = SECTION
+    write_section = SECTION
+    refuse_read_only = True
+
+    def source(self) -> SupplierSource:
+        public_id: uuid.UUID = self.kwargs["public_id"]
+        return get_object_or_404(
+            self.scoped(SupplierSource).select_related("vendor"), public_id=public_id
+        )
+
+    def back(self) -> HttpResponseRedirect:
+        return HttpResponseRedirect(
+            reverse("manager:platform:ingest_source", args=[self.kwargs["public_id"]])
+        )
+
+
+class SampleForm(forms.Form):
+    sample = forms.FileField(label=gettext_lazy("Sample file"))
+
+    def clean_sample(self) -> Any:
+        return SourceForm.clean_sample(self)  # type: ignore[arg-type]
+
+
+class SourceChecklistView(_SourceView):
+    """What is missing before this source can be activated; re-check the sample and activate."""
+
     template_name = "manager/platform/ingest_source.html"
 
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
-        public_id: uuid.UUID = self.kwargs["public_id"]
-        source = get_object_or_404(
-            self.scoped(SupplierSource).select_related("vendor"), public_id=public_id
-        )
+        source = self.source()
         items = onboarding.checklist(source)
         context["source"] = source
         context["items"] = [
             {"key": item.key, "ok": item.ok, "label": CHECK_LABELS[item.key]} for item in items
         ]
         context["ready"] = all(i.ok for i in items if i.key != "source_active")
+        context["can_write"] = writer(SECTION)(self.manager)
+        context.setdefault("form", SampleForm())
         context["list_url"] = reverse(LIST_URL)
         return context
+
+    @requires_level_method(GATE_ACTION)
+    def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
+        source = self.source()
+        ctx = audit_context(request)
+        if request.POST.get("action") == "activate":
+            try:
+                onboarding.activate_source(source, ctx=ctx)
+            except ValidationError as error:
+                messages.error(request, " ".join(error.messages))
+                return self.render_to_response(self.get_context_data(), status=400)
+            messages.success(
+                request, _("The source is active. Runs stay dry until writing is enabled.")
+            )
+            return self.back()
+        form = SampleForm(request.POST, request.FILES)
+        if not form.is_valid():
+            return self.render_to_response(self.get_context_data(form=form), status=400)
+        report = onboarding.run_sample(source, form.cleaned_data["sample"].read())
+        onboarding.record_sample(source, report, ctx=ctx)
+        messages.info(request, _("The sample was read again with the current mapping."))
+        return self.back()
+
+
+class SourceMappingView(_SourceView):
+    """Step 2: map the columns of a sample to fields. The sample only gives the column names; it
+    is not kept. The pairs are posted back and saved through the audited mapping service."""
+
+    template_name = "manager/platform/ingest_source_mapping.html"
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        context["source"] = self.source()
+        context["can_write"] = writer(SECTION)(self.manager)
+        context.setdefault("form", SampleForm())
+        context.setdefault("columns", None)
+        context["fields"] = base.FIELDS
+        return context
+
+    @requires_level_method(GATE_ACTION)
+    def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
+        source = self.source()
+        if request.POST.get("action") == "save":
+            pairs: dict[str, str] = {}
+            for i in range(onboarding.MAX_HEADERS):
+                header = request.POST.get(f"header_{i}")
+                if header is None:
+                    break
+                name = request.POST.get(f"field_{i}", "")
+                if name:
+                    pairs[header[:200]] = name
+            try:
+                onboarding.save_column_mappings(source.vendor, pairs, ctx=audit_context(request))
+            except ValidationError as error:
+                messages.error(request, " ".join(error.messages))
+                return self.render_to_response(self.get_context_data(), status=400)
+            messages.success(
+                request, _("The mapping is saved. Read the sample again to confirm it.")
+            )
+            return self.back()
+        form = SampleForm(request.POST, request.FILES)
+        if not form.is_valid():
+            return self.render_to_response(self.get_context_data(form=form), status=400)
+        report = onboarding.run_sample(source, form.cleaned_data["sample"].read())
+        current = {
+            e.key.casefold(): e.target_value for e in onboarding.column_entries(source.vendor)
+        }
+        columns = [
+            {
+                "header": h,
+                "field": current.get(
+                    h.casefold(), h.casefold() if h.casefold() in base.FIELDS else ""
+                ),
+            }
+            for h in report.headers
+        ]
+        return self.render_to_response(self.get_context_data(columns=columns))
 
 
 CHECK_LABELS: Final = {
