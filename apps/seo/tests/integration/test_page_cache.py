@@ -323,3 +323,43 @@ def test_a_clean_page_is_served_from_the_cache_the_second_time() -> None:
     assert "public" in second["Cache-Control"]
     assert "Cookie" in second["Vary"]
     assert not second.cookies
+
+
+def test_a_page_that_extends_the_csp_for_this_request_is_never_stored() -> None:
+    """The video block adds frame origins to this response's CSP (`mpmv_video_embed`); a hit
+    would lose them and block the embed."""
+
+    def view(request: HttpRequest) -> HttpResponse:
+        request.mpmv_video_embed = True  # type: ignore[attr-defined]
+        return served()
+
+    make_middleware(view)(page_request())
+    assert page_cache.lookup(page_request()) is None
+
+
+def test_a_response_varying_on_cookie_is_never_stored() -> None:
+    def view(request: HttpRequest) -> HttpResponse:
+        response = served()
+        response["Vary"] = "Cookie"
+        return response
+
+    make_middleware(view)(page_request())
+    assert page_cache.lookup(page_request()) is None
+
+
+def test_host_case_and_port_share_one_entry_and_double_slashes_are_not_stored() -> None:
+    make_middleware(lambda r: served())(page_request())
+    upper = RequestFactory().get("/about-seo6/", HTTP_HOST="TESTSERVER")
+    upper.LANGUAGE_CODE = "en"
+    assert page_cache.lookup(upper) is not None
+    flooded = page_request()
+    flooded.path = "/about-seo6//"
+    flooded.path_info = "/about-seo6//"
+    make_middleware(lambda r: served())(flooded)
+    assert page_cache.lookup(flooded) is None
+
+
+def test_a_bypassed_private_path_does_not_advertise_the_cache(
+    client: Client, seeded: SeedReport
+) -> None:
+    assert "X-Page-Cache" not in client.get("/manager/")

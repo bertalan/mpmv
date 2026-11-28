@@ -87,6 +87,7 @@ def test_an_anonymous_get_without_cookies_is_cacheable() -> None:
         {"cookie_names": frozenset({"mpmv_garage"})},
         {"authorization": True},
         {"path": "/admin/pages/3/view_draft/"},
+        {"path": "/about//team/"},  # an empty path part routes to the page but is a new key
         {"path": "/manager/"},
         {"path": "/account/mfa/"},
         {"path": "/api/v1/products/"},
@@ -115,6 +116,8 @@ def skip(**override: object) -> str | None:
         "session_modified": False,
         "nonce_used": False,
         "csrf_used": False,
+        "vary": "",
+        "csp_extended": False,
         "body": b"<html><body>Hello</body></html>",
         "max_bytes": 1024,
     }
@@ -139,6 +142,9 @@ def test_a_plain_html_page_is_stored() -> None:
         {"cache_control": "max-age=0"},
         {"session_modified": True},
         {"nonce_used": True},
+        {"vary": "Cookie"},
+        {"vary": "Accept-Language, cookie"},
+        {"csp_extended": True},
         {"csrf_used": True},
         {"body": b'<form><input name="csrfmiddlewaretoken" value="x"></form>'},
         {"body": b'<script nonce="abc123">1</script>'},
@@ -203,3 +209,13 @@ def test_a_malformed_target_is_ignored() -> None:
 
 def test_a_zero_max_age_means_not_stored() -> None:
     assert engine.lifetime(300, "max-age=0", b"", NOW) == 0
+
+
+def test_a_vary_without_cookie_is_stored() -> None:
+    assert skip(vary="Accept-Language") is None
+
+
+def test_the_host_is_normalised_in_the_key() -> None:
+    assert engine.normalise_host("Shop.Example:8443") == "shop.example"
+    assert engine.normalise_host("[::1]:8000") == "[::1]"
+    assert engine.normalise_host("shop.example") == "shop.example"

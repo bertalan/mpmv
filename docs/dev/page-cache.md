@@ -52,20 +52,23 @@ Never read from or stored in the cache:
 
 | Request | Why |
 |---|---|
-| not `GET` (`HEAD` included: conservative, a `HEAD` is rendered and not stored) | writes and conditional answers |
+| not `GET`. `HEAD` is a deliberate deviation from the row ("GET and HEAD"): a hit would have to strip the body itself, and a `HEAD` is rare, so it is rendered and never stored; revisit if crawlers make it matter | writes and conditional answers |
 | any query string | tracking parameters and previews must not split or poison entries |
 | cookie `sessionid`, the CSRF cookie, `messages`, `mpmv_consent` or `mpmv_garage` | signed in, cart, consent or garage state |
+| a path with an empty part (`/a//b/`) | Wagtail routes it to the same page: a second entry would let a client flood the store |
 | `Authorization` header | API style access |
 | path under `PRIVATE_PATHS` (`/admin/`, `/manager/`, `/account/`, ...) | previews and private areas |
 
-Also not stored: a response with `Cache-Control: private`, `no-store`, `no-cache` or `max-age=0`,
+Also not stored: a response with `Vary: Cookie` (the row and wagtail-cache), a page that extends the
+CSP for its own request (the video block sets `request.mpmv_video_embed`; a hit would lose the
+frame origins and block the embed), a response with `Cache-Control: private`, `no-store`, `no-cache` or `max-age=0`,
 a page with a view restriction on it or an ancestor (a `before_serve_page` hook,
 `mark_unrestricted_page`, marks the request; an unmarked request is never stored, because a hit
 would skip the restriction check), and a streaming response.
 
 ## Key
 
-`cache_key` hashes: generation, scheme, host (the Wagtail site), path (the language prefix), the
+`cache_key` hashes: generation, scheme, host (lower case, no port: `ALLOWED_HOSTS` ignores it), path (the language prefix), the
 active language, and whether indexing is forced off. The generation token is in every key;
 `page_cache.invalidate()` writes a new one, which empties the cache for every process at once.
 The middleware builds the key **before** it renders, so a change that commits during a render
@@ -73,16 +76,24 @@ leaves that page under the old, unreachable generation. The default lifetime is 
 (`PAGE_CACHE_SECONDS`), shortened by the view's `max-age` and by a running launch countdown
 (`data-target`), so a page never outlives a launch.
 
+The per-site SEO noindex switch is not in the key: the outer middleware applies it on every
+response, hit or miss. `FileBasedCache` culls every fourth file by name when full, which can hit the
+generation file; that acts as a full purge (a cold burst, never a stale page), and old-generation
+files are only removed by culling.
+
 ## Headers
 
 Stored and served pages send `Cache-Control: public, max-age=0, must-revalidate` and
-`Vary: Cookie, Accept-Language`, plus `X-Page-Cache: HIT|MISS|BYPASS`.
+`Vary: Cookie, Accept-Language`, plus `X-Page-Cache: HIT|MISS|BYPASS` (no header on private paths).
 
 ## Storage
 
 A Django `FileBasedCache` (alias `pagecache`) in `var/page-cache`, outside `MEDIA_ROOT` and
 `STATIC_ROOT`. It pickles entries: never expose the directory and never share it with an untrusted
-writer. A cache that cannot be read or written is a miss, never an error. Bounded by
+writer. The web and the task worker must share this directory (one volume in both containers: part of
+3/3), or a purge issued by the worker (scheduled publish, event tasks) never reaches the web
+workers. **Do not set `MPMV_PAGE_CACHE=1` on STAGE before 3/3**: until then it costs a lookup per
+anonymous page and stores nothing. A cache that cannot be read or written is a miss, never an error. Bounded by
 `MAX_ENTRIES` 500 and 256 KiB per entry (about 128 MiB at most).
 
 | Setting | Env | Default |
