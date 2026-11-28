@@ -29,7 +29,9 @@ through it. `apps/ingest/enrich_engine.py` holds the pure schema and policy chec
 
 `apps.ingest.gemini.get_enricher()` returns the chosen enricher. Claude and OpenAI, per-vendor keys
 and encrypted storage are ING.14. The Gemini call uses `apps.core.outbound.open_url` (no redirects);
-a TODO(MIG.12) marks the move to `safe_http` when it lands. The key is sent in a header and never
+`manage check` fails (`ingest.E001`) when `gemini` is selected without a key. The adapters retry with
+pauses and sleep in the calling thread, so `enrich_draft` with a real provider runs **only in a
+background job**, never in a request. A TODO(MIG.12) marks the move to `safe_http` when it lands. The key is sent in a header and never
 logged. Only product data is sent, never customer data.
 
 ## Hardening (peer and lane-a reviews)
