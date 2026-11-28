@@ -31,8 +31,9 @@ through it. `apps/ingest/enrich_engine.py` holds the pure schema and policy chec
 
 `apps.ingest.gemini.get_enricher()` returns the chosen enricher. Per vendor (ING.14),
 `apps.ingest.provider_services.resolve_enricher(vendor)` picks the vendor's own provider and key;
-a vendor with no provider of its own gets the platform default (`settings.INGEST_ENRICHER`, else
-fake). The vendor key is an `EncryptedCharField` with its own keyring (SEC.3, `MPMV_AI_KEY_ENCRYPTION_KEYS`,
+a vendor that never chose a provider gets the platform default (`settings.INGEST_ENRICHER`, else
+fake). A vendor that chose its own provider but has **no key** gets `NoVendorKey` (no enrichment and
+a notice): never the platform's real provider. The vendor key is an `EncryptedCharField` with its own keyring (SEC.3, `MPMV_AI_KEY_ENCRYPTION_KEYS`,
 `rotate_field_keys --keyring ai`). A key that cannot be read raises `ProviderError`; nothing falls
 back to another provider. `usage_count(vendor)` counts archived answers. The Gemini call uses
 `apps.core.outbound.open_url` (no redirects); `manage check` fails (`ingest.E001`) when a provider

@@ -12,7 +12,7 @@ from django.test import override_settings
 
 from apps.core.audit import AuditContext
 from apps.core.crypto import generate_key
-from apps.core.encryption import key_id_of_raw
+from apps.core.encryption import AI_KEYS_SETTING, key_id_of_raw
 from apps.core.models import AuditLog
 from apps.core.services import rotate_field_keys
 from apps.ingest import provider_services as svc
@@ -61,10 +61,50 @@ def test_a_vendor_with_a_key_gets_its_own_provider(provider: str, cls: type) -> 
     assert enricher.model == "m-1"
 
 
-def test_a_choice_without_a_key_falls_back_to_the_platform_default() -> None:
+@pytest.mark.parametrize("platform", ["fake", "gemini", "claude", "openai"])
+def test_a_choice_without_a_key_never_gets_the_platform_provider(platform: str) -> None:
     vendor = VendorFactory.create()
     VendorAIProviderFactory.create(vendor=vendor, provider="claude", api_key="")
-    assert isinstance(svc.resolve_enricher(vendor), FakeEnricher)
+    platform_key = secrets.token_urlsafe(16)
+    with (
+        override_settings(
+            INGEST_ENRICHER=platform,
+            INGEST_GEMINI_API_KEY=platform_key,
+            INGEST_CLAUDE_API_KEY=platform_key,
+            INGEST_OPENAI_API_KEY=platform_key,
+        ),
+        pytest.raises(svc.NoVendorKey) as info,
+    ):
+        svc.resolve_enricher(vendor, transport=noop_transport)
+    assert "AI provider page" in str(info.value.notice)
+    assert platform_key not in str(info.value)
+
+
+def test_a_vendor_that_removed_its_key_or_changed_provider_gets_no_enrichment() -> None:
+    vendor = VendorFactory.create()
+    row = VendorAIProviderFactory.create(vendor=vendor, provider="claude")
+    row.api_key = ""  # what the provider-change and remove paths of `save_provider` do
+    row.save()
+    with pytest.raises(svc.NoVendorKey):
+        svc.resolve_enricher(vendor)
+
+
+def test_no_key_means_the_drafts_text_is_left_as_it_is() -> None:
+    vendor = VendorFactory.create()
+    VendorAIProviderFactory.create(vendor=vendor, provider="claude", api_key="")
+    draft = ProductDraftFactory.create(
+        extracted={"title": "Ceramic mug"}, item__vendor=vendor, item__source__vendor=vendor
+    )
+    with pytest.raises(svc.NoVendorKey):
+        services.enrich_draft(
+            draft,
+            svc.resolve_enricher(vendor),
+            run=ImportRunFactory.create(source=draft.item.source),
+            ctx=CTX,
+        )
+    draft.refresh_from_db()
+    assert draft.enriched == {}
+    assert not EnrichmentVersion.objects.exists()
 
 
 def test_the_choice_applies_only_to_that_vendors_products() -> None:
@@ -87,7 +127,7 @@ def test_an_unreadable_vendor_key_never_falls_back_to_another_provider() -> None
     vendor = VendorFactory.create()
     VendorAIProviderFactory.create(vendor=vendor, provider="claude")
     with (
-        override_settings(FIELD_ENCRYPTION_KEYS=[generate_key("other")], INGEST_ENRICHER="fake"),
+        override_settings(AI_KEY_ENCRYPTION_KEYS=[generate_key("other")], INGEST_ENRICHER="fake"),
         pytest.raises(ProviderError),
     ):
         svc.resolve_enricher(vendor)
@@ -158,18 +198,39 @@ def test_a_provider_error_leaves_the_text_unchanged_and_does_not_try_another() -
     assert all("anthropic" in url for url in calls)
 
 
-def test_usage_is_counted_per_vendor() -> None:
-    a, b = VendorFactory.create(), VendorFactory.create()
-    for vendor, times in ((a, 2), (b, 1)):
-        for _ in range(times):
-            draft = ProductDraftFactory.create(
-                extracted={"title": "Ceramic mug"},
-                item__vendor=vendor,
-                item__source__vendor=vendor,
-            )
-            run = ImportRunFactory.create(source=draft.item.source)
-            services.enrich_draft(draft, FakeEnricher(), run=run, ctx=CTX)
-    assert (svc.usage_count(a), svc.usage_count(b)) == (2, 1)
+def enrich_with_claude(vendor: Any, times: int) -> None:
+    def transport(
+        url: str, payload: Mapping[str, Any], headers: Mapping[str, str], timeout: float
+    ) -> Any:
+        return {"content": [{"text": json.dumps(GOOD)}], "stop_reason": "end_turn"}
+
+    for _ in range(times):
+        draft = ProductDraftFactory.create(
+            extracted={"title": "Ceramic mug"}, item__vendor=vendor, item__source__vendor=vendor
+        )
+        run = ImportRunFactory.create(source=draft.item.source)
+        enricher = svc.resolve_enricher(vendor, transport=transport)
+        services.enrich_draft(draft, enricher, run=run, ctx=CTX)
+
+
+def test_usage_is_counted_per_vendor_for_its_own_provider_only() -> None:
+    a, b, c = VendorFactory.create(), VendorFactory.create(), VendorFactory.create()
+    for vendor in (a, b):
+        VendorAIProviderFactory.create(vendor=vendor, provider="claude")
+    enrich_with_claude(a, 2)
+    enrich_with_claude(b, 1)
+    # The platform's provider writes for a vendor that has none of its own: not its usage.
+    for _ in range(2):
+        draft = ProductDraftFactory.create(
+            extracted={"title": "Ceramic mug"}, item__vendor=c, item__source__vendor=c
+        )
+        run = ImportRunFactory.create(source=draft.item.source)
+        services.enrich_draft(draft, FakeEnricher(), run=run, ctx=CTX)
+    assert EnrichmentVersion.objects.filter(draft__item__vendor=c).count() == 2
+    assert (svc.usage_count(a), svc.usage_count(b), svc.usage_count(c)) == (2, 1, 0)
+    # Answers archived while the vendor used the platform provider are not counted either.
+    VendorAIProviderFactory.create(vendor=c, provider="claude")
+    assert svc.usage_count(c) == 0
 
 
 # --- rotation: old ciphertext stays readable, the re-encrypt tool moves it
@@ -187,18 +248,19 @@ def test_rotation_keeps_old_ciphertext_readable_and_the_job_moves_it() -> None:
     vendor = VendorFactory.create()
     key = secrets.token_urlsafe(24)
     row = VendorAIProviderFactory.create(vendor=vendor, api_key=key)
-    old, new = str(settings.FIELD_ENCRYPTION_KEYS[0]), generate_key("k2")
-    assert raw_key_id(row) == "test"
-    with override_settings(FIELD_ENCRYPTION_KEYS=[new, old]):
+    old, new = str(settings.AI_KEY_ENCRYPTION_KEYS[0]), generate_key("k2")
+    assert raw_key_id(row) == "test-ai"
+    with override_settings(AI_KEY_ENCRYPTION_KEYS=[new, old]):
         assert svc.key_for(vendor) == key  # the old ciphertext still decrypts
-        preview = rotate_field_keys(ctx=CTX, dry_run=True)
+        ai = AI_KEYS_SETTING
+        preview = rotate_field_keys(ctx=CTX, dry_run=True, keyring=ai)
         assert [c.model for c in preview.changes] == ["ingest.vendoraiprovider"]
-        assert raw_key_id(row) == "test"
-        rotate_field_keys(ctx=CTX)
+        assert raw_key_id(row) == "test-ai"
+        rotate_field_keys(ctx=CTX, keyring=ai)
         assert raw_key_id(row) == "k2"
         assert svc.key_for(vendor) == key
         entry = AuditLog.objects.get(target_model="ingest.vendoraiprovider")
         assert key not in str(entry.before) + str(entry.after)
-        assert rotate_field_keys(ctx=CTX).is_empty
-    with override_settings(FIELD_ENCRYPTION_KEYS=[new]):  # the old key can be retired
+        assert rotate_field_keys(ctx=CTX, keyring=ai).is_empty
+    with override_settings(AI_KEY_ENCRYPTION_KEYS=[new]):  # the old key can be retired
         assert svc.key_for(vendor) == key

@@ -24,8 +24,9 @@ from apps.vendors.services import has_vendor_permission
 
 from . import gemini
 from .enrichment import ProviderError, TextEnricher
-from .gemini import MODEL_NAME, GeminiEnricher, Transport
+from .gemini import MODEL_NAME, GeminiEnricher
 from .models import AIProvider, EnrichmentVersion, VendorAIProvider
+from .provider_http import Transport
 from .providers import ClaudeEnricher, OpenAIEnricher
 
 MIN_KEY_LENGTH = 8
@@ -130,13 +131,26 @@ _ENRICHERS: dict[str, Any] = {
 }
 
 
-def resolve_enricher(vendor: Vendor, *, transport: Transport | None = None) -> TextEnricher:
-    """The enricher for one vendor's drafts: its own provider and key, else the platform default
-    (`settings.INGEST_ENRICHER`, `fake` in tests and local runs).
+class NoVendorKey(ProviderError):
+    """The vendor chose its own provider but has no key: no enrichment, and a notice for it."""
 
-    The vendor's choice never reaches another vendor's drafts, and a vendor key that cannot be
-    read raises `ProviderError`: there is no fallback to the platform's provider with the vendor's
-    data against its choice. Callers treat the error as "no enrichment" (the text stays as it is).
+    notice = _(
+        "Your own AI provider has no key, so no AI texts were written. "
+        "Enter a key on the AI provider page."
+    )
+
+
+def resolve_enricher(vendor: Vendor, *, transport: Transport | None = None) -> TextEnricher:
+    """The enricher for one vendor's drafts: its own provider and key; the platform default
+    (`settings.INGEST_ENRICHER`, `fake` in tests and local runs) only for a vendor that never
+    chose a provider.
+
+    The vendor's choice never reaches another vendor's drafts. A vendor that chose its own
+    provider but has no key (never set, removed, or cleared by a provider change) gets
+    `NoVendorKey`, never the platform's real provider: its data does not go to another provider
+    without its choice (spec 08). A key that cannot be read raises `ProviderError` too. Callers
+    treat both as "no enrichment" (the text stays as it is); `NoVendorKey.notice` is for the
+    vendor.
     """
     extra: dict[str, Any] = {} if transport is None else {"transport": transport}
     try:  # the field decrypts while the row loads
@@ -144,11 +158,22 @@ def resolve_enricher(vendor: Vendor, *, transport: Transport | None = None) -> T
         api_key = row.api_key if row is not None else ""
     except DecryptionError:
         raise ProviderError("the vendor key cannot be read") from None
-    if row is None or not api_key:
+    if row is None:
         return gemini.get_enricher(**extra)
+    if not api_key:
+        raise NoVendorKey("the vendor chose its own provider and has no key")
     return _ENRICHERS[row.provider](api_key, row.model, **extra)  # type: ignore[no-any-return]
 
 
 def usage_count(vendor: Vendor) -> int:
-    """How many enrichment answers were archived for this vendor's drafts (any provider)."""
-    return EnrichmentVersion.objects.filter(draft__item__vendor=vendor).count()
+    """How many answers of the vendor's own provider (its own key) were archived for its drafts.
+
+    The platform's provider is not counted: only archives written by the provider the vendor
+    chose, and nothing for a vendor with no key of its own.
+    """
+    row = VendorAIProvider.objects.filter(vendor=vendor).first()
+    if row is None or not row.has_key:
+        return 0
+    return EnrichmentVersion.objects.filter(
+        draft__item__vendor=vendor, provider=row.provider
+    ).count()
