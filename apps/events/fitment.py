@@ -44,3 +44,13 @@ def matches_garage(request: HttpRequest, page: EventPage) -> bool:
     """Whether the active garage is covered by one of the event's tags: a tag on the vehicle's
     node or on an ancestor of it. One query per request, however long the list."""
     return page.translation_key in _matching_keys(request)
+
+
+def garage_label(request: HttpRequest) -> str:
+    """The name of the visitor's active vehicle when events can be matched to it, else empty
+    (generic visitor, garage off): the *Only events for my garage* checkbox shows only then."""
+    from apps.fitment.garage_state import garage_state
+
+    if active_node(request) is None:
+        return ""
+    return str(garage_state(request)["active_label"])

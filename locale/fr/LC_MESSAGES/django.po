@@ -3774,6 +3774,10 @@ msgstr "Événements"
 msgid "Events awaiting review"
 msgstr "Événements en attente de relecture"
 
+#: apps/events/templates/events/_filters.html
+msgid "Events for everyone, with no vehicle, are left out."
+msgstr "Les événements pour tous, sans véhicule, sont masqués."
+
 #: apps/events/templates/events/event_calendar.html
 msgid "Events in %(month)s"
 msgstr "Événements de %(month)s"
@@ -6546,6 +6550,10 @@ msgstr ""
 "Seules les marques approuvées ont une page publique et peuvent être choisies par tous les "
 "vendeurs. Utilisez les actions d'approbation, de rejet et de fusion pour examiner une proposition."
 " Exemple : Approuvée."
+
+#: apps/events/templates/events/_filters.html
+msgid "Only events for my garage"
+msgstr "Uniquement les événements pour mon garage"
 
 #: apps/events/templates/events/_filters.html
 msgid "Only events in %(language)s"
@@ -9769,7 +9777,10 @@ msgid ""
 "Tag the event with the vehicles it is for. Visitors whose garage matches see a badge. Leave it "
 "empty for an event for everyone. Edit the tags on the page in the original language: translations "
 "follow it."
-msgstr "Indiquez les véhicules concernés par l'événement. Les visiteurs dont le garage correspond voient un badge. Laissez vide pour un événement ouvert à tous. Modifiez les véhicules sur la page dans la langue d'origine : les traductions la suivent."
+msgstr ""
+"Indiquez les véhicules concernés par l'événement. Les visiteurs dont le garage correspond voient "
+"un badge. Laissez vide pour un événement ouvert à tous. Modifiez les véhicules sur la page dans la"
+" langue d'origine : les traductions la suivent."
 
 #: apps/manager/forms.py
 msgid "Tagline"
