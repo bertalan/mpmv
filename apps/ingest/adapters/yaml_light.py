@@ -6,7 +6,8 @@ and aliases are refused (they allow a billion-laughs blow-up), nesting and the n
 are capped (the event cap follows the row and column caps). Only then a `SafeLoader` that
 resolves every plain scalar as text builds the data: no Python tags, and no YAML 1.1 surprises
 (`0123` stays "0123", not octal 83; `1_000`, `yes`, dates stay text). The row validation then
-converts numbers explicitly.
+converts numbers explicitly. A stream of several documents (`---`) is refused as a whole (the
+single-document load fails), never cut to its first document.
 """
 
 from collections.abc import Sequence

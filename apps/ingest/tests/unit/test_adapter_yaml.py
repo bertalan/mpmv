@@ -103,3 +103,11 @@ def test_event_cap_follows_the_row_and_column_caps() -> None:
     doc = "".join(f"- {{code: s{n}, name: n}}\n" for n in range(50))
     with pytest.raises(base.AdapterError):
         _adapter(max_rows=5, max_columns=2).parse(doc.encode())
+
+
+def test_multi_document_stream_is_refused() -> None:
+    """Only one document is allowed: the second must never be silently dropped or merged."""
+    with pytest.raises(base.AdapterError):
+        _adapter().parse(b"code: E-1\nname: Lamp\n---\ncode: E-2\nname: Vase\n")
+    with pytest.raises(base.AdapterError):
+        _adapter().parse(b"---\ncode: E-1\nname: Lamp\n...\n---\ncode: E-2\nname: Vase\n")
