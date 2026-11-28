@@ -155,22 +155,27 @@ def test_a_page_built_with_an_active_garage_is_private_to_the_cache(
     assert "private" in client.get(str(primary_index().url)).get("Cache-Control", "")
 
 
+def _queries(client: Client) -> int:
+    client.get(str(primary_index().url))  # warm caches
+    with CaptureQueriesContext(connection) as captured:
+        assert _list(client)
+    return len(captured)
+
+
 def test_the_badge_costs_a_constant_number_of_queries(
     tree: dict[str, object],
 ) -> None:
+    """The extra queries a garage costs are the same for 5 and for a full page of tagged events."""
     for days in range(10, 15):
         EventFitmentFactory.create(page=_event(days, title=f"Meet {days}"), node=tree["roadster"])
-    client = Client()
-    _garage(client, "Roadster")
-    index = str(primary_index().url)
-    client.get(index)  # warm caches
-    with CaptureQueriesContext(connection) as many:
-        assert _list(client).count(BADGE) >= 5
+    visitor = Client()
+    _garage(visitor, "Roadster")
+    few = _queries(visitor) - _queries(Client())
     for days in range(15, 25):
         EventFitmentFactory.create(page=_event(days, title=f"Meet {days}"), node=tree["roadster"])
-    with CaptureQueriesContext(connection) as more:
-        assert _list(client).count(BADGE) >= 10
-    assert len(more) <= len(many) + 10  # events themselves cost a little; the badge adds none
+    many = _queries(visitor) - _queries(Client())
+    assert _list(visitor).count(BADGE) >= 12  # a full page of tagged events
+    assert few == many  # a fixed cost for the garage, nothing per event
 
 
 def test_the_badge_is_translated_in_the_page_language(tree: dict[str, object]) -> None:

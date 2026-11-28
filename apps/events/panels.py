@@ -28,11 +28,26 @@ from wagtail.admin.panels import (
 
 from apps.vendors.scoping import is_platform_staff
 
+from .fitment_form import EventFitmentForm
+
 # The inputs of the event form the picker reads and writes (`data-<name>-input` on the picker).
 PICKER_INPUTS = ("latitude", "longitude", "street", "postcode", "city", "country")
 # The hidden inputs that keep the chosen "Find coordinates" candidate's point when the marker is
 # moved before saving (`data-picked-latitude-input`, `data-picked-longitude-input`).
 PICKED_INPUTS = ("picked_latitude", "picked_longitude")
+
+
+class FitmentInlinePanel(InlinePanel):  # type: ignore[misc]  # Wagtail is untyped
+    """The vehicle tags of an event, whose chooser offers pickable nodes only (FIT.11).
+
+    Wagtail builds the child form of an inline panel without the child model's
+    `base_form_class`, so the panel passes `EventFitmentForm` as the formset's own form.
+    """
+
+    def get_form_options(self) -> dict[str, Any]:
+        options: dict[str, Any] = super().get_form_options()
+        options["formsets"][self.relation_name]["form"] = EventFitmentForm
+        return options
 
 
 def map_assets() -> Media:
@@ -161,7 +176,7 @@ def event_content_panels() -> list[Any]:
             ],
             heading=_("Links"),
         ),
-        InlinePanel(
+        FitmentInlinePanel(
             "fitment_rows",
             heading=_("Vehicles"),
             label=_("Vehicle"),
