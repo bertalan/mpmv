@@ -2469,6 +2469,14 @@ msgstr ""
 "Choisissez un texte réutilisable. Lorsqu’il est modifié et approuvé, chaque page qui l’utilise "
 "affiche le nouveau texte. Rien n’est affiché tant que l’extrait n’est pas publié."
 
+#: apps/manager/templates/manager/platform/shop_closures.html
+msgid ""
+"Choose a shop to see, add, change or remove its holidays and closures. A closure that has ended "
+"cannot be changed."
+msgstr ""
+"Choisissez une boutique pour voir, ajouter, modifier ou supprimer ses congés et ses fermetures. "
+"Une fermeture déjà terminée ne peut pas être modifiée."
+
 #: apps/themes/admin_views.py
 msgid "Choose a site to switch it to this palette when you save."
 msgstr "Choisissez un site à passer sur cette palette à l'enregistrement."
@@ -2514,6 +2522,10 @@ msgstr "Choisissez un événement ou indiquez une adresse web."
 #: apps/manager/event_block_forms.py
 msgid "Choose an image"
 msgstr "Choisissez une image"
+
+#: apps/manager/templates/manager/shop/closures.html
+msgid "Choose another shop"
+msgstr "Choisir une autre boutique"
 
 #: apps/manager/amendment_forms.py
 msgid "Choose at least one change."
@@ -3650,6 +3662,10 @@ msgstr "Se termine à"
 #: themes/base/templates/components/gallery.html themes/ride/templates/components/gallery.html
 msgid "Enlarge"
 msgstr "Agrandir"
+
+#: apps/core/models.py
+msgid "Enter a time zone name such as Europe/Rome."
+msgstr "Saisissez le nom d’un fuseau horaire, par exemple Europe/Rome."
 
 #: apps/manager/forms.py
 msgid "Enter a valid carrier name."
@@ -5863,6 +5879,10 @@ msgstr "Éléments suivants"
 msgid "Next month"
 msgstr "Mois suivant"
 
+#: apps/manager/templates/manager/platform/shop_closures.html
+msgid "Next page"
+msgstr "Page suivante"
+
 #: themes/ride/templates/components/carousel_controls.html
 msgid "Next slide"
 msgstr "Diapositive suivante"
@@ -6035,6 +6055,10 @@ msgstr "Aucune condition du vendeur publiée."
 #: themes/ride/templates/accounts/sessions/list.html
 msgid "No session is recorded yet."
 msgstr "Aucune session enregistrée pour l'instant."
+
+#: apps/manager/templates/manager/platform/shop_closures.html
+msgid "No shop matches."
+msgstr "Aucune boutique ne correspond."
 
 #: apps/manager/templates/manager/platform/profile_changes.html
 msgid "No storefront changes yet."
@@ -7776,6 +7800,10 @@ msgstr "Éléments précédents"
 msgid "Previous month"
 msgstr "Mois précédent"
 
+#: apps/manager/templates/manager/platform/shop_closures.html
+msgid "Previous page"
+msgstr "Page précédente"
+
 #: themes/ride/templates/components/carousel_controls.html
 msgid "Previous slide"
 msgstr "Diapositive précédente"
@@ -8802,9 +8830,9 @@ msgid "screen or page type"
 msgstr "écran ou type de page"
 
 #: apps/catalog/templates/catalog/search.html apps/manager/fitment_shop_views.py
-#: apps/manager/product_views.py apps/seo/page_builders.py
-#: themes/base/templates/components/search_form.html themes/ride/templates/catalog/search.html
-#: themes/ride/templates/components/header.html
+#: apps/manager/product_views.py apps/manager/templates/manager/platform/shop_closures.html
+#: apps/seo/page_builders.py themes/base/templates/components/search_form.html
+#: themes/ride/templates/catalog/search.html themes/ride/templates/components/header.html
 msgid "Search"
 msgstr "Rechercher"
 
@@ -8815,6 +8843,10 @@ msgstr "Rechercher par nom"
 #: apps/cms/blocks.py
 msgid "Search by name, SKU, brand or vendor, then click the product."
 msgstr "Recherchez par nom, SKU, marque ou vendeur, puis cliquez sur le produit."
+
+#: apps/manager/templates/manager/platform/shop_closures.html
+msgid "Search by shop name"
+msgstr "Rechercher par nom de boutique"
 
 #: themes/base/templates/components/search_form.html themes/ride/templates/404.html
 msgid "Search products"
@@ -9110,6 +9142,11 @@ msgstr "Acheter par catégorie"
 #: apps/shipping/templates/shipping/closure_notice.html
 msgid "Shop closure"
 msgstr "Fermeture de la boutique"
+
+#: apps/manager/sections.py apps/manager/site_map.py
+#: apps/manager/templates/manager/platform/shop_closures.html
+msgid "Shop closures"
+msgstr "Fermetures des boutiques"
 
 #: apps/manager/amendment_views.py
 msgid "Shop frozen"
@@ -11705,6 +11742,15 @@ msgstr ""
 "L'ordre des versions : les nombres les plus bas passent en premier, par exemple 1, 2, 3. Laissez 0"
 " pour conserver l'ordre dans lequel elles ont été ajoutées."
 
+#: apps/orders/tz.py
+msgid ""
+"The order records still compute their retention dates in %(zone)s, so the business time zone must "
+"stay %(zone)s until a developer updates them (ORD.41)."
+msgstr ""
+"Les données des commandes calculent encore leurs dates de conservation en %(zone)s : le fuseau "
+"horaire de l’activité doit donc rester %(zone)s jusqu’à ce qu’un développeur les mette à jour "
+"(ORD.41)."
+
 #: apps/manager/views.py
 msgid "The order was updated."
 msgstr "La commande a été mise à jour."
@@ -12766,6 +12812,17 @@ msgstr ""
 "Les seuils des badges de confiance des vendeurs. Un changement est une nouvelle version à partir "
 "d'une date ; une ancienne version n'est jamais modifiée, si bien que chaque résultat enregistré "
 "reste explicable."
+
+#: apps/core/models.py
+msgid ""
+"The time zone of the platform's calendar: when a day, a month or a year starts for order numbers, "
+"deadlines and retention. For example Europe/Rome. Change it only with your developer, and only "
+"from 1 January: scheduled jobs, order records and tax periods depend on it."
+msgstr ""
+"Le fuseau horaire du calendrier de la plateforme : quand commencent un jour, un mois ou une année "
+"pour les numéros de commande, les délais et la conservation. Par exemple Europe/Rome. Ne le "
+"modifiez qu’avec votre développeur, et seulement à partir du 1er janvier : les tâches planifiées, "
+"les données des commandes et les périodes fiscales en dépendent."
 
 #: apps/events/models.py
 msgid ""

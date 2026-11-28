@@ -123,14 +123,15 @@ MAX_PREFIX_LENGTH = 14  # number = prefix + "YYYY-" + 6+ digits must fit in 32 c
 
 
 def _year_and_prefix(now: dt.datetime | None) -> tuple[int, str]:
-    """The numbering year is the business year (settings.BUSINESS_TIME_ZONE, Europe/Rome), so an
+    """The numbering year is the business year (`business_tz()`, ARC.27; Europe/Rome), so an
     order placed at 00:30 on 1 January in Rome starts the new year even when UTC says 31 Dec."""
     prefix = str(getattr(settings, "ORDER_NUMBER_PREFIX", ""))
     if len(prefix) > MAX_PREFIX_LENGTH:
         raise ImproperlyConfigured(
             f"ORDER_NUMBER_PREFIX is longer than {MAX_PREFIX_LENGTH} characters"
         )
-    return (now or timezone.now()).astimezone(business_tz()).year, prefix
+    moment = now or timezone.now()
+    return moment.astimezone(business_tz(moment)).year, prefix
 
 
 def peek_order_number(*, now: dt.datetime | None = None) -> str:

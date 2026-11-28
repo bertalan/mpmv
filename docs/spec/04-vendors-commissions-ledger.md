@@ -741,7 +741,11 @@ class VendorClosure(Model):                     # vendor-scoped (CORE.3)
   accept `dry_run=True`, return a `ChangeSet` and write an `AuditLog` entry (actor, before and
   after, source: vendor area, admin or API).
 - **Vendor area** (CORE.9, `/manager/shop/settings/closures/`): list of current and upcoming ranges,
-  add, edit and delete forms, a preview of the notice. Staff use a Wagtail admin ViewSet. **API**:
+  add, edit and delete forms, a preview of the notice. Staff (Support and the platform owner, CORE.18 row
+  `platform.shop_closures`) manage any shop's closures in the Manager platform space, at
+  `/manager/platform/shop-closures/`: pick a shop, then the same list and forms, with audit source
+  `admin`; there is no Wagtail ViewSet, and an ended range stays immutable for staff too (owner
+  decision 2026-11-26). **API**:
   `/api/v1/vendors/{id}/closures` (list, create, update, delete, `?dry_run=true`, RFC 9457 errors);
   a vendor-scoped key (CORE.13) reaches only its own vendor, anything else is a 404.
 

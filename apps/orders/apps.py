@@ -44,3 +44,13 @@ class OrdersConfig(AppConfig):
         register_email_attachment(
             documents.ATTACHMENT_KIND, documents.vendor_confirmation_attachment
         )
+        from django.core import checks
+
+        from apps.core.services import register_business_zone_guard
+
+        from .checks import check_trigger_time_zone
+        from .tz import trigger_zone_refusal
+
+        # ARC.27 until ORD.41: fail closed on a zone the order triggers cannot follow.
+        checks.register(check_trigger_time_zone, checks.Tags.database)
+        register_business_zone_guard(trigger_zone_refusal)

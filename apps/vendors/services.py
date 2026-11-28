@@ -10,7 +10,6 @@ import hashlib
 import logging
 from collections.abc import Callable, Collection, Mapping
 from typing import Any, Protocol
-from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.contrib.auth.base_user import AbstractBaseUser
@@ -63,6 +62,7 @@ from apps.core.services import (
     NoPlatformOperator,
     allowed_vendor_countries,
     audit_changes,
+    business_tz,
     consume_rate_limit,
     current_operator,
     enqueue_email,
@@ -792,7 +792,7 @@ def requirement_rules(purpose: str = engine.PAYOUT) -> list[engine.Requirement]:
 def business_today(at: dt.datetime | None = None) -> dt.date:
     """Today's calendar day in the business time zone (the day the no-TIN list is dated by), or
     the day of the instant `at` there (a checkout built for a given `now`)."""
-    return timezone.localdate(at or timezone.now(), ZoneInfo(settings.BUSINESS_TIME_ZONE))
+    return timezone.localdate(at or timezone.now(), business_tz())
 
 
 def no_tin_countries(on: dt.date | None = None) -> frozenset[str]:
