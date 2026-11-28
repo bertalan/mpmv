@@ -43,11 +43,15 @@ from urllib.parse import urlsplit
 import pytest
 from django.conf import settings
 from django.db import connection, models
+from django.http import HttpRequest, HttpResponse
 from django.http.response import HttpResponseBase
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
 from django.urls import resolve, reverse
 from django.utils import translation
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
+from django.views.generic import View
 from wagtail.contrib.routable_page.models import RoutablePageMixin
 from wagtail.models import Page, PageViewRestriction
 
@@ -72,6 +76,7 @@ from apps.vendors.tests.integration.test_claim import (
     send_link,
 )
 from tests.security_registry import (
+    ADMIN_CSRF_EXEMPT,
     API_CSRF_REASON,
     CSRF_EXEMPT,
     GET_WRITES_ALLOWED,
@@ -99,7 +104,6 @@ from tests.tenancy import (
 )
 from tests.tenancy_registry import (
     API_OPERATIONS,
-    CMS_ADMIN_ROUTE,
     ENDPOINTS,
     SHADOWED,
     classify,
@@ -276,11 +280,6 @@ def written_tables() -> Iterator[set[str]]:
             tables.add(match.group(1))
 
 
-def is_editors_admin(endpoint: Endpoint) -> bool:
-    """Served under the Wagtail admin (`/admin/`), whose API views are CSRF-exempt."""
-    return endpoint.route.startswith(CMS_ADMIN_ROUTE)
-
-
 def staff_client(*, raise_request_exception: bool = True) -> Client:
     client = Client(enforce_csrf_checks=True, raise_request_exception=raise_request_exception)
     verified_login(client, UserFactory.create(superuser=True))
@@ -296,18 +295,82 @@ def test_public_allow_list_has_no_stale_entries() -> None:
     assert not stale, "No such endpoint any more, remove from PUBLIC: " + ", ".join(stale)
 
 
+MIN_REASON = 15  # characters: a sentence, not a placeholder like "ok" or "TODO"
+
+
+def csrf_exempt_declaration_problems(
+    endpoints: Sequence[Endpoint], declared: Mapping[str, str], admin_declared: Mapping[str, str]
+) -> list[str]:
+    """Each `csrf_exempt` web view is declared one by one, with its reason (SEC.11)."""
+    exempt = {e.key for e in endpoints if getattr(e.callback, "csrf_exempt", False)}
+    allowed = set(declared) | set(admin_declared)
+    problems = [f"undeclared csrf_exempt view: {key}" for key in sorted(exempt - allowed)]
+    problems += [f"declared but no longer csrf_exempt: {key}" for key in sorted(allowed - exempt)]
+    problems += [f"declared twice: {key}" for key in sorted(set(declared) & set(admin_declared))]
+    problems += [
+        f"no reason for {key}"
+        for key, why in {**declared, **admin_declared}.items()
+        if len(why.strip()) < MIN_REASON
+    ]
+    return problems
+
+
 def test_csrf_exempt_views_are_declared() -> None:
-    exempt = {e.key for e in WEB_ENDPOINTS if getattr(e.callback, "csrf_exempt", False)}
-    # Wagtail's admin API (django-ninja) and wagtail-localize's (DRF) views are marked exempt but
-    # either check the token themselves (DRF SessionAuthentication) or take no POST at all:
-    # `test_post_without_csrf_token_is_refused` proves it for each of them.
-    editors_admin = {e.key for e in WEB_ENDPOINTS if is_editors_admin(e)}
-    undeclared = sorted(exempt - set(CSRF_EXEMPT) - editors_admin)
-    stale = sorted(set(CSRF_EXEMPT) - exempt)
-    assert not undeclared, "Declare in tests.security_registry.CSRF_EXEMPT: " + ", ".join(
-        undeclared
+    # Hook-registered admin views are no longer accepted wholesale: each sits in
+    # `ADMIN_CSRF_EXEMPT` with its reason, and `test_post_without_csrf_token_is_refused` proves it.
+    problems = csrf_exempt_declaration_problems(WEB_ENDPOINTS, CSRF_EXEMPT, ADMIN_CSRF_EXEMPT)
+    assert not problems, (
+        "Declare in tests.security_registry.CSRF_EXEMPT (or ADMIN_CSRF_EXEMPT for a Wagtail "
+        "admin view) with a reason: " + "; ".join(problems)
     )
-    assert not stale, "No longer CSRF-exempt, remove from CSRF_EXEMPT: " + ", ".join(stale)
+
+
+def _exempt_view_forms() -> dict[str, Callable[..., HttpResponseBase]]:
+    """The ways a package can mark a view csrf_exempt; the guard must see all of them."""
+
+    @csrf_exempt
+    def decorated(request: HttpRequest) -> HttpResponse:
+        return HttpResponse("")
+
+    class Cbv(View):
+        def post(self, request: HttpRequest) -> HttpResponse:
+            return HttpResponse("")
+
+    def plain(request: HttpRequest) -> HttpResponse:
+        return HttpResponse("")
+
+    return {
+        "decorator": decorated,
+        "method_decorator on dispatch": method_decorator(csrf_exempt, name="dispatch")(
+            Cbv
+        ).as_view(),
+        "url-level wrapper": csrf_exempt(plain),
+    }
+
+
+@pytest.mark.parametrize("form", ["decorator", "method_decorator on dispatch", "url-level wrapper"])
+def test_the_csrf_exempt_guard_fails_on_an_undeclared_view(form: str) -> None:
+    """Meta-test: a throwaway view that skips the CSRF check turns the guard red, in each form."""
+    throwaway = _exempt_view_forms()[form]
+    view = Endpoint(
+        key="wagtailadmin_throwaway",
+        route="admin/throwaway/",
+        namespace="",
+        params=(),
+        regex="^admin/throwaway/$",
+        callback=throwaway,
+    )
+    reviewed = "Checks the token itself, reviewed by hand."
+    assert csrf_exempt_declaration_problems([view], {}, {}) == [
+        "undeclared csrf_exempt view: wagtailadmin_throwaway"
+    ]
+    assert csrf_exempt_declaration_problems([view], {}, {view.key: reviewed}) == []
+    assert csrf_exempt_declaration_problems([view], {}, {view.key: ""}) == [
+        "no reason for wagtailadmin_throwaway"
+    ]
+    assert csrf_exempt_declaration_problems([], {}, {view.key: reviewed}) == [
+        "declared but no longer csrf_exempt: wagtailadmin_throwaway"
+    ]
 
 
 def test_every_non_public_sample_path_reaches_its_endpoint() -> None:
@@ -392,7 +455,7 @@ def test_post_without_csrf_token_is_refused(endpoint: Endpoint) -> None:
             f"{endpoint.key} is CSRF-exempt ({CSRF_EXEMPT[endpoint.key]}), but an unsigned POST "
             f"got {describe(response)}"
         )
-    elif is_editors_admin(endpoint) and getattr(endpoint.callback, "csrf_exempt", False):
+    elif endpoint.key in ADMIN_CSRF_EXEMPT:
         # Wagtail's admin API and wagtail-localize: DRF checks the token itself (403); a view
         # without a POST handler answers 405 and changes nothing.
         assert response.status_code in {403, 405}, (
@@ -737,7 +800,6 @@ REPO = Path(__file__).resolve().parents[2]
 CITED_TEST = re.compile(r"`(test_\w+)`")
 CITED_FILE = re.compile(r"\b((?:apps|tests)/[\w/]+\.py)\b")
 TEST_DEF = re.compile(r"^\s*(?:async\s+)?def\s+(test_\w+)\s*\(", re.MULTILINE)
-MIN_REASON = 15  # characters: a sentence, not a placeholder like "ok" or "TODO"
 
 
 def defined_tests() -> set[str]:
