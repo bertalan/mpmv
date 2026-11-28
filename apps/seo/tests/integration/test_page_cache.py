@@ -172,6 +172,26 @@ def test_a_session_cookie_bypasses_the_cache_both_ways(client: Client, seeded: S
     assert status(client.get("/")) == "BYPASS"
 
 
+def test_a_garage_cookie_is_never_served_from_or_stored_into_the_cache() -> None:
+    """FIT.11: garage-dependent pages are private only when a garage is active, so a request
+    with the garage cookie must neither read nor fill the cache."""
+    from apps.fitment.garage import COOKIE_NAME as GARAGE_COOKIE
+
+    make_middleware(lambda r: served("<html><body>Anonymous</body></html>"))(page_request())
+    assert page_cache.lookup(page_request()) is not None  # the cache works for anonymous
+
+    def garage_view(request: HttpRequest) -> HttpResponse:
+        return served("<html><body>My garage</body></html>")
+
+    with_garage = page_request(HTTP_COOKIE=f"{GARAGE_COOKIE}=abc")
+    response = make_middleware(garage_view)(with_garage)
+    assert status(response) == "BYPASS"
+    assert b"My garage" in response.content  # not the cached anonymous copy
+    page_cache.invalidate()
+    make_middleware(garage_view)(page_request(HTTP_COOKIE=f"{GARAGE_COOKIE}=abc"))
+    assert page_cache.lookup(page_request()) is None  # and nothing was stored
+
+
 def test_a_signed_in_visitor_never_gets_or_fills_the_cache(
     client: Client, seeded: SeedReport
 ) -> None:
