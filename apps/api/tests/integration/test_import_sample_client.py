@@ -2,6 +2,8 @@
 
 import importlib.util
 import json
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
 
@@ -123,3 +125,66 @@ def test_a_non_json_error_body_does_not_crash_the_client() -> None:
     assert sample._json(b"<html>Bad gateway</html>") == {"detail": "<html>Bad gateway</html>"}
     assert sample._json(b"") == {}
     assert sample._json(b"[1]") == {"detail": "[1]"}
+
+
+def test_a_200_answer_without_a_summary_does_not_crash_the_client() -> None:
+    lines = sample.run({"products": [{"sku": "A"}]}, lambda *_: (200, {"rows": []}))
+    assert len(lines) == 1
+    assert "dry-run products" in lines[0]
+
+
+def test_a_dry_run_404_names_the_skus_the_feed_creates() -> None:
+    def send(method: str, path: str, body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+        if "products" in path:
+            return 200, {"summary": "ok", "rows": []}
+        return 404, {"detail": "The resource does not exist."}
+
+    feed = {
+        "products": [{"sku": "NEW-1"}],
+        "stock": [{"sku": "new-1", "stock_qty": 1}, {"sku": "OLD-1", "stock_qty": 1}],
+    }
+    lines = sample.run(feed, send)
+    assert lines[1].startswith("dry-run stock: refused 404")
+    assert "created in this feed" in lines[2]
+    assert "new-1" in lines[2]
+    assert "OLD-1" not in lines[2]
+
+
+def test_a_redirect_is_refused_and_the_key_is_not_sent_on() -> None:
+    seen: list[str | None] = []
+
+    class Target(BaseHTTPRequestHandler):
+        def do_POST(self) -> None:
+            seen.append(self.headers.get("Authorization"))
+            self.send_response(200)
+            self.end_headers()
+
+        def log_message(self, *args: Any) -> None:
+            pass
+
+    target = HTTPServer(("127.0.0.1", 0), Target)
+    target_url = f"http://127.0.0.1:{target.server_port}/stolen"
+
+    class Redirector(BaseHTTPRequestHandler):
+        def do_POST(self) -> None:
+            self.send_response(302)
+            self.send_header("Location", target_url)
+            self.end_headers()
+
+        def log_message(self, *args: Any) -> None:
+            pass
+
+    origin = HTTPServer(("127.0.0.1", 0), Redirector)
+    threads = [threading.Thread(target=s.handle_request, daemon=True) for s in (origin, target)]
+    for thread in threads:
+        thread.start()
+    try:
+        send = sample.http_transport(f"http://127.0.0.1:{origin.server_port}", "k-" + "x" * 8)
+        status, answer = send("POST", "/api/v1/import/products", {"items": []})
+    finally:
+        origin.server_close()
+        target.server_close()
+
+    assert status == 302
+    assert answer["detail"] == sample.REDIRECT_DETAIL
+    assert seen == []

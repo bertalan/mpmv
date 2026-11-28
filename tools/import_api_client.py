@@ -7,8 +7,16 @@
 `feed.json` holds `{"products": [...], "stock": [...], "prices": [...]}` with the row shapes of
 `/api/v1/import/*` (see /api/v1/docs). By default every call is a dry run: it prints what would
 change and writes nothing. `--apply` repeats the calls for real, and only when the dry run
-reported no refused row. A stock or price dry run for a SKU the same feed would create answers 404 (it does not exist
-yet): put a new SKU's price and stock in `products` and keep `stock` and `prices` for known SKUs.
+reported no refused row.
+
+A dry run writes nothing, so a SKU that `products` would create does not exist yet while the
+`stock` and `prices` steps are checked: those steps answer 404 for it, and the client says which
+SKUs of the feed it is (see "created in this feed" in the output). That is expected, not a data
+error: put a new SKU's price and stock in `products` and keep `stock` and `prices` for SKUs the
+vendor already has.
+
+Redirects are never followed: `urllib` would resend the `Authorization` header to the new
+address and could leak the key, so a redirect is reported as a refusal. Use the final URL.
 Standard library only; the key comes from the environment, never argv.
 """
 
@@ -50,6 +58,22 @@ def _json(raw: bytes) -> dict[str, Any]:
     return data if isinstance(data, dict) else {"detail": str(data)[:200]}
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Refuse every redirect: the default handler resends `Authorization` to the new location."""
+
+    def redirect_request(
+        self, req: Any, fp: Any, code: int, msg: str, headers: Any, newurl: str
+    ) -> None:
+        raise urllib.error.HTTPError(req.full_url, code, msg, headers, fp)
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
+REDIRECT_DETAIL = (
+    "The server answered with a redirect. It is not followed, so the key is never sent to "
+    "another address; use the final URL."
+)
+
+
 def http_transport(base_url: str, api_key: str) -> Transport:
     check_base_url(base_url)
 
@@ -61,9 +85,11 @@ def http_transport(base_url: str, api_key: str) -> Transport:
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
         )
         try:
-            with urllib.request.urlopen(request, timeout=60) as response:  # noqa: S310 (https base URL checked above)
+            with _OPENER.open(request, timeout=60) as response:
                 return response.status, _json(response.read())
         except urllib.error.HTTPError as error:  # RFC 9457 problem details
+            if 300 <= error.code < 400:
+                return error.code, {"detail": REDIRECT_DETAIL}
             return error.code, _json(error.read())
 
     return send
@@ -75,6 +101,11 @@ def run(feed: dict[str, Any], send: Transport, *, apply: bool = False) -> list[s
     Returns report lines. Stops at the first problem (a non-200 answer) or refused upsert row.
     """
     report: list[str] = []
+    created_here = {
+        str(row.get("sku", "")).casefold()
+        for row in feed.get("products") or []
+        if isinstance(row, dict)
+    }
     for write in [False, True] if apply else [False]:
         mode = "apply" if write else "dry-run"
         for name, method, path in STEPS:
@@ -84,9 +115,21 @@ def run(feed: dict[str, Any], send: Transport, *, apply: bool = False) -> list[s
             status, answer = send(method, path + query, {"items": feed[name]})
             if status != 200:
                 report.append(f"{mode} {name}: refused {status} {answer.get('detail', '')}")
+                if status == 404 and not write and name != "products":
+                    new = [
+                        str(r.get("sku"))
+                        for r in feed[name]
+                        if str(r.get("sku", "")).casefold() in created_here
+                    ]
+                    if new:
+                        report.append(
+                            "  created in this feed, so not there yet in a dry run: "
+                            + ", ".join(new)
+                            + ". Move their stock and price into `products`."
+                        )
                 return report
             refused = [row for row in answer.get("rows", []) if row["outcome"] == "refused"]
-            summary = answer["summary"]
+            summary = answer.get("summary", "no summary in the answer")
             report.append(f"{mode} {name}: {summary}, refused rows: {len(refused)}")
             if refused:
                 report.extend(f"  row {r['index']} {r['sku']}: refused" for r in refused)
