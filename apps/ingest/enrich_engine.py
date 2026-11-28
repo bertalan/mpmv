@@ -4,6 +4,7 @@ import html
 import re
 import unicodedata
 from collections.abc import Mapping
+from typing import Final, NamedTuple
 
 from apps.ingest.enrichment import HARD_MAX_LENGTHS, TEXT_FIELDS, EnrichedText, TextPolicy
 
@@ -115,6 +116,34 @@ def check_policy(text: EnrichedText, policy: TextPolicy) -> list[str]:
             if pattern.search(lowered):
                 violations.append(f"{name}: placeholder or model boilerplate {term!r}")
     return violations
+
+
+ACCEPTED: Final = "accepted"
+SCHEMA_INVALID: Final = "schema_invalid"
+OUT_OF_POLICY: Final = "out_of_policy"
+
+
+class GateResult(NamedTuple):
+    """The verdict of `gate`. ``text`` is set whenever the schema held (also out of policy);
+    only the ``accepted`` outcome may be used."""
+
+    text: EnrichedText | None
+    outcome: str
+    violations: list[str]
+
+
+def gate(raw: Mapping[str, object], lang: str, policy: TextPolicy) -> GateResult:
+    """The one gate every AI text passes: schema first, then policy.
+
+    Whatever stores, publishes or copies a provider's text (the enrichment service, the ING.14
+    providers, the publish path, I18N.4) calls this and uses the text only on ``accepted``;
+    calling `validate_schema` or `check_policy` alone would skip half of the gate.
+    """
+    text, errors = validate_schema(raw, lang)
+    if text is None:
+        return GateResult(None, SCHEMA_INVALID, errors)
+    violations = check_policy(text, policy)
+    return GateResult(text, OUT_OF_POLICY if violations else ACCEPTED, violations)
 
 
 def can_write_language(lang: str, policy: TextPolicy, existing: Mapping[str, object]) -> bool:

@@ -79,13 +79,32 @@ def test_dry_run_changes_nothing_and_returns_the_changeset() -> None:
     assert draft.enriched == {}
 
 
-def test_provider_error_leaves_the_text_unchanged() -> None:
+def test_a_dry_run_leaves_the_callers_draft_object_untouched() -> None:
+    for enricher in (FakeEnricher(), FakeEnricher({"description": "An eco-friendly mug"})):
+        draft, run = make_draft()
+        status = draft.status
+        services.enrich_draft(draft, enricher, run=run, ctx=CTX, dry_run=True)
+        assert draft.enriched == {}  # no refresh_from_db: this is the caller's own object
+        assert draft.status == status
+
+
+def test_provider_error_leaves_the_text_unchanged_and_a_trace() -> None:
     draft, run = make_draft()
     result = services.enrich_draft(draft, FakeEnricher(error="quota"), run=run, ctx=CTX)
     assert result.outcome == "provider_error"
     draft.refresh_from_db()
     assert draft.enriched == {}
     assert not EnrichmentVersion.objects.exists()
+    entry = AuditLog.objects.get(action=services.ENRICHMENT_FAILED)
+    assert entry.target_key == str(draft.public_id)
+    assert entry.after == {"lang": "en", "provider": "fake", "error": "ProviderError"}
+    assert "quota" not in str(entry.after)  # the message never goes into the audit
+
+
+def test_a_dry_run_provider_error_leaves_no_trace() -> None:
+    draft, run = make_draft()
+    services.enrich_draft(draft, FakeEnricher(error="quota"), run=run, ctx=CTX, dry_run=True)
+    assert not AuditLog.objects.filter(action=services.ENRICHMENT_FAILED).exists()
 
 
 def test_only_english_is_written() -> None:
@@ -117,6 +136,32 @@ def test_an_existing_catalog_translation_blocks_the_language() -> None:
     with pytest.raises(services.EnrichmentRefused):
         services.enrich_draft(draft, fake, run=run, ctx=CTX, lang=language, policy=policy)
     assert fake.calls == []
+
+
+def test_a_migrated_italian_translation_is_never_touched_q71() -> None:
+    product = ProductFactory.create()
+    migrated = ProductTranslationFactory.create(
+        product=product,
+        language="it",
+        title="Tazza",
+        short_description="Breve",
+        description="Lunga",
+    )
+    draft, run = make_draft(item__product=product, item__source__vendor=product.vendor)
+    fake = FakeEnricher()
+    both = TextPolicy(languages=("en", "it"))
+    with pytest.raises(services.EnrichmentRefused):
+        services.enrich_draft(draft, fake, run=run, ctx=CTX, lang="it", policy=both)
+    assert fake.calls == []  # refused before any provider call
+    services.enrich_draft(draft, fake, run=run, ctx=CTX, lang="en", policy=both)
+    assert len(fake.calls) == 1
+    migrated.refresh_from_db()
+    assert (migrated.title, migrated.short_description, migrated.description) == (
+        "Tazza",
+        "Breve",
+        "Lunga",
+    )
+    assert product.translations.filter(language="it").count() == 1
 
 
 def test_run_of_another_vendor_is_refused() -> None:
