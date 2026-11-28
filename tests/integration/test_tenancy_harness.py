@@ -39,8 +39,10 @@ CHILD_ROWS: dict[type[models.Model], tuple[str, str]] = {
 }
 
 
-def check_seeded_identifiers(seeded: list[models.Model], markers: tuple[str, ...]) -> None:
-    """Every seeded object shows its public id, or is a listed child row whose parent does."""
+def check_seeded_identifiers(
+    seeded: list[models.Model], markers: tuple[str, ...], vendor: Vendor | None = None
+) -> None:
+    """Every seeded object shows its public id, or is a listed child row of Vendor B's."""
     for obj in seeded:
         if hasattr(obj, "public_id"):
             assert public_id_of(obj) in markers, f"{type(obj).__name__}: public id not in markers"
@@ -50,7 +52,8 @@ def check_seeded_identifiers(seeded: list[models.Model], markers: tuple[str, ...
             "with its parent and the reason"
         )
         parent = getattr(obj, CHILD_ROWS[type(obj)][0])
-        assert public_id_of(parent) in markers, f"{type(obj).__name__}: parent not in markers"
+        assert vendor is not None, "a child row needs the vendor to check its parent against"
+        assert parent.vendor_id == vendor.pk, f"{type(obj).__name__}: parent is not Vendor B's"
 
 
 URLCONF = "tests.integration.urls_tenancy"
@@ -158,9 +161,8 @@ def test_vendor_b_is_seeded_with_every_vendor_owned_model(cross_tenant: CrossTen
     seeded = cross_tenant.seed_b()
     assert {type(obj) for obj in seeded} == set(OWNED_OBJECTS)
     assert all(obj.pk is not None for obj in seeded)
-    parents = [getattr(o, CHILD_ROWS[type(o)][0]) for o in seeded if type(o) in CHILD_ROWS]
-    markers = cross_tenant.markers(*seeded, *parents)
-    check_seeded_identifiers(list(seeded), markers)
+    markers = cross_tenant.markers(*seeded)
+    check_seeded_identifiers(list(seeded), markers, cross_tenant.b.vendor)
 
 
 def test_a_seeded_model_without_a_public_id_and_not_listed_is_caught() -> None:
