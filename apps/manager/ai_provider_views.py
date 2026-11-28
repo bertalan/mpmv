@@ -12,7 +12,9 @@ from django.contrib import messages
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect
 from django.urls import reverse
+from django.utils.decorators import method_decorator
 from django.utils.translation import gettext as _
+from django.views.decorators.debug import sensitive_post_parameters
 
 from apps.accounts.decorators import requires_level_method
 from apps.accounts.models import User
@@ -41,7 +43,9 @@ class AIProviderView(ManagerView):
         context["has_key"] = bool(row and row.has_key)
         return context
 
+    # The key never reaches an error report (500 page, tracker): Django hides it from the POST.
     # Group 2 (CORE.25); the shop owner confirms it, once or in a window.
+    @method_decorator(sensitive_post_parameters("api_key"))
     @requires_level_method("ai_provider_key", shop=lambda view, request: view.manager.vendor)
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         vendor, actor = self.manager.vendor, self.manager.user

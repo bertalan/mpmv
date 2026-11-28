@@ -73,3 +73,26 @@ def test_the_page_of_one_shop_never_shows_another_shops_choice(
     VendorAIProvider.objects.create(vendor=other_vendor, provider="openai", model="other-model")
     _open(client, owner, vendor)
     assert b"other-model" not in client.get(URL).content
+
+
+def test_the_key_is_marked_sensitive_for_error_reports(
+    client: Client, owner: User, vendor: Vendor
+) -> None:
+    _open(client, owner, vendor)
+    data = {"provider": "claude", "model": "m-1", "api_key": secrets.token_urlsafe(24)}
+    response = client.post(URL, data)
+    assert response.wsgi_request.sensitive_post_parameters == ("api_key",)  # type: ignore[attr-defined]
+
+
+def test_a_new_key_together_with_remove_is_a_form_error(
+    client: Client, owner: User, vendor: Vendor
+) -> None:
+    _open(client, owner, vendor)
+    data = {
+        "provider": "claude",
+        "model": "m-1",
+        "api_key": secrets.token_urlsafe(24),
+        "remove_key": "on",
+    }
+    assert client.post(URL, data).status_code == 200
+    assert not VendorAIProvider.objects.exists()

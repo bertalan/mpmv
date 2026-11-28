@@ -569,7 +569,9 @@ msgstr "eine höhere Menge erfordert die Zustimmung des Kunden"
 
 #: apps/manager/templates/manager/shop/ai_provider.html
 msgid "A key is saved. For your safety it is never shown again; enter a new one to replace it."
-msgstr "Ein Schlüssel ist gespeichert. Aus Sicherheitsgründen wird er nicht mehr angezeigt; geben Sie einen neuen ein, um ihn zu ersetzen."
+msgstr ""
+"Ein Schlüssel ist gespeichert. Aus Sicherheitsgründen wird er nicht mehr angezeigt; geben Sie "
+"einen neuen ein, um ihn zu ersetzen."
 
 #: apps/compliance/templates/email/compliance/termination_notice/body.html
 #: apps/compliance/templates/email/compliance/termination_notice/body.txt
@@ -2629,7 +2631,10 @@ msgstr ""
 msgid ""
 "Choose the service that writes the texts of your own products, and give it your own key. We send "
 "it product data only, never customer data. Every text waits for your review before it is shown."
-msgstr "Wählen Sie den Dienst, der die Texte Ihrer eigenen Produkte schreibt, und geben Sie ihm Ihren eigenen Schlüssel. Wir senden nur Produktdaten, niemals Kundendaten. Jeder Text wartet auf Ihre Prüfung, bevor er angezeigt wird."
+msgstr ""
+"Wählen Sie den Dienst, der die Texte Ihrer eigenen Produkte schreibt, und geben Sie ihm Ihren "
+"eigenen Schlüssel. Wir senden nur Produktdaten, niemals Kundendaten. Jeder Text wartet auf Ihre "
+"Prüfung, bevor er angezeigt wird."
 
 #: apps/cms/blocks.py
 msgid "Choose the shop the card leads to. A card to a shop that is not open is left out."
@@ -3677,6 +3682,10 @@ msgstr "Endet um"
 #: themes/base/templates/components/gallery.html themes/ride/templates/components/gallery.html
 msgid "Enlarge"
 msgstr "Vergrößern"
+
+#: apps/manager/forms.py
+msgid "Enter a new key or remove the saved one, not both."
+msgstr "Geben Sie einen neuen Schlüssel ein oder entfernen Sie den gespeicherten, nicht beides."
 
 #: apps/core/models.py
 msgid "Enter a time zone name such as Europe/Rome."
@@ -16364,7 +16373,9 @@ msgstr "Ihre Rechnung ist bereits ausgestellt"
 msgid ""
 "Your key for this provider. It is stored encrypted and never shown again. Leave it empty to keep "
 "the key you saved before."
-msgstr "Ihr Schlüssel für diesen Anbieter. Er wird verschlüsselt gespeichert und nicht mehr angezeigt. Lassen Sie das Feld leer, um den zuvor gespeicherten Schlüssel zu behalten."
+msgstr ""
+"Ihr Schlüssel für diesen Anbieter. Er wird verschlüsselt gespeichert und nicht mehr angezeigt. "
+"Lassen Sie das Feld leer, um den zuvor gespeicherten Schlüssel zu behalten."
 
 #: apps/compliance/forms.py
 msgid "Your name. Required, except for a report of child sexual abuse material."

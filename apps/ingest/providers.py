@@ -26,6 +26,8 @@ CLAUDE_MAX_TOKENS = 2000
 OPENAI_ENDPOINT = "https://api.openai.com/v1/chat/completions"
 
 
+# `build_prompt` is shared with Gemini: when the prompt changes, bump `prompt_version` of all three
+# adapters together so the archive stays comparable.
 class _HttpEnricher:
     provider = ""
     prompt_version = ""
@@ -75,7 +77,7 @@ class _HttpEnricher:
         answer = self._call(self._payload(build_prompt(facts, lang, policy)))
         try:
             raw = json.loads(self._extract(answer))
-        except (KeyError, IndexError, TypeError, ValueError, AttributeError):
+        except (KeyError, IndexError, TypeError, ValueError, AttributeError, StopIteration):
             raise ProviderError("unexpected answer shape") from None
         if not isinstance(raw, dict):
             raise ProviderError("unexpected answer shape")
@@ -103,7 +105,8 @@ class ClaudeEnricher(_HttpEnricher):
         stop = answer["stop_reason"]
         if stop != "end_turn":
             raise ProviderError(f"stop reason {str(stop)[:30]}")
-        text = answer["content"][0]["text"]
+        # The first text block: a reply may start with another block type.
+        text = next(b["text"] for b in answer["content"] if b.get("type", "text") == "text")
         if not isinstance(text, str):
             raise TypeError
         return text
