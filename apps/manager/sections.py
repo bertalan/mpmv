@@ -11,6 +11,7 @@ from django.utils.translation import gettext_lazy as _
 
 from apps.vendors.services import can_review_profiles
 
+from .ai_provider_views import SECTION as AI_PROVIDER_SECTION
 from .amendment_views import PLATFORM_SECTION as ORDER_CHANGES_SECTION
 from .amendment_views import SETTINGS_SECTION as AMENDMENT_SETTINGS_SECTION
 from .closure_views import SECTION as CLOSURES_SECTION
@@ -72,6 +73,15 @@ BUILT_IN = (
         Space.SHOP,
         _("Return policy"),
         "manager:shop:return_policy",
+        order=23,
+        allowed=vendor_action("profile"),
+    ),
+    # The shop's own AI provider and key (ING.14): owners only, like the sales terms.
+    Section(
+        AI_PROVIDER_SECTION,
+        Space.SHOP,
+        _("AI provider"),
+        "manager:shop:ai_provider",
         order=23,
         allowed=vendor_action("profile"),
     ),

@@ -76,6 +76,7 @@ DEFAULT_SENSITIVE_ACTIONS: Final = frozenset(
         "notice_decision",  # CMP.5: review, decide, restrict, tell the authorities
         "sales_terms_publish",  # VEN.35: a seller publishes a new version of its sales terms
         "order_draft_send",  # ORD.32: staff email a draft's payment link (owner 2026-11-19)
+        "ai_provider_key",  # ING.14: a shop owner sets, rotates or removes its AI provider key
         "return_policy_review",  # VEN.40 3/3: staff approve or reject a vendor's return policy
     }
 )

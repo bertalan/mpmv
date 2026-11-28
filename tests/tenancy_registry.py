@@ -110,6 +110,7 @@ from apps.ingest.models import (
     SourceStateVersion,
     SourceVariation,
     SupplierSource,
+    VendorAIProvider,
 )
 from apps.ingest.tests.factories import (
     EnrichmentVersionFactory,
@@ -125,6 +126,7 @@ from apps.ingest.tests.factories import (
     SourceStateVersionFactory,
     SourceVariationFactory,
     SupplierSourceFactory,
+    VendorAIProviderFactory,
 )
 from apps.ledger.models import LedgerEntry, Refund
 from apps.ledger.tests.factories import LedgerEntryFactory, RefundFactory
@@ -291,6 +293,7 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     GpsrInfo: lambda vendor: GpsrInfoFactory.create(product=ProductFactory.create(vendor=vendor)),
     VendorGpsrDefaults: lambda vendor: VendorGpsrDefaultsFactory.create(vendor=vendor),
     SupplierSource: lambda vendor: SupplierSourceFactory.create(vendor=vendor),
+    VendorAIProvider: lambda vendor: VendorAIProviderFactory.create(vendor=vendor),
     SourceItem: lambda vendor: SourceItemFactory.create(source__vendor=vendor),
     SourceObservation: lambda vendor: SourceObservationFactory.create(item__source__vendor=vendor),
     ProductDraft: lambda vendor: ProductDraftFactory.create(item__source__vendor=vendor),
@@ -430,6 +433,15 @@ def member_with_landing_taxonomy(client: Client, tenants: CrossTenant) -> dict[s
 def manager_vendor(vendor: Vendor) -> Vendor:
     """The Manager's shop pages show the selected vendor itself (CORE.17)."""
     return vendor
+
+
+def ai_provider_row(vendor: Vendor) -> VendorAIProvider:
+    """A provider choice with a model name of its own, the one field the page shows (ING.14)."""
+    return VendorAIProviderFactory.create(vendor=vendor, model=f"model-{secrets.token_hex(6)}")
+
+
+def ai_provider_model(row: models.Model) -> str:
+    return str(row.model)  # type: ignore[attr-defined]
 
 
 def ledger_entry_with_ref(vendor: Vendor) -> LedgerEntry:
@@ -735,6 +747,8 @@ ENDPOINTS: dict[str, Access] = {
     "manager:shop:return_policy": VendorScopedList(
         make=manager_vendor, identify=vendor_display_name
     ),
+    # The page shows the shop's own provider model; the key is write-only and never listed.
+    "manager:shop:ai_provider": VendorScopedList(make=ai_provider_row, identify=ai_provider_model),
     "manager:shop:termination": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     # The statements of reasons of the selected shop (DSA art. 17); another shop's are never listed.
     "manager:shop:statements": VendorScopedList(

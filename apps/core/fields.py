@@ -9,12 +9,13 @@ from django.core.files.base import ContentFile
 from django.db import models
 from django.db.models import lookups
 from django.db.models.expressions import Col
+from django.db.models.query_utils import DeferredAttribute
 from wagtail.images.models import WagtailImageField, WagtailImageFieldFile
 from wagtail.utils.file import hash_filelike
 
 from .countries import InvalidCountry, normalize_country
 from .crypto import DecryptionError
-from .encryption import configured_keyring, encryption_context
+from .encryption import KEYS_SETTING, configured_keyring, encryption_context
 from .i18n import language_choices
 from .svg import MAX_SVG_BYTES, UnsafeSvgError, sanitise_svg
 from .uploads import ImageLimits, UploadRefused, safe_svg_name, sanitise_image, upload_kind
@@ -105,6 +106,32 @@ def _not_searchable(field: Any) -> str:
     )
 
 
+class Sealed(str):
+    """An encrypted token (`enc1:...`) of a row-bound field, not yet decrypted: what a bound field
+    holds between the database and the row's own `unseal` (a plain `str` is a plaintext)."""
+
+    __slots__ = ()
+
+
+class _BoundDescriptor(DeferredAttribute):
+    """The attribute of a row-bound encrypted field. Reading it decrypts the stored token with the
+    row's bound value (nothing is decrypted while the row loads or is saved unchanged); writing
+    stores the plaintext, which `pre_save` seals with the row's bound value."""
+
+    field: "EncryptedFieldMixin"
+
+    def __get__(self, instance: Any, cls: Any = None) -> Any:
+        if instance is None:
+            return self
+        value = super().__get__(instance, cls)
+        if isinstance(value, Sealed):
+            return self.field.unseal(value, getattr(instance, self.field.bound_attname))
+        return value
+
+    def __set__(self, instance: Any, value: Any) -> None:
+        instance.__dict__[self.field.attname] = value
+
+
 class EncryptedFieldMixin(models.Field[Any, Any]):
     """Encrypts the value at rest (SEC.3): AES-256-GCM, key outside the database, rotatable.
 
@@ -114,29 +141,93 @@ class EncryptedFieldMixin(models.Field[Any, Any]):
     silent fallback. Lookups other than `=''` and `__isnull`, and ordering by the field, raise
     `FieldError`.
 
+    `keyring_setting` names the settings entry of the keyring (default: the SEC.3 field keys; the
+    vendors' AI keys use `AI_KEY_ENCRYPTION_KEYS`). `bound_to` names a field of the model (a
+    foreign key, e.g. `"vendor"`): its value joins the associated data, so a token copied to
+    another row does not decrypt. A bound field decrypts when the attribute is read.
+
     Mask the field in audit snapshots too: an encrypted column is pointless if the audit log
     copies the value in clear. See docs/dev/field-encryption.md.
     """
 
-    def _context(self) -> str:
-        return encryption_context(self.model, self.name)
+    def __init__(
+        self,
+        *args: Any,
+        keyring_setting: str = KEYS_SETTING,
+        bound_to: str | None = None,
+        **kwargs: Any,
+    ) -> None:
+        self.keyring_setting = keyring_setting
+        self.bound_to = bound_to
+        super().__init__(*args, **kwargs)
+        if bound_to is not None:
+            self.descriptor_class = _BoundDescriptor
 
-    def get_prep_value(self, value: Any) -> Any:
-        value = super().get_prep_value(value)
-        if value is None or value == "":
-            return value
-        return configured_keyring().encrypt(str(value), context=self._context())
+    def deconstruct(self) -> Any:
+        name, path, args, kwargs = super().deconstruct()
+        if self.keyring_setting != KEYS_SETTING:
+            kwargs["keyring_setting"] = self.keyring_setting
+        if self.bound_to is not None:
+            kwargs["bound_to"] = self.bound_to
+        return name, path, args, kwargs
 
-    def from_db_value(self, value: Any, expression: Any, connection: Any) -> Any:
-        if value is None or value == "":
-            return value
+    @property
+    def bound_attname(self) -> str:
+        """The attribute of the model instance that holds the bound value (`vendor_id`)."""
+        if self.bound_to is None:
+            raise AttributeError("this field is not bound to another column")
+        return str(self.model._meta.get_field(self.bound_to).attname)  # type: ignore[union-attr]
+
+    def _keyring(self) -> Any:
+        return configured_keyring(self.keyring_setting)
+
+    def _context(self, bound: object | None = None) -> str:
+        if self.bound_to is not None and bound is None:
+            raise ValueError(
+                f"{self.model._meta.label_lower}.{self.name} needs its {self.bound_to}"
+            )
+        return encryption_context(self.model, self.name, bound)
+
+    def seal(self, plaintext: str, bound: object | None) -> Sealed:
+        """The token for `plaintext` in the row whose bound value is `bound`."""
+        return Sealed(self._keyring().encrypt(plaintext, context=self._context(bound)))
+
+    def unseal(self, token: str, bound: object | None) -> str:
         try:
-            return configured_keyring().decrypt(value, context=self._context())
+            return str(self._keyring().decrypt(token, context=self._context(bound)))
         except DecryptionError as exc:
             raise DecryptionError(
                 f"Cannot read {exc}. Check the field encryption keys: "
                 "`manage.py check --database default`."
             ) from None
+
+    def pre_save(self, model_instance: Any, add: bool) -> Any:
+        if self.bound_to is None:
+            return super().pre_save(model_instance, add)
+        value = model_instance.__dict__.get(self.attname)
+        if value is None or value == "" or isinstance(value, Sealed):
+            return value  # empty, or a token read from this row and not changed
+        return self.seal(str(value), getattr(model_instance, self.bound_attname))
+
+    def get_prep_value(self, value: Any) -> Any:
+        if isinstance(value, Sealed):
+            return str(value)
+        value = super().get_prep_value(value)
+        if value is None or value == "":
+            return value
+        if self.bound_to is not None:
+            raise ValueError(
+                f"{self.model._meta.label_lower}.{self.name} is bound to its {self.bound_to}: "
+                "save the row (or `seal` the value for it) instead of writing a plaintext."
+            )
+        return self._keyring().encrypt(str(value), context=self._context())
+
+    def from_db_value(self, value: Any, expression: Any, connection: Any) -> Any:
+        if value is None or value == "":
+            return value
+        if self.bound_to is not None:
+            return Sealed(value)  # decrypted on attribute access, with the row's bound value
+        return self.unseal(value, None)
 
     def get_lookup(self, lookup_name: str) -> Any:
         if lookup_name == "exact":

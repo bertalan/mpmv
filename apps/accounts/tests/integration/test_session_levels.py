@@ -634,6 +634,7 @@ WIRED = {
     "sessions_end_all",  # CORE.24
     "export",  # VEN.9: the shop's CSV ledger extract
     "order_draft_send",  # ORD.32: staff send a draft's payment link (owner 2026-11-19)
+    "ai_provider_key",  # ING.14: a shop owner sets or removes its AI provider key
     "return_policy_review",  # VEN.40: staff approve or reject a return policy
 }
 # Actions whose web view does not exist yet: nothing to decorate (follow-ups in the PR).

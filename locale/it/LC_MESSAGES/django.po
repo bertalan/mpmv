@@ -562,6 +562,12 @@ msgstr "un prezzo più alto richiede l’accettazione del cliente"
 msgid "a higher quantity needs the customer's acceptance"
 msgstr "una quantità più alta richiede l’accettazione del cliente"
 
+#: apps/manager/templates/manager/shop/ai_provider.html
+msgid "A key is saved. For your safety it is never shown again; enter a new one to replace it."
+msgstr ""
+"Una chiave è salvata. Per sicurezza non viene più mostrata; ne inserisca una nuova per "
+"sostituirla."
+
 #: apps/compliance/templates/email/compliance/termination_notice/body.html
 #: apps/compliance/templates/email/compliance/termination_notice/body.txt
 msgid "a legal or regulatory obligation"
@@ -1337,6 +1343,11 @@ msgstr ""
 msgid "Age in days"
 msgstr "Età in giorni"
 
+#: apps/manager/forms.py apps/manager/sections.py apps/manager/site_map.py
+#: apps/manager/templates/manager/shop/ai_provider.html
+msgid "AI provider"
+msgstr "Fornitore di IA"
+
 #: themes/base/templates/components/ai_image_label.html
 msgid "AI-edited image"
 msgstr "Immagine modificata con IA"
@@ -1622,6 +1633,10 @@ msgstr "Interno, piano o altro dettaglio. Facoltativo."
 #: apps/seo/site_links.py
 msgid "API documentation"
 msgstr "Documentazione dell'API"
+
+#: apps/manager/forms.py
+msgid "API key"
+msgstr "Chiave API"
 
 #: apps/vendors/templates/vendors/apply/cancelled.html
 msgid "Application cancelled"
@@ -2531,6 +2546,10 @@ msgstr "Scegli come si ripete l'evento. I campi qui sotto dipendono dalla scelta
 msgid "Choose how you will confirm it is you after your password."
 msgstr "Scelga come confermare la Sua identità dopo la password."
 
+#: apps/ingest/provider_services.py
+msgid "Choose one of the listed providers."
+msgstr "Scelga uno dei fornitori indicati."
+
 #: apps/orders/ui/present.py
 msgid "Choose one of the shipping options."
 msgstr "Scegli una delle opzioni di spedizione."
@@ -2581,6 +2600,14 @@ msgstr ""
 "Scelga il venditore se i resi sono gratuiti per l'acquirente. Scelga il cliente se l'acquirente "
 "paga i costi di spedizione del reso. Deve corrispondere alle Sue condizioni di vendita. "
 "Obbligatorio."
+
+#: apps/manager/templates/manager/shop/ai_provider.html
+msgid ""
+"Choose the service that writes the texts of your own products, and give it your own key. We send "
+"it product data only, never customer data. Every text waits for your review before it is shown."
+msgstr ""
+"Scelga il servizio che scrive i testi dei Suoi prodotti e gli dia la Sua chiave. Inviamo solo dati"
+" di prodotto, mai dati dei clienti. Ogni testo attende la Sua revisione prima di essere mostrato."
 
 #: apps/cms/blocks.py
 msgid "Choose the shop the card leads to. A card to a shop that is not open is left out."
@@ -3613,6 +3640,10 @@ msgstr "Finisce alle"
 msgid "Enlarge"
 msgstr "Ingrandisci"
 
+#: apps/manager/forms.py
+msgid "Enter a new key or remove the saved one, not both."
+msgstr "Inserisca una nuova chiave oppure rimuova quella salvata, non entrambe le cose."
+
 #: apps/core/models.py
 msgid "Enter a time zone name such as Europe/Rome."
 msgstr "Inserisca il nome di un fuso orario, per esempio Europe/Rome."
@@ -4576,6 +4607,10 @@ msgid ""
 msgstr ""
 "Quanti prodotti mostrare, da 1 fino al massimo consentito. Se lo lasci vuoto, si usa il numero "
 "predefinito."
+
+#: apps/ingest/models.py
+msgid "How many times the key was set. It grows with every rotation."
+msgstr "Quante volte la chiave è stata impostata. Aumenta a ogni rotazione."
 
 #: apps/catalog/models.py
 msgid "How many units of this version you have now, for example 5. Not negative."
@@ -5591,6 +5626,10 @@ msgstr "Gruppi mancanti"
 msgid "Missing in %(language)s"
 msgstr "Mancante in %(language)s"
 
+#: apps/manager/forms.py
+msgid "Model"
+msgstr "Modello"
+
 #: apps/compliance/templates/compliance/includes/product_safety.html
 msgid "Model or type"
 msgstr "Modello o tipo"
@@ -5871,6 +5910,10 @@ msgstr "Nessuna immagine"
 #: apps/manager/templates/manager/shop/_fitment_rows.html
 msgid "No item found."
 msgstr "Nessun elemento trovato."
+
+#: apps/manager/templates/manager/shop/ai_provider.html
+msgid "No key is saved. Without one, no AI writes your texts."
+msgstr "Nessuna chiave è salvata. Senza chiave nessuna IA scrive i Suoi testi."
 
 #: apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "No level yet."
@@ -8271,6 +8314,10 @@ msgstr ""
 msgid "Remove the logo"
 msgstr "Rimuovi il logo"
 
+#: apps/manager/forms.py
+msgid "Remove the saved key"
+msgstr "Rimuovi la chiave salvata"
+
 #: apps/manager/event_block_views.py apps/manager/templates/manager/shop/_event_blocks.html
 msgid "Remove this block?"
 msgstr "Rimuovere questo blocco?"
@@ -8619,6 +8666,7 @@ msgstr "Link sameAs"
 msgid "Saturday"
 msgstr "Sabato"
 
+#: apps/manager/templates/manager/shop/ai_provider.html
 #: apps/manager/templates/manager/shop/profile.html apps/seo/admin_views.py
 msgid "Save"
 msgstr "Salva"
@@ -11221,6 +11269,14 @@ msgstr "L'indirizzo postale del produttore, con via, città e paese."
 msgid "The map shows the typed point."
 msgstr "La mappa mostra il punto digitato."
 
+#: apps/manager/forms.py
+msgid "The model name as the provider writes it, for example the current small model."
+msgstr "Il nome del modello come lo scrive il fornitore, ad esempio l'attuale modello piccolo."
+
+#: apps/ingest/models.py
+msgid "The model of the provider to use."
+msgstr "Il modello del fornitore da usare."
+
 #: apps/compliance/models.py
 msgid ""
 "The model, type or reference that identifies the product, for example the number printed on the "
@@ -12318,6 +12374,10 @@ msgstr "Il servizio termina il"
 msgid "The service that found the position from the address. Filled in for you."
 msgstr "Il servizio che ha trovato la posizione dall'indirizzo. Compilato per te."
 
+#: apps/manager/forms.py
+msgid "The service that writes the texts of your own products. Required."
+msgstr "Il servizio che scrive i testi dei Suoi prodotti. Obbligatorio."
+
 #: apps/accounts/session_views.py
 msgid "The session has ended."
 msgstr "La sessione è terminata."
@@ -12876,6 +12936,10 @@ msgstr "Il venditore a cui appartiene questo regime IVA."
 msgid "The vendor whose address the parcel is collected from."
 msgstr "Il venditore al cui indirizzo si ritira il pacco."
 
+#: apps/ingest/models.py
+msgid "The vendor whose catalogue texts this provider writes."
+msgstr "Il venditore i cui testi di catalogo sono scritti da questo fornitore."
+
 #: apps/catalog/taxonomy.py
 msgid ""
 "The vendor whose feed or import brought these brands. It lets the review team ask the right "
@@ -12893,6 +12957,10 @@ msgstr "Il venditore a cui appartiene questo flusso del fornitore."
 msgid "The vendor's newest products shown after the story; 0 shows none."
 msgstr ""
 "I prodotti più recenti del venditore mostrati dopo la storia. Con 0 non se ne mostra nessuno."
+
+#: apps/ingest/models.py
+msgid "The vendor's own key. It is never shown again."
+msgstr "La chiave propria del venditore. Non viene più mostrata."
 
 #: apps/accounts/decorators.py apps/compliance/views.py apps/orders/ui/views.py
 msgid "The verification failed. Please reload the page and try again."
@@ -13256,6 +13324,10 @@ msgstr ""
 #: apps/accounts/views.py
 msgid "This content is not available in this language."
 msgstr "Questo contenuto non è disponibile in questa lingua."
+
+#: apps/ingest/provider_services.py
+msgid "This does not look like an API key."
+msgstr "Questa non sembra una chiave API."
 
 #: apps/orders/ui/forms.py
 msgid "This does not look like an EU VAT number. Check the prefix and the digits."
@@ -13808,6 +13880,10 @@ msgstr ""
 "Spunta questa casella per chiedere ai motori di ricerca di ignorare questa pagina. La pagina resta"
 " fuori anche dalle sitemap e da llms.txt. Lasciala senza spunta per una normale pagina pubblica."
 
+#: apps/manager/forms.py
+msgid "Tick this to delete the key you saved. Without a key, no AI writes your texts."
+msgstr "Spunti questa casella per eliminare la chiave salvata. Senza chiave nessuna IA scrive i Suoi testi."
+
 #: apps/orders/ui/forms.py
 msgid ""
 "Tick this to enter your company and VAT number. A valid EU VAT number can remove the VAT on a "
@@ -14316,6 +14392,10 @@ msgstr "Usa su questo sito"
 #: apps/accounts/templates/accounts/mfa/verify.html themes/ride/templates/accounts/mfa/verify.html
 msgid "Use recovery code"
 msgstr "Usa un codice di recupero"
+
+#: apps/ingest/provider_services.py
+msgid "Use the model name as the provider writes it."
+msgstr "Usi il nome del modello come lo scrive il fornitore."
 
 #: apps/manager/product_views.py
 msgid "Use the shop's default"
@@ -15094,6 +15174,10 @@ msgstr ""
 msgid "When the event was first planned, in the event's time zone. Optional."
 msgstr "Quando l'evento era stato pianificato in origine, nel fuso orario dell'evento. Facoltativo."
 
+#: apps/ingest/models.py
+msgid "When the key was last set."
+msgstr "Quando la chiave è stata impostata l'ultima volta."
+
 #: apps/cms/blocks.py
 msgid ""
 "When the launch happens, in the platform's local time. Example: 2026-12-01 09:00. Required: the "
@@ -15387,6 +15471,10 @@ msgstr ""
 "Indica se realizza i prodotti che vende (produttore) o li acquista per rivenderli (rivenditore). I"
 " motori di ricerca e gli assistenti IA lo vedono nei dati del prodotto. Lo lasci vuoto se non è "
 "sicuro: non diremo mai che realizza il prodotto. Un singolo prodotto può avere un valore diverso."
+
+#: apps/ingest/models.py
+msgid "Which AI provider writes this vendor's product texts."
+msgstr "Quale fornitore di IA scrive i testi dei prodotti di questo venditore."
 
 #: apps/ingest/models.py
 msgid "Which AI provider wrote the text."
@@ -15953,6 +16041,10 @@ msgstr ""
 " staff della piattaforma. Potrà gestire il venditore, i suoi dati fiscali e i suoi pagamenti dopo "
 "l'approvazione."
 
+#: apps/manager/ai_provider_views.py
+msgid "Your AI provider is saved."
+msgstr "Il Suo fornitore di IA è salvato."
+
 #: apps/vendors/templates/vendors/apply/confirmed.html
 msgid ""
 "Your application is with our team for review. Sign in with the password you chose: you will be "
@@ -16092,6 +16184,13 @@ msgstr "Le Sue immagini"
 #: apps/manager/templates/manager/shop/order.html
 msgid "Your invoice is already issued"
 msgstr "La Sua fattura è già emessa"
+
+#: apps/manager/forms.py
+msgid ""
+"Your key for this provider. It is stored encrypted and never shown again. Leave it empty to keep "
+"the key you saved before. If you change the provider, enter the key for the new one: the old key "
+"is deleted."
+msgstr "La Sua chiave per questo fornitore. È salvata cifrata e non viene più mostrata. La lasci vuota per mantenere la chiave salvata in precedenza. Se cambia fornitore, inserisca la chiave del nuovo: la vecchia chiave viene eliminata."
 
 #: apps/compliance/forms.py
 msgid "Your name. Required, except for a report of child sexual abuse material."

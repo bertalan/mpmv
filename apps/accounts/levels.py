@@ -65,7 +65,9 @@ MAX_SHOP_OFFERS: Final = 8
 
 # Shop-space actions a vendor owner may confirm for their own shop (D-32 amendment 2026-11-14).
 # `export`: the shop's own CSV ledger extract (VEN.9), never a platform-wide export.
-SHOP_OWNER_ACTIONS: Final = frozenset({"payout_details", "sales_terms_publish", "export"})
+SHOP_OWNER_ACTIONS: Final = frozenset(
+    {"payout_details", "sales_terms_publish", "export", "ai_provider_key"}
+)
 # Order actions a shop member with the ORDERS right (the owner included) may confirm "once" for
 # that shop (ORD.20 part 3, spec 07 Roles and the passkey): the refund of an order amendment
 # (the PAY.7 grant) and an address change. Never with a passkey window: each is critical.

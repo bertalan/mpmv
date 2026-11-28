@@ -608,6 +608,11 @@ VIES_INVALID_REQUESTER_CACHE_SECONDS = 60 * 60  # VIES refused the requester: as
 # System checks fail without a valid key (core.E301/E302) or when the stored data does not
 # decrypt with these keys (core.E303/E304, run by `migrate`).
 FIELD_ENCRYPTION_KEYS = env_secret_list("MPMV_FIELD_ENCRYPTION_KEYS")
+# The vendors' own AI provider API keys (ING.14, spec 12 SEC.3) have a keyring of their own, in
+# the same format: MPMV_AI_KEY_ENCRYPTION_KEYS or MPMV_AI_KEY_ENCRYPTION_KEYS_FILE. Empty until
+# the first vendor sets a key; once a vendor key is stored it is required (core.E305, run by
+# `migrate`). Rotate it with `rotate_field_keys --keyring ai`. Never reuse the SEC.3 keys.
+AI_KEY_ENCRYPTION_KEYS = env_secret_list("MPMV_AI_KEY_ENCRYPTION_KEYS")
 
 # Feature flags and kill switches (ARC.8, docs/dev/feature-flags.md): this environment's defaults,
 # e.g. MPMV_FEATURE_FLAGS="checkout=off"; staff switches in the admin override them. Each process

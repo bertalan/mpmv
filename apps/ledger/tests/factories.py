@@ -45,7 +45,7 @@ class LedgerEntryFactory(DjangoModelFactory[LedgerEntry]):
     def _build(cls, model_class: type[LedgerEntry], *args: Any, **kwargs: Any) -> LedgerEntry:
         if kwargs.get("platform_entity") is None:
             kwargs["platform_entity"] = PlatformOperatorFactory.build()
-        return model_class(*args, **kwargs)
+        return model_class(**kwargs)
 
     @classmethod
     def _create(cls, model_class: type[LedgerEntry], *args: Any, **kwargs: Any) -> LedgerEntry:

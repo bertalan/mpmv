@@ -20,6 +20,7 @@ class IngestConfig(AppConfig):
         "reviewitem",
         "mappingtable",
         "enrichmentversion",
+        "vendoraiprovider",
     )
     unaudited_models = {
         "sourceitem": "staging row rebuilt from the supplier feed on every run",

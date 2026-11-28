@@ -10,6 +10,7 @@ from wagtail.rich_text import features as feature_registry
 
 from apps.core.nfc_forms import NFCForm
 from apps.core.text import nfc
+from apps.ingest.models import AIProvider
 from apps.orders import engine as orders_engine
 from apps.vendors import return_engine
 from apps.vendors.engine import LOGO_ALT_MAX_LENGTH, PROFILE_MAX_LENGTH
@@ -326,7 +327,7 @@ class ReturnPolicyForm(NFCForm):
         ),
         max_length=return_engine.URL_MAX,
         required=False,
-        widget=forms.URLInput(attrs={"autocomplete": "off"}),
+        widget=forms.URLInput(attrs={"autocomplete": "new-password"}),
     )
     return_country = forms.CharField(
         label=_("Country returns are sent to"),
@@ -403,3 +404,48 @@ class ClosureForm(NFCForm):
         max_value=60,
         initial=14,
     )
+
+
+class AIProviderForm(NFCForm):
+    """The shop's own AI provider and key (ING.14). The key is write-only: it is never rendered
+    back, blank keeps the stored one. The service owns the rules."""
+
+    nfc_exact_fields = ("model",)
+
+    provider = forms.ChoiceField(
+        label=_("AI provider"),
+        choices=AIProvider.choices,
+        help_text=_("The service that writes the texts of your own products. Required."),
+    )
+    model = forms.CharField(
+        label=_("Model"),
+        max_length=80,
+        help_text=_(
+            "The model name as the provider writes it, for example the current small model."
+        ),
+    )
+    api_key = forms.CharField(
+        label=_("API key"),
+        required=False,
+        max_length=300,
+        strip=True,
+        widget=forms.PasswordInput(render_value=False, attrs={"autocomplete": "off"}),
+        help_text=_(
+            "Your key for this provider. It is stored encrypted and never shown again. "
+            "Leave it empty to keep the key you saved before. If you change the provider, "
+            "enter the key for the new one: the old key is deleted."
+        ),
+    )
+    remove_key = forms.BooleanField(
+        label=_("Remove the saved key"),
+        required=False,
+        help_text=_(
+            "Tick this to delete the key you saved. Without a key, no AI writes your texts."
+        ),
+    )
+
+    def clean(self) -> dict[str, Any]:
+        data: dict[str, Any] = super().clean() or {}
+        if data.get("api_key") and data.get("remove_key"):
+            self.add_error("remove_key", _("Enter a new key or remove the saved one, not both."))
+        return data

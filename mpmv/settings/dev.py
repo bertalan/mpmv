@@ -15,6 +15,12 @@ if not os.environ.get("MPMV_FIELD_ENCRYPTION_KEYS"):
     _key_file = Path(_keys).expanduser()
     ensure_key_file(_key_file, key_id="dev")
     os.environ["MPMV_FIELD_ENCRYPTION_KEYS_FILE"] = str(_key_file)
+# The vendors' AI provider keys have a keyring of their own (ING.14), generated the same way.
+if not os.environ.get("MPMV_AI_KEY_ENCRYPTION_KEYS"):
+    _ai_keys = os.environ.get("MPMV_AI_KEY_ENCRYPTION_KEYS_FILE") or "~/.config/mpmv/dev-ai-keys"
+    _ai_key_file = Path(_ai_keys).expanduser()
+    ensure_key_file(_ai_key_file, key_id="dev-ai")
+    os.environ["MPMV_AI_KEY_ENCRYPTION_KEYS_FILE"] = str(_ai_key_file)
 
 from .base import *  # noqa: F403
 
