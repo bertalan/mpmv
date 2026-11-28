@@ -22,6 +22,7 @@ from typing import Any, Literal
 
 from django.db import transaction
 from django.http import HttpRequest
+from django.utils import timezone
 from ninja import File, Form, Router, Schema, Status, UploadedFile
 from pydantic import Field
 
@@ -54,6 +55,17 @@ def _own_vendor(request: HttpRequest) -> Vendor:
             detail="The import API is for a vendor's own key; a platform key is refused.",
         )
     return vendor
+
+
+def _vendor_key(request: HttpRequest) -> media.VendorKey:
+    client = api_client_of(request)
+    return media.VendorKey(
+        vendor_id=client.vendor_id,
+        scopes=frozenset(client.scopes),
+        active=client.is_active
+        and client.revoked_at is None
+        and client.expires_at > timezone.now(),
+    )
 
 
 def _not_found() -> ApiProblem:
@@ -285,6 +297,6 @@ def attach_media(
         language=data.language,
         alt_text=data.alt_text,
         dry_run=dry_run,
-        by_vendor_key=True,
+        key=_vendor_key(request),
     )
     return Status(200 if dry_run else 201, changeset_out(changes, dry_run=dry_run))
