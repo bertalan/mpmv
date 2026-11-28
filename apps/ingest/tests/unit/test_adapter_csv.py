@@ -170,3 +170,29 @@ def test_the_adapter_leaves_the_process_wide_csv_limit_as_it_found_it() -> None:
     before = csv.field_size_limit()
     _adapter().parse(b"Code,Name,Price,Qty\nA-1,Pan,1.50,3\n")
     assert csv.field_size_limit() == before
+
+
+def test_build_row_caps_every_cell_for_all_adapters() -> None:
+    """The cap lives in the shared `build_row`, so XLSX, JSON and YAML cells get it too."""
+    big = "x" * (base.FIELD_MAX_CHARS + 1)
+    err = base.build_row(1, {"sku": "A-1", "title": big})
+    assert isinstance(err, base.RowError)
+    assert err.code == "field_too_long"
+    ok = base.build_row(1, {"sku": "A-1", "title": "x" * base.FIELD_MAX_CHARS})
+    assert isinstance(ok, base.ParsedRow)
+
+
+def test_table_parser_caps_cells_that_are_not_csv() -> None:
+    from apps.ingest.adapters.table import TableParser
+
+    big = "y" * (base.FIELD_MAX_CHARS + 1)
+    parser = TableParser([_col("Code", "sku"), _col("Name", "title")], vendor_id=1)
+    res = parser.parse_rows(["Code", "Name"], [["A-1", big], ["A-2", "Pot"]], encoding="")
+    assert [r.product.sku for r in res.rows] == ["A-2"]
+    assert [e.code for e in res.errors] == ["field_too_long"]
+
+
+def test_parsing_never_persists() -> None:
+    """No caller persists yet: a parse is pure (no ORM import), and the result says so."""
+    res = _adapter().parse(b"Code,Name\nA-1,Pan\n")
+    assert res.dry_run is True
