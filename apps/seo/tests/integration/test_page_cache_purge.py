@@ -257,3 +257,49 @@ def test_a_purge_makes_a_stored_page_a_miss_and_a_rollback_keeps_it(
     with django_capture_on_commit_callbacks(execute=True):
         purge_public_pages("committed")
     assert middleware(request())["X-Page-Cache"] == "MISS"
+
+
+def test_a_navigation_menu_change_purges(seeded: SeedReport) -> None:
+    from apps.cms.models import NavigationMenu
+
+    menu = NavigationMenu.objects.first()  # the seeded header or footer
+    assert menu is not None
+    before = generation()
+    menu.save()
+    assert generation() != before
+    before = generation()
+    menu.delete()
+    assert generation() != before
+
+
+def test_a_blog_author_change_purges(seeded: SeedReport) -> None:
+    from apps.cms.tests.factories import BlogAuthorFactory
+
+    author = BlogAuthorFactory.create()
+    before = generation()
+    author.bio = "<p>New bio.</p>"
+    author.save()
+    assert generation() != before
+    before = generation()
+    author.delete()
+    assert generation() != before
+
+
+def test_a_snippet_publish_and_unpublish_purge_but_a_draft_save_does_not(
+    seeded: SeedReport,
+) -> None:
+    from apps.cms.tests.factories import ContentSnippetFactory
+
+    snippet = ContentSnippetFactory.create()
+    before = generation()
+    snippet.body = "<p>Changed.</p>"
+    snippet.save_revision().publish()
+    assert generation() != before
+    before = generation()
+    snippet.unpublish()
+    assert generation() != before
+    before = generation()
+    snippet.refresh_from_db()
+    snippet.body = "<p>Draft only.</p>"
+    snippet.save()  # not live: a visitor never sees it
+    assert generation() == before

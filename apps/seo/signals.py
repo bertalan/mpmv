@@ -20,8 +20,15 @@ from wagtail.models import (
     PageViewRestriction,
     Site,
 )
-from wagtail.signals import page_published, page_unpublished, post_page_move
+from wagtail.signals import (
+    page_published,
+    page_unpublished,
+    post_page_move,
+    published,
+    unpublished,
+)
 
+from apps.cms.models import BlogAuthor, ContentSnippet, NavigationMenu
 from apps.core import public_cache
 from apps.core.models import PlatformOperator
 
@@ -38,6 +45,9 @@ def drop_cache(**_kwargs: Any) -> None:
 
 CONTENT_MODELS = (
     PlatformOperator,  # the legal and tax text of the footer
+    NavigationMenu,  # the header and footer links of every page
+    ContentSnippet,  # a text placed in any page body (a draft is skipped, see below)
+    BlogAuthor,  # the byline and the author box of a post
     Page,
     Site,
     Locale,
@@ -63,7 +73,7 @@ REVISION_BOOKKEEPING = frozenset(
 
 def drop_for_content_model(instance: Any = None, **kwargs: Any) -> None:
     """A change to a model a public page renders from."""
-    if isinstance(instance, Page):
+    if isinstance(instance, Page | ContentSnippet):
         if not instance.live:
             return  # a draft is not served to the public
         fields = kwargs.get("update_fields")
@@ -85,6 +95,10 @@ def connect() -> None:
     public_cache.register_purge_listener(purge_on_request)
     for signal in (page_published, page_unpublished, post_page_move):
         signal.connect(drop_cache, dispatch_uid=f"{_UID}.{signal.__class__.__name__}.{id(signal)}")
+    for signal in (published, unpublished):  # a snippet's publish and unpublish
+        signal.connect(
+            drop_cache, sender=ContentSnippet, dispatch_uid=f"{_UID}.snippet.{id(signal)}"
+        )
     for model in django_apps.get_models():
         if issubclass(model, CONTENT_MODELS):
             post_save.connect(drop_for_content_model, sender=model, dispatch_uid=f"{_UID}.save")
