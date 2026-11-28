@@ -6,7 +6,8 @@ naming another vendor or a SKU the vendor does not have answers 404, as for a re
 not exist. `?dry_run=true` returns the ChangeSet and writes nothing. Batches are capped at
 `MAX_ITEMS` rows; the request body size and the per-key rate limit are the API-wide ones.
 
-Rows of an upsert are independent: a refused row is listed in `errors` and the others apply.
+Rows of an upsert are independent (partial apply, no all-or-nothing mode): a refused row is
+listed in `errors` and in `rows` (index and SKU) and the others apply.
 Stock is all or nothing: one unknown SKU answers 404 and nothing is written.
 """
 
@@ -56,7 +57,18 @@ class RowErrorOut(Schema):
     errors: dict[str, list[str]]
 
 
+class RowOutcomeOut(Schema):
+    index: int = Field(description="Position of the row in `items`, from 0.")
+    sku: str
+    outcome: Literal["created", "updated", "unchanged", "refused"]
+
+
 class UpsertOut(ChangeSetOut):
+    rows: list[RowOutcomeOut] = Field(
+        description="One entry per submitted row, in order: which rows applied (created, updated, "
+        "unchanged) and which were refused (see `errors` for why). A refused row writes nothing; "
+        "the others apply (partial apply)."
+    )
     created: list[str]
     updated: list[str]
     unchanged: list[str]
@@ -89,8 +101,22 @@ def upsert_products(
         dry_run=dry_run,
         require_active_vendor=True,
     )
+    outcome = (
+        {sku: "created" for sku in report.created}
+        | {sku: "updated" for sku in report.updated}
+        | {sku: "unchanged" for sku in report.unchanged}
+    )
+    refused = {e.index for e in report.errors}
     return {
         **changeset_out(report.changes, dry_run=dry_run),
+        "rows": [
+            {
+                "index": index,
+                "sku": item.sku,
+                "outcome": "refused" if index in refused else outcome[item.sku],
+            }
+            for index, item in enumerate(payload.items)
+        ],
         "created": report.created,
         "updated": report.updated,
         "unchanged": report.unchanged,

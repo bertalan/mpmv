@@ -98,6 +98,10 @@ def test_a_bad_row_is_reported_and_the_others_apply(client: Client, vendor: Vend
     assert response.status_code == 200, response.content
     data = response.json()
     assert data["created"] == ["OK-1"]
+    assert data["rows"] == [
+        {"index": 0, "sku": "OK-1", "outcome": "created"},
+        {"index": 1, "sku": "BAD-1", "outcome": "refused"},
+    ]
     assert [(e["index"], e["sku"]) for e in data["errors"]] == [(1, "BAD-1")]
     assert Product.objects.filter(vendor=vendor, sku="OK-1").exists()
     assert not Product.objects.filter(vendor=vendor, sku="BAD-1").exists()
@@ -224,3 +228,28 @@ def test_stock_validation_errors_are_problems(client: Client, vendor: Vendor, it
 def test_mutations_are_logged(client: Client, vendor: Vendor) -> None:
     _post(client, UPSERT, {"items": [_row()]}, _headers(vendor, ["catalog:write"]))
     assert ApiMutationLog.objects.filter(path=UPSERT, status_code=200).count() == 1
+
+
+def test_a_mixed_batch_says_which_rows_applied_and_which_did_not(
+    client: Client, vendor: Vendor
+) -> None:
+    headers = _headers(vendor, ["catalog:write"])
+    _post(client, UPSERT, {"items": [_row("OLD-1"), _row("SAME-1")]}, headers)
+    body: dict[str, Any] = {
+        "items": [
+            _row("NEW-1"),
+            _row("OLD-1", price_net="99.00"),
+            _row("BAD-1", price_net="-5.00"),
+            _row("SAME-1"),
+        ]
+    }
+    response = _post(client, UPSERT, body, headers)
+
+    assert response.status_code == 200, response.content
+    assert [(r["index"], r["sku"], r["outcome"]) for r in response.json()["rows"]] == [
+        (0, "NEW-1", "created"),
+        (1, "OLD-1", "updated"),
+        (2, "BAD-1", "refused"),
+        (3, "SAME-1", "unchanged"),
+    ]
+    assert str(Product.objects.get(vendor=vendor, sku="OLD-1").price_net) == "99.00"
