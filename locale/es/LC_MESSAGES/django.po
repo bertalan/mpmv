@@ -563,6 +563,10 @@ msgstr "un precio más alto requiere la aceptación del cliente"
 msgid "a higher quantity needs the customer's acceptance"
 msgstr "una cantidad mayor requiere la aceptación del cliente"
 
+#: apps/manager/templates/manager/shop/ai_provider.html
+msgid "A key is saved. For your safety it is never shown again; enter a new one to replace it."
+msgstr "Hay una clave guardada. Por seguridad ya no se muestra; introduzca una nueva para sustituirla."
+
 #: apps/compliance/templates/email/compliance/termination_notice/body.html
 #: apps/compliance/templates/email/compliance/termination_notice/body.txt
 msgid "a legal or regulatory obligation"
@@ -1335,6 +1339,11 @@ msgstr ""
 msgid "Age in days"
 msgstr "Antigüedad en días"
 
+#: apps/manager/forms.py apps/manager/sections.py apps/manager/site_map.py
+#: apps/manager/templates/manager/shop/ai_provider.html
+msgid "AI provider"
+msgstr "Proveedor de IA"
+
 #: themes/base/templates/components/ai_image_label.html
 msgid "AI-edited image"
 msgstr "Imagen editada con IA"
@@ -1624,6 +1633,10 @@ msgstr "Puerta, piso u otro detalle. Opcional."
 #: apps/seo/site_links.py
 msgid "API documentation"
 msgstr "Documentación de la API"
+
+#: apps/manager/forms.py
+msgid "API key"
+msgstr "Clave API"
 
 #: apps/vendors/templates/vendors/apply/cancelled.html
 msgid "Application cancelled"
@@ -2579,6 +2592,12 @@ msgstr ""
 "Elija al vendedor si las devoluciones son gratuitas para el comprador. Elija al cliente si el "
 "comprador paga el coste del envío de la devolución. Debe coincidir con sus condiciones de venta. "
 "Obligatorio."
+
+#: apps/manager/templates/manager/shop/ai_provider.html
+msgid ""
+"Choose the service that writes the texts of your own products, and give it your own key. We send "
+"it product data only, never customer data. Every text waits for your review before it is shown."
+msgstr "Elija el servicio que redacta los textos de sus propios productos y dele su propia clave. Solo enviamos datos de producto, nunca datos de clientes. Cada texto espera su revisión antes de mostrarse."
 
 #: apps/cms/blocks.py
 msgid "Choose the shop the card leads to. A card to a shop that is not open is left out."
@@ -4581,6 +4600,10 @@ msgstr ""
 "Cuántos productos se muestran, desde 1 hasta el máximo permitido. Si lo deja vacío, se usa el "
 "número predeterminado."
 
+#: apps/ingest/models.py
+msgid "How many times the key was set. It grows with every rotation."
+msgstr "Cuántas veces se ha definido la clave. Aumenta con cada rotación."
+
 #: apps/catalog/models.py
 msgid "How many units of this version you have now, for example 5. Not negative."
 msgstr "Cuántas unidades de esta versión tiene ahora, por ejemplo 5. No puede ser negativo."
@@ -5593,6 +5616,10 @@ msgstr "Grupos que faltan"
 msgid "Missing in %(language)s"
 msgstr "Falta en %(language)s"
 
+#: apps/manager/forms.py
+msgid "Model"
+msgstr "Modelo"
+
 #: apps/compliance/templates/compliance/includes/product_safety.html
 msgid "Model or type"
 msgstr "Modelo o tipo"
@@ -5873,6 +5900,10 @@ msgstr "Sin imagen"
 #: apps/manager/templates/manager/shop/_fitment_rows.html
 msgid "No item found."
 msgstr "No se encontró ningún elemento."
+
+#: apps/manager/templates/manager/shop/ai_provider.html
+msgid "No key is saved. Without one the platform default applies."
+msgstr "No hay ninguna clave guardada. Sin clave se aplica el valor predeterminado de la plataforma."
 
 #: apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "No level yet."
@@ -8278,6 +8309,10 @@ msgstr ""
 msgid "Remove the logo"
 msgstr "Eliminar el logotipo"
 
+#: apps/manager/forms.py
+msgid "Remove the saved key"
+msgstr "Eliminar la clave guardada"
+
 #: apps/manager/event_block_views.py apps/manager/templates/manager/shop/_event_blocks.html
 msgid "Remove this block?"
 msgstr "¿Eliminar este bloque?"
@@ -8626,6 +8661,7 @@ msgstr "Enlaces sameAs"
 msgid "Saturday"
 msgstr "Sábado"
 
+#: apps/manager/templates/manager/shop/ai_provider.html
 #: apps/manager/templates/manager/shop/profile.html apps/seo/admin_views.py
 msgid "Save"
 msgstr "Guardar"
@@ -11211,6 +11247,14 @@ msgstr "La dirección postal del fabricante, con calle, ciudad y país."
 msgid "The map shows the typed point."
 msgstr "El mapa muestra el punto escrito."
 
+#: apps/manager/forms.py
+msgid "The model name as the provider writes it, for example the current small model."
+msgstr "El nombre del modelo tal como lo escribe el proveedor, por ejemplo el modelo pequeño actual."
+
+#: apps/ingest/models.py
+msgid "The model of the provider to use."
+msgstr "El modelo del proveedor que se usa."
+
 #: apps/compliance/models.py
 msgid ""
 "The model, type or reference that identifies the product, for example the number printed on the "
@@ -12315,6 +12359,10 @@ msgstr "El servicio termina el"
 msgid "The service that found the position from the address. Filled in for you."
 msgstr "El servicio que encontró la posición a partir de la dirección. Se rellena automáticamente."
 
+#: apps/manager/forms.py
+msgid "The service that writes the texts of your own products. Required."
+msgstr "El servicio que redacta los textos de sus propios productos. Obligatorio."
+
 #: apps/accounts/session_views.py
 msgid "The session has ended."
 msgstr "La sesión ha terminado."
@@ -12879,6 +12927,10 @@ msgstr "El vendedor al que pertenece este régimen de IVA."
 msgid "The vendor whose address the parcel is collected from."
 msgstr "El vendedor en cuya dirección se recoge el paquete."
 
+#: apps/ingest/models.py
+msgid "The vendor whose catalogue texts this provider writes."
+msgstr "El vendedor cuyos textos de catálogo redacta este proveedor."
+
 #: apps/catalog/taxonomy.py
 msgid ""
 "The vendor whose feed or import brought these brands. It lets the review team ask the right "
@@ -12896,6 +12948,10 @@ msgid "The vendor's newest products shown after the story; 0 shows none."
 msgstr ""
 "Los productos más recientes del vendedor que se muestran después de la historia; con 0 no se "
 "muestra ninguno."
+
+#: apps/ingest/models.py
+msgid "The vendor's own key. It is never shown again."
+msgstr "La clave propia del vendedor. Ya no se muestra."
 
 #: apps/accounts/decorators.py apps/compliance/views.py apps/orders/ui/views.py
 msgid "The verification failed. Please reload the page and try again."
@@ -15098,6 +15154,10 @@ msgstr ""
 msgid "When the event was first planned, in the event's time zone. Optional."
 msgstr "Cuándo estaba previsto el evento originalmente, en la zona horaria del evento. Opcional."
 
+#: apps/ingest/models.py
+msgid "When the key was last set."
+msgstr "Cuándo se definió la clave por última vez."
+
 #: apps/cms/blocks.py
 msgid ""
 "When the launch happens, in the platform's local time. Example: 2026-12-01 09:00. Required: the "
@@ -15394,6 +15454,10 @@ msgstr ""
 "(revendedor). Los motores de búsqueda y los asistentes de IA lo ven en los datos del producto. "
 "Déjelo vacío si no está seguro: entonces nunca diremos que usted fabrica el producto. Un producto "
 "concreto puede tener otro valor."
+
+#: apps/ingest/models.py
+msgid "Which AI provider writes this vendor's product texts."
+msgstr "Qué proveedor de IA redacta los textos de los productos de este vendedor."
 
 #: apps/ingest/models.py
 msgid "Which AI provider wrote the text."
@@ -15959,6 +16023,10 @@ msgstr ""
 "Su cuenta está lista y su solicitud de %(name)s está pendiente de aprobación por el equipo de la "
 "plataforma. Podrá gestionar el vendedor, sus datos fiscales y sus pagos una vez aprobada."
 
+#: apps/manager/ai_provider_views.py
+msgid "Your AI provider is saved."
+msgstr "Su proveedor de IA está guardado."
+
 #: apps/vendors/templates/vendors/apply/confirmed.html
 msgid ""
 "Your application is with our team for review. Sign in with the password you chose: you will be "
@@ -16099,6 +16167,12 @@ msgstr "Sus imágenes"
 #: apps/manager/templates/manager/shop/order.html
 msgid "Your invoice is already issued"
 msgstr "Su factura ya está emitida"
+
+#: apps/manager/forms.py
+msgid ""
+"Your key for this provider. It is stored encrypted and never shown again. Leave it empty to keep "
+"the key you saved before."
+msgstr "Su clave para este proveedor. Se guarda cifrada y ya no se muestra. Déjela vacía para conservar la clave guardada antes."
 
 #: apps/compliance/forms.py
 msgid "Your name. Required, except for a report of child sexual abuse material."
