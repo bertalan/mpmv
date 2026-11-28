@@ -438,7 +438,7 @@ class AIProviderForm(NFCForm):
     remove_key = forms.BooleanField(
         label=_("Remove the saved key"),
         required=False,
-        help_text=_("Tick this to delete the key you saved. Texts are no longer written for you."),
+        help_text=_("Tick this to delete the key you saved. The platform default applies again."),
     )
 
     def clean(self) -> dict[str, Any]:
