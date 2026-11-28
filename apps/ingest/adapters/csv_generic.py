@@ -62,10 +62,15 @@ class CsvAdapter:
         text, encoding = decode(data)
         if not text.strip():
             raise base.AdapterError("The file is empty.")
-        csv.field_size_limit(base.FIELD_MAX_CHARS)  # process-wide, set before every read
-        reader = csv.reader(io.StringIO(text), delimiter=detect_delimiter(text))
+        # The limit is process-wide: set it for this read only and put the previous value back,
+        # or the shipping CSV import (a larger cell cap) would read with ours.
+        previous = csv.field_size_limit(base.FIELD_MAX_CHARS)
         try:
-            header = next(reader)
-        except csv.Error as exc:
-            raise base.AdapterError("The header line cannot be read.") from exc
-        return self.table.parse_rows(header, _rows(reader), encoding=encoding)
+            reader = csv.reader(io.StringIO(text), delimiter=detect_delimiter(text))
+            try:
+                header = next(reader)
+            except csv.Error as exc:
+                raise base.AdapterError("The header line cannot be read.") from exc
+            return self.table.parse_rows(header, _rows(reader), encoding=encoding)
+        finally:
+            csv.field_size_limit(previous)
