@@ -136,12 +136,12 @@ def test_upsert_never_touches_another_vendors_product(client: Client, vendor: Ve
     assert Product.objects.filter(sku=other.sku).count() == 2
 
 
-def test_a_row_naming_another_vendor_is_404(client: Client, vendor: Vendor) -> None:
+def test_a_vendor_field_in_a_row_is_ignored_the_key_decides(client: Client, vendor: Vendor) -> None:
     stranger = VendorFactory.create(status=Vendor.Status.ACTIVE)
     headers = _headers(vendor, ["catalog:write"])
     response = _post(client, UPSERT, {"items": [_row(vendor=str(stranger.public_id))]}, headers)
-    assert response.status_code == 404
-    assert not Product.objects.exists()
+    assert response.status_code == 200, response.content
+    assert set(Product.objects.values_list("vendor_id", flat=True)) == {vendor.pk}
 
 
 @pytest.mark.parametrize(("method", "url"), [("post", UPSERT), ("put", STOCK)])
