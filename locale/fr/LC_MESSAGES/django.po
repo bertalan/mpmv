@@ -239,6 +239,10 @@ msgstr[1] "%(n)s lignes lues."
 msgid "%(name)s is deleted."
 msgstr "%(name)s a été supprimé."
 
+#: apps/ingest/onboarding.py
+msgid "%(name)s is not a field a column can map to."
+msgstr "%(name)s n'est pas un champ auquel une colonne peut être associée."
+
 #: apps/fitment/garage_views.py apps/fitment/views.py
 msgid "%(name)s is now your active vehicle."
 msgstr "%(name)s est maintenant ton véhicule actif."
@@ -469,6 +473,10 @@ msgstr ""
 #: apps/manager/templates/manager/shop/closures.html
 msgid "A closure that has ended stays here as history and cannot be changed."
 msgstr "Une fermeture terminée reste ici comme historique et ne peut pas être modifiée."
+
+#: apps/ingest/onboarding.py
+msgid "A column name cannot be empty."
+msgstr "Le nom d'une colonne ne peut pas être vide."
 
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.html
 #: apps/compliance/templates/email/compliance/statement_of_reasons/body.txt
@@ -770,6 +778,9 @@ msgstr "Une période terminée reste dans l'historique."
 #: apps/manager/ingest_views.py
 msgid "A real export of the supplier. It is read once to show you the result and is not kept."
 msgstr "Un export réel du fournisseur. Il est lu une seule fois pour vous montrer le résultat et n'est pas conservé."
+"Un export réel du fournisseur. Il est lu une seule fois pour vous montrer le résultat et n'est pas"
+" conservé.Un export réel du fournisseur. Il est lu une seule fois pour vous montrer le résultat et"
+" n'est pas conservé."
 
 #: apps/manager/amendment_views.py
 msgid "a refund to the customer"
@@ -1008,6 +1019,9 @@ msgid ""
 "A source reads one supplier's price list or feed. Add a new vendor from a sample file without "
 "writing code."
 msgstr "Une source lit la liste de prix ou le flux d'un fournisseur. Ajoutez un nouveau vendeur à partir d'un fichier échantillon, sans écrire de code."
+"Une source lit la liste de prix ou le flux d'un fournisseur. Ajoutez un nouveau vendeur à partir "
+"d'un fichier échantillon, sans écrire de code.Une source lit la liste de prix ou le flux d'un "
+"fournisseur. Ajoutez un nouveau vendeur à partir d'un fichier échantillon, sans écrire de code."
 
 #: apps/manager/money_views.py
 msgid "A statement needs a start and an end date. The current month is shown."
@@ -1184,6 +1198,10 @@ msgstr "Mesure prise"
 #: apps/manager/templates/manager/shop/events.html
 msgid "Actions"
 msgstr "Actions"
+
+#: apps/manager/templates/manager/platform/ingest_source.html
+msgid "Activate the source"
+msgstr "Activer la source"
 
 #: apps/fitment/templates/fitment/garage_account.html apps/manager/fitment_forms.py
 #: apps/manager/templates/manager/platform/ingest_sources.html
@@ -1886,6 +1904,10 @@ msgstr "Retour au panier"
 #: apps/manager/templates/manager/amendment_passkey.html
 msgid "Back to the change"
 msgstr "Retour à la modification"
+
+#: apps/manager/templates/manager/platform/ingest_source_mapping.html
+msgid "Back to the checklist"
+msgstr "Retour à la liste de contrôle"
 
 #: apps/manager/templates/manager/shop/closure_form.html
 msgid "Back to the closures"
@@ -2772,9 +2794,17 @@ msgstr "Couleur"
 msgid "colour picker"
 msgstr "sélecteur de couleur"
 
+#: apps/manager/templates/manager/platform/ingest_source_mapping.html
+msgid "Column"
+msgstr "Colonne"
+
 #: apps/manager/templates/manager/platform/ingest_source_new.html
 msgid "Columns found:"
 msgstr "Colonnes trouvées :"
+
+#: apps/manager/templates/manager/platform/ingest_source_mapping.html
+msgid "Columns of the sample"
+msgstr "Colonnes de l'échantillon"
 
 #: apps/manager/ingest_views.py
 msgid "Comma"
@@ -3992,6 +4022,7 @@ msgstr "Traitements d’images en échec"
 msgid "Featured products"
 msgstr "Produits à la une"
 
+#: apps/manager/templates/manager/platform/ingest_source_mapping.html
 #: apps/manager/templates/manager/platform/profile_changes.html
 msgid "Field"
 msgstr "Champ"
@@ -4944,6 +4975,10 @@ msgstr ""
 "expressément d'un moyen différent ; en tout état de cause, ce remboursement n'occasionnera pas de "
 "frais pour vous."
 
+#: apps/manager/templates/manager/platform/ingest_source_mapping.html
+msgid "Ignore this column"
+msgstr "Ignorer cette colonne"
+
 #: apps/compliance/templates/email/compliance/termination_notice/body.html
 #: apps/compliance/templates/email/compliance/termination_notice/body.txt
 msgid "illegal content"
@@ -5628,6 +5663,11 @@ msgstr "Référence du fabricant"
 msgid "Map of the listed events"
 msgstr "Carte des événements listés"
 
+#: apps/manager/templates/manager/platform/ingest_source.html
+#: apps/manager/templates/manager/platform/ingest_source_mapping.html
+msgid "Map the columns"
+msgstr "Associer les colonnes"
+
 #: apps/events/templates/events/_event_map.html
 msgid "Map: %(name)s"
 msgstr "Carte : %(name)s"
@@ -5990,6 +6030,10 @@ msgstr "Aucune modification"
 #: apps/manager/templates/manager/shop/closures.html
 msgid "No closure is planned."
 msgstr "Aucune fermeture n'est prévue."
+
+#: apps/manager/ingest_views.py
+msgid "No column was received. The sample is not kept: choose the file again to list its columns."
+msgstr "Aucune colonne n'a été reçue. L'échantillon n'est pas conservé : choisissez à nouveau le fichier pour en lister les colonnes."
 
 #: apps/manager/event_block_forms.py
 msgid "No event"
@@ -8156,6 +8200,10 @@ msgstr "Noté %(value)s sur 5"
 msgid "Read more and choose"
 msgstr "En savoir plus et choisir"
 
+#: apps/manager/templates/manager/platform/ingest_source_mapping.html
+msgid "Read the columns"
+msgstr "Lire les colonnes"
+
 #: apps/cms/templates/cms/legal_page_version.html themes/ride/templates/cms/legal_page_version.html
 msgid "Read the current version"
 msgstr "Lis la version actuelle"
@@ -8167,6 +8215,10 @@ msgstr "Lire la politique de retour"
 #: apps/compliance/templates/compliance/includes/destination_notice.html
 msgid "Read the safety warnings in:"
 msgstr "Lis les avertissements de sécurité en :"
+
+#: apps/manager/templates/manager/platform/ingest_source.html
+msgid "Read the sample again"
+msgstr "Relire l'échantillon"
 
 #: apps/events/templates/email/events/event_hidden/body.html
 #: apps/events/templates/email/events/event_hidden/body.txt
@@ -8843,6 +8895,10 @@ msgid "Save the event first: then you can add text, pictures and other blocks to
 msgstr ""
 "Enregistrez d'abord l'événement : vous pourrez ensuite ajouter du texte, des images et d'autres "
 "blocs à sa page."
+
+#: apps/manager/templates/manager/platform/ingest_source_mapping.html
+msgid "Save the mapping"
+msgstr "Enregistrer l'association"
 
 #: apps/manager/templates/manager/platform/fitment_node.html
 msgid "Save the name"
@@ -10312,6 +10368,10 @@ msgstr "La modification a été annulée et les titulaires ont été informés."
 msgid "The check could not be reached. Save is off until it works again."
 msgstr "La vérification est injoignable. L’enregistrement reste désactivé jusqu’à son retour."
 
+#: apps/ingest/onboarding.py
+msgid "The checklist is not met: %(missing)s."
+msgstr "La liste de contrôle n'est pas satisfaite : %(missing)s."
+
 #: apps/vendors/models.py
 msgid ""
 "The city of the court that decides disputes with business buyers. Empty means the court of your "
@@ -10826,6 +10886,10 @@ msgstr ""
 #: apps/ingest/models.py
 msgid "The fields this change sets, as true flags."
 msgstr "Les champs que cette modification définit, sous forme d'indicateurs vrais."
+
+#: apps/manager/ingest_views.py
+msgid "The file has no columns."
+msgstr "Le fichier n'a pas de colonnes."
 
 #: apps/manager/ingest_views.py
 msgid "The file is larger than the allowed size."
@@ -11430,6 +11494,17 @@ msgstr "L'adresse postale du fabricant, avec rue, ville et pays."
 #: apps/events/templates/events/admin/map_picker_panel.html
 msgid "The map shows the typed point."
 msgstr "La carte affiche le point saisi."
+
+#: apps/manager/templates/manager/platform/ingest_source.html
+#: apps/manager/templates/manager/platform/ingest_source_mapping.html
+msgid "The mapping belongs to the vendor: it applies to all of this vendor's sources."
+msgstr "L'association appartient au vendeur : elle s'applique à toutes les sources de ce vendeur."
+
+#: apps/manager/ingest_views.py
+msgid ""
+"The mapping is saved. The sample is not kept: choose the file again on this page and read it to "
+"confirm the mapping."
+msgstr "L'association est enregistrée. L'échantillon n'est pas conservé : choisissez à nouveau le fichier sur cette page et lisez-le pour confirmer l'association."
 
 #: apps/compliance/models.py
 msgid ""
@@ -12435,6 +12510,22 @@ msgstr "Le rapport de l'exécution, en texte brut."
 msgid "The sales terms of %(vendor)s. Buyers read them before they pay."
 msgstr "Les conditions de vente de %(vendor)s. Les acheteurs les lisent avant de payer."
 
+#: apps/manager/templates/manager/platform/ingest_source.html
+msgid "The sample is not kept. Choose the file again each time you read it."
+msgstr "L'échantillon n'est pas conservé. Choisissez à nouveau le fichier à chaque lecture."
+
+#: apps/manager/templates/manager/platform/ingest_source_mapping.html
+msgid "The sample is not kept. Choose the file again to list its columns."
+msgstr "L'échantillon n'est pas conservé. Choisissez à nouveau le fichier pour en lister les colonnes."
+
+#: apps/manager/ingest_views.py
+msgid "The sample is not kept. Choose the file again."
+msgstr "L'échantillon n'est pas conservé. Choisissez à nouveau le fichier."
+
+#: apps/manager/ingest_views.py
+msgid "The sample was read again with the current mapping."
+msgstr "L'échantillon a été relu avec l'association actuelle."
+
 #: apps/manager/fitment_views.py
 msgid "The scheme is updated."
 msgstr "Le schéma est mis à jour."
@@ -12700,6 +12791,10 @@ msgstr ""
 #: apps/ingest/onboarding.py
 msgid "The source is active"
 msgstr "La source est active"
+
+#: apps/manager/ingest_views.py
+msgid "The source is active. Runs stay dry until writing is enabled."
+msgstr "La source est active. Les exécutions restent à blanc tant que l'écriture n'est pas activée."
 
 #: apps/manager/ingest_views.py
 msgid "The source is created. It stays inactive until the checklist is met."
@@ -14255,6 +14350,10 @@ msgstr ""
 #: apps/orders/customer_views.py apps/vendors/views.py
 msgid "Too many attempts. Please try again later."
 msgstr "Trop de tentatives. Veuillez réessayer plus tard."
+
+#: apps/ingest/onboarding.py
+msgid "Too many columns."
+msgstr "Trop de colonnes."
 
 #: apps/manager/termination_views.py
 msgid "Too many downloads. Try again later."

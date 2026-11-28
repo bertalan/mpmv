@@ -10,5 +10,23 @@ The checklist of one supplier source (ING.13): what is met and what is missing b
     {% for item in items %}<li>{% if item.ok %}<span aria-hidden="true">&#10003;</span> <span class="visually-hidden">{% translate "Done:" %}</span>{% else %}<span aria-hidden="true">&#10007;</span> <span class="visually-hidden">{% translate "Missing:" %}</span>{% endif %} {{ item.label }}</li>{% endfor %}
   </ul>
   <p>{% if ready %}{% translate "Everything needed is in place." %}{% else %}{% translate "Something is still missing. Fix the items marked as missing." %}{% endif %}</p>
+  {% if can_write %}
+    <p>{% translate "The mapping belongs to the vendor: it applies to all of this vendor's sources." %}</p>
+    <p><a href="{% url 'manager:platform:ingest_source_mapping' source.public_id %}">{% translate "Map the columns" %}</a></p>
+    <p>{% translate "The sample is not kept. Choose the file again each time you read it." %}</p>
+    <form method="post" enctype="multipart/form-data" class="manager-form" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="action" value="check">
+      {% for field in form.visible_fields %}{% include "components/field.html" with field=field only %}{% endfor %}
+      {% include "components/button.html" with label=_("Read the sample again") type="submit" variant="secondary" only %}
+    </form>
+    {% if ready and not source.is_active %}
+    <form method="post" class="manager-form" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="action" value="activate">
+      {% include "components/button.html" with label=_("Activate the source") type="submit" only %}
+    </form>
+    {% endif %}
+  {% endif %}
   <p><a href="{{ list_url }}">{% translate "Back to the sources" %}</a></p>
 {% endblock %}

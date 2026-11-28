@@ -185,6 +185,7 @@ def _manager_pages() -> dict[str, str]:
         "manager:platform:ingest_sources": "platform",  # ING.13
         "manager:platform:ingest_source": "platform",
         "manager:platform:ingest_source_new": "platform",
+        "manager:platform:ingest_source_mapping": "platform",
         "manager:platform:order_draft": "platform",
         "manager:platform:amendment_settings": "platform",
         "manager:platform:trust_rules": "platform",  # TRU.1 part 2
@@ -235,7 +236,7 @@ def _open(name: str) -> tuple[Client, str]:
             kwargs = {"version": TrustRulesFactory.create().version}  # type: ignore[dict-item]
         if name == "manager:platform:order":
             kwargs = {"public_id": paid_vendor_order().public_id}
-        if name == "manager:platform:ingest_source":
+        if name in ("manager:platform:ingest_source", "manager:platform:ingest_source_mapping"):
             kwargs = {"public_id": SupplierSourceFactory.create().public_id}
         if name == "manager:platform:order_draft":
             draft = StaffDraftFactory.create()

@@ -363,6 +363,10 @@ IDOR_REVIEWED: dict[str, str] = {
         "Platform space only (CORE.18 row platform.ingest_sources); the checklist of a source of "
         "any vendor, shown to staff by design (ING.13)."
     ),
+    "manager:platform:ingest_source_mapping": (
+        "Platform space only; maps the columns of a sample of any vendor's source, staff by "
+        "design (ING.13). A POST needs the write cell, the CORE.25 gate and the CSRF token."
+    ),
     "manager:platform:ingest_source_new": (
         "Platform space only; a POST needs the write cell of the row (Support and the owner get "
         "403), the CORE.25 gate and the CSRF token; the sample is parsed in memory, never stored "
