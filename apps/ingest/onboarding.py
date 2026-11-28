@@ -36,6 +36,7 @@ DECIMALS: Final = (",", ".")
 MAX_PREVIEW_ROWS: Final = 10
 MAX_LISTED_ERRORS: Final = 50
 MAX_HEADERS: Final = base.DEFAULT_MAX_COLUMNS
+MAX_HEADER_CHARS: Final = 100  # a column name kept in the source config
 
 
 def column_entries(vendor: Vendor) -> list[engine.MappingEntry]:
@@ -149,7 +150,7 @@ def record_sample(
             "rows": report.rows,
             "errors": report.error_count,
             "mapping": report.mapping,
-            "headers": report.headers,
+            "headers": [h[:MAX_HEADER_CHARS] for h in report.headers],
             "checked_at": timezone.now().isoformat(timespec="seconds"),
         },
     }

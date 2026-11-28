@@ -166,3 +166,23 @@ def test_an_empty_file_is_reported_not_raised() -> None:
     report = onboarding.run_sample(source, io.BytesIO(b"").read())
     assert report.failure
     assert not report.clean
+
+
+def test_a_failed_sample_record_leaves_no_source(monkeypatch: pytest.MonkeyPatch) -> None:
+    def boom(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(onboarding, "record_sample", boom)
+    client = staff("catalog")
+    client.raise_request_exception = False
+    assert post(client, VendorFactory.create(), "create").status_code == 500
+    assert not SupplierSource.objects.exists()
+    assert not AuditLog.objects.filter(action=services.SOURCE_CREATED).exists()
+
+
+def test_a_long_column_name_is_cut_in_the_kept_headers() -> None:
+    source = SupplierSourceFactory.create()
+    report = onboarding.SampleReport(headers=["h" * 500])
+    ctx = AuditContext(actor_label="t", source=AuditLog.Source.SYSTEM)
+    onboarding.record_sample(source, report, ctx=ctx)
+    assert len(source.config["sample"]["headers"][0]) == onboarding.MAX_HEADER_CHARS
