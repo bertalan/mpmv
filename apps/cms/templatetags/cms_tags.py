@@ -208,7 +208,14 @@ def language_links(context: dict[str, Any]) -> list[LanguageLink]:
             _stay(
                 {code: url + suffix for code, url in found.items()},
                 current,
-                fallback=bool(getattr(page.specific_class, "language_fallback", True)),
+                # An editor preview on the "add page" form shows an unsaved page: no content type.
+                fallback=bool(
+                    getattr(
+                        type(page) if page.pk is None else page.specific_class,
+                        "language_fallback",
+                        True,
+                    )
+                ),
             ),
         )
     if request is None or switch_goes_home(request):

@@ -7,6 +7,7 @@ build/e2e/screenshots. The signed-in Manager and account cases changed language 
 lane-b/i18n-manager-language lands: remove the marker then.
 """
 
+import html
 import secrets
 from collections.abc import Callable
 from pathlib import Path
@@ -25,7 +26,7 @@ from apps.cms.tests.factories import StandardPageFactory
 from apps.core.i18n import configured_languages, primary_language
 from apps.vendors.tests.factories import VendorMemberFactory
 from tests.e2e.test_cms_pages import RECORD_CSP_VIOLATIONS, csp_violations
-from tests.i18n import language_prefix, other_language
+from tests.i18n import fallback_notice, language_prefix, other_language
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -67,7 +68,7 @@ def test_a_translated_cms_page_keeps_its_object(
     assert csp_violations(page) == []
 
 
-def test_an_untranslated_page_falls_back_to_the_home_with_a_notice(
+def test_an_untranslated_page_stays_in_place_with_the_fallback_notice(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
     second = other_language()
@@ -75,12 +76,16 @@ def test_an_untranslated_page_falls_back_to_the_home_with_a_notice(
     page.goto(f"{live_server.url}/only-in-english/")
     shot(primary_language())
     _switch(page, second)
-    expect(page).to_have_url(f"{live_server.url}{language_prefix(second)}/")
+    # I18N.22: the same page under the new prefix, showing the primary-language text with the
+    # layout's own notice (not a flash), so it is still there after a reload.
+    expect(page).to_have_url(f"{live_server.url}{language_prefix(second)}/only-in-english/")
     _lang(page, second)
-    expect(page.locator(".site-messages")).to_contain_text(switch_notice(second))
+    expect(page.locator(".site-messages")).to_contain_text(
+        html.unescape(fallback_notice(primary_language(), second))
+    )
     shot(f"{second}-notice")
     page.reload()
-    expect(page.locator(".site-messages")).to_have_count(0)
+    expect(page.locator(".site-messages")).to_have_count(1)
 
 
 def test_a_secret_url_is_not_echoed_and_the_switch_goes_home(
