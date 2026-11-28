@@ -23,12 +23,16 @@ through it. `apps/ingest/enrich_engine.py` holds the pure schema and policy chec
 
 | Setting (env) | Default | Meaning |
 |---|---|---|
-| `MPMV_INGEST_ENRICHER` | `fake` | `fake` or `gemini`. Tests always use `fake` |
+| `MPMV_INGEST_ENRICHER` | `fake` | `fake`, `gemini`, `claude` or `openai`. Tests always use `fake` |
 | `MPMV_INGEST_GEMINI_API_KEY` | empty | Gemini key; environment only, never in code or tests |
 | `MPMV_INGEST_GEMINI_MODEL` | `gemini-2.0-flash` | Model name stored in the archive |
+| `MPMV_INGEST_CLAUDE_API_KEY`, `MPMV_INGEST_OPENAI_API_KEY` | empty | Same, for the other two providers (environment only) |
+| `MPMV_INGEST_CLAUDE_MODEL`, `MPMV_INGEST_OPENAI_MODEL` | `claude-haiku-4-5`, `gpt-4o-mini` | Model names |
 
-`apps.ingest.gemini.get_enricher()` returns the chosen enricher. Claude and OpenAI, per-vendor keys
-and encrypted storage are ING.14. The Gemini call uses `apps.core.outbound.open_url` (no redirects);
+`apps.ingest.gemini.get_enricher()` returns the chosen enricher. Per vendor (ING.14), `apps.ingest.provider_services.resolve_enricher(vendor)` picks the vendor's
+own provider and key, else the platform default, else fake. The vendor key is an `EncryptedCharField`
+(SEC.3): `rotate_field_keys` re-encrypts it with the others. A key that cannot be read raises
+`ProviderError`; nothing falls back to another provider. `usage_count(vendor)` counts archived answers. The Gemini call uses `apps.core.outbound.open_url` (no redirects);
 a TODO(MIG.12) marks the move to `safe_http` when it lands. The key is sent in a header and never
 logged. Only product data is sent, never customer data.
 

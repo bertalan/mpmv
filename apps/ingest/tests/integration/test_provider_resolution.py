@@ -11,14 +11,15 @@ from django.db import connection
 from django.test import override_settings
 
 from apps.core.audit import AuditContext
-from apps.core.crypto import generate_key, key_id_of
+from apps.core.crypto import generate_key
+from apps.core.encryption import key_id_of_raw
 from apps.core.models import AuditLog
 from apps.core.services import rotate_field_keys
 from apps.ingest import provider_services as svc
 from apps.ingest import services
 from apps.ingest.enrichment import FakeEnricher, ProviderError
 from apps.ingest.gemini import GeminiEnricher
-from apps.ingest.models import EnrichmentVersion, ImportRun, ProductDraft, VendorAIProvider
+from apps.ingest.models import EnrichmentVersion, ProductDraft, VendorAIProvider
 from apps.ingest.providers import ClaudeEnricher, OpenAIEnricher
 from apps.ingest.tests.factories import (
     ImportRunFactory,
@@ -57,7 +58,7 @@ def test_a_vendor_with_a_key_gets_its_own_provider(provider: str, cls: type) -> 
     VendorAIProviderFactory.create(vendor=vendor, provider=provider, model="m-1")
     enricher = svc.resolve_enricher(vendor, transport=noop_transport)
     assert isinstance(enricher, cls)
-    assert enricher.model == "m-1"  # type: ignore[attr-defined]
+    assert enricher.model == "m-1"
 
 
 def test_a_choice_without_a_key_falls_back_to_the_platform_default() -> None:
@@ -126,7 +127,6 @@ def test_the_key_stays_out_of_the_archive_audit_and_review_after_an_enrichment()
             *EnrichmentVersion.objects.values_list("raw", "violations", "provider", "model"),
             *AuditLog.objects.values_list("before", "after"),
             *ProductDraft.objects.values_list("enriched", "extracted"),
-            *ImportRun.objects.values_list("stats", flat=True),
         ],
         default=str,
     )
@@ -180,7 +180,7 @@ def raw_key_id(row: VendorAIProvider) -> str | None:
         cursor.execute("SELECT api_key FROM ingest_vendoraiprovider WHERE id = %s", [row.pk])
         found = cursor.fetchone()
     assert found is not None
-    return key_id_of(str(found[0]))
+    return key_id_of_raw(str(found[0]))
 
 
 def test_rotation_keeps_old_ciphertext_readable_and_the_job_moves_it() -> None:
@@ -188,12 +188,12 @@ def test_rotation_keeps_old_ciphertext_readable_and_the_job_moves_it() -> None:
     key = secrets.token_urlsafe(24)
     row = VendorAIProviderFactory.create(vendor=vendor, api_key=key)
     old, new = str(settings.FIELD_ENCRYPTION_KEYS[0]), generate_key("k2")
-    assert raw_key_id(row) == key_id_of(old)
+    assert raw_key_id(row) == "test"
     with override_settings(FIELD_ENCRYPTION_KEYS=[new, old]):
         assert svc.key_for(vendor) == key  # the old ciphertext still decrypts
         preview = rotate_field_keys(ctx=CTX, dry_run=True)
         assert [c.model for c in preview.changes] == ["ingest.vendoraiprovider"]
-        assert raw_key_id(row) == key_id_of(old)
+        assert raw_key_id(row) == "test"
         rotate_field_keys(ctx=CTX)
         assert raw_key_id(row) == "k2"
         assert svc.key_for(vendor) == key

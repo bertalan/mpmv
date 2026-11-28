@@ -61,6 +61,18 @@ REGISTER: tuple[SubProcessor, ...] = (
         _("DPA and standard contractual clauses"),
     ),
     SubProcessor(
+        "ai_vendor",
+        "ai",
+        _("AI provider chosen by a vendor"),
+        _("Drafts of the product texts of that vendor's own catalogue, reviewed before they show"),
+        _("Product data only (title, article number, attributes, supplier text); no customer data"),
+        _("EU and USA"),
+        _(
+            "The vendor is the controller and the provider its own processor, as the vendor "
+            "terms say; the vendor's own key is stored encrypted"
+        ),
+    ),
+    SubProcessor(
         "hosting",
         "hosting",
         _("Hosting provider"),

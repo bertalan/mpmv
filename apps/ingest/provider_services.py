@@ -15,12 +15,16 @@ from django.utils import timezone
 from apps.accounts.models import User
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
+from apps.core.crypto import DecryptionError
 from apps.core.services import run_mutation
 from apps.vendors.models import Vendor
 from apps.vendors.services import has_vendor_permission
 
-from .gemini import MODEL_NAME
-from .models import AIProvider, VendorAIProvider
+from . import gemini
+from .enrichment import ProviderError, TextEnricher
+from .gemini import MODEL_NAME, GeminiEnricher, Transport
+from .models import AIProvider, EnrichmentVersion, VendorAIProvider
+from .providers import ClaudeEnricher, OpenAIEnricher
 
 MIN_KEY_LENGTH = 8
 MAX_KEY_LENGTH = 300
@@ -103,3 +107,49 @@ def save_provider(
             changes.update("ingest.vendoraiprovider", key, before, after)
         run_mutation(changes, target.save, ctx=ctx, action=action, dry_run=dry_run)
     return changes
+
+
+_ENRICHERS: dict[str, Any] = {
+    AIProvider.CLAUDE: ClaudeEnricher,
+    AIProvider.GEMINI: GeminiEnricher,
+    AIProvider.OPENAI: OpenAIEnricher,
+}
+
+
+def resolve_enricher(vendor: Vendor, *, transport: Transport | None = None) -> TextEnricher:
+    """The enricher for one vendor's drafts: its own provider and key, else the platform default
+    (`settings.INGEST_ENRICHER`, `fake` in tests and local runs).
+
+    The vendor's choice never reaches another vendor's drafts, and a vendor key that cannot be
+    read raises `ProviderError`: there is no fallback to the platform's provider with the vendor's
+    data against its choice. Callers treat the error as "no enrichment" (the text stays as it is).
+    """
+    try:  # the field decrypts while the row loads
+        row = VendorAIProvider.objects.filter(vendor=vendor).first()
+        api_key = row.api_key if row is not None else ""
+    except DecryptionError:
+        raise ProviderError("the vendor key cannot be read") from None
+    if row is None or not api_key:
+        return gemini.get_enricher() if transport is None else _platform(transport)
+    extra: dict[str, Any] = {} if transport is None else {"transport": transport}
+    return _ENRICHERS[row.provider](api_key, row.model, **extra)  # type: ignore[no-any-return]
+
+
+def _platform(transport: Transport) -> TextEnricher:
+    from django.conf import settings
+
+    choice = settings.INGEST_ENRICHER
+    if choice == "gemini":
+        return GeminiEnricher(
+            settings.INGEST_GEMINI_API_KEY, settings.INGEST_GEMINI_MODEL, transport=transport
+        )
+    if choice in ("claude", "openai"):
+        from .providers import platform_enricher
+
+        return platform_enricher(choice, transport=transport)
+    return gemini.get_enricher()
+
+
+def usage_count(vendor: Vendor) -> int:
+    """How many enrichment answers were archived for this vendor's drafts (any provider)."""
+    return EnrichmentVersion.objects.filter(draft__item__vendor=vendor).count()

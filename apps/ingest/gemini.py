@@ -172,4 +172,8 @@ def get_enricher() -> TextEnricher:
             transport=http_post_json,
             timeout=settings.INGEST_ENRICH_TIMEOUT,
         )
+    if choice in ("claude", "openai"):
+        from .providers import platform_enricher
+
+        return platform_enricher(choice)
     raise ProviderError(f"unknown enricher {choice!r}")
