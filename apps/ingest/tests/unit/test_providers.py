@@ -140,6 +140,21 @@ def test_openai_refusal_or_length_is_an_error() -> None:
         build("openai", Recorder(openai_reply(GOOD, finish="length"))).describe(FACTS, "en", POLICY)
 
 
+def test_claude_skips_a_leading_non_text_block() -> None:
+    reply = {
+        "content": [
+            {"type": "thinking", "thinking": "x"},
+            {"type": "text", "text": json.dumps(GOOD)},
+        ],
+        "stop_reason": "end_turn",
+    }
+    assert build("claude", Recorder(reply)).describe(FACTS, "en", POLICY).raw == GOOD
+    with pytest.raises(ProviderError):
+        build(
+            "claude", Recorder({"content": [{"type": "thinking"}], "stop_reason": "end_turn"})
+        ).describe(FACTS, "en", POLICY)
+
+
 def test_non_object_json_is_an_error() -> None:
     with pytest.raises(ProviderError):
         build("claude", Recorder(claude_reply([1, 2]))).describe(FACTS, "en", POLICY)
