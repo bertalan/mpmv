@@ -3,29 +3,34 @@
 import json
 import logging
 import secrets
+from typing import Any
 
 import pytest
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import connection
 
+from apps.accounts.models import User
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
 from apps.ingest import provider_services as svc
 from apps.ingest.models import VendorAIProvider
+from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 
 pytestmark = pytest.mark.django_db
 CTX = AuditContext(actor_label="user:test", source="vendor", ip="127.0.0.1")
 
 
-def owner_of(vendor):  # type: ignore[no-untyped-def]
+def owner_of(vendor: Vendor) -> User:
     return VendorMemberFactory.create(vendor=vendor, role="owner").user
 
 
 def raw_column(row: VendorAIProvider) -> str:
     with connection.cursor() as cursor:
         cursor.execute("SELECT api_key FROM ingest_vendoraiprovider WHERE id = %s", [row.pk])
-        return str(cursor.fetchone()[0])
+        found = cursor.fetchone()
+    assert found is not None
+    return str(found[0])
 
 
 def audit_text() -> str:
@@ -52,7 +57,7 @@ def test_setting_a_key_stores_it_encrypted_and_audits_without_the_value() -> Non
     assert key not in json.dumps(changes.to_dict())
     entries = list(AuditLog.objects.filter(action="ingest.provider.key_set"))
     assert len(entries) == 1
-    assert entries[0].after["has_key"] is True
+    assert (entries[0].after or {}).get("has_key") is True
     assert key not in audit_text()
 
 
@@ -134,7 +139,7 @@ def test_a_vendor_cannot_reach_another_vendors_key() -> None:
         {"provider": "claude", "model": "m-1", "api_key": "has space in the key"},
     ],
 )
-def test_invalid_input_is_refused_without_echoing_the_key(kwargs: dict[str, str]) -> None:
+def test_invalid_input_is_refused_without_echoing_the_key(kwargs: dict[str, Any]) -> None:
     vendor = VendorFactory.create()
     with pytest.raises(ValidationError) as info:
         svc.save_provider(vendor, actor=owner_of(vendor), ctx=CTX, **kwargs)

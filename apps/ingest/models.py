@@ -20,6 +20,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from apps.catalog.models import Product
+from apps.core.fields import EncryptedCharField
 from apps.core.models import BaseModel
 from apps.vendors.models import Vendor
 from apps.vendors.scoping import VendorScopedManager
@@ -608,6 +609,61 @@ class EnrichmentVersion(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.draft} {self.lang} ({self.outcome})"
+
+
+class AIProvider(models.TextChoices):
+    CLAUDE = "claude", "Claude"
+    GEMINI = "gemini", "Gemini"
+    OPENAI = "openai", "OpenAI"
+
+
+class VendorAIProvider(BaseModel):
+    """A vendor's own AI provider for its own catalogue texts (ING.14, owner decision D-13).
+
+    The key is encrypted at rest with the field keys of SEC.3 (`EncryptedCharField`), write-only
+    in every form and never part of an audit snapshot, a serializer or an error message.
+    """
+
+    vendor_scope: ClassVar[str] = "vendor"
+
+    vendor = models.OneToOneField(
+        Vendor,
+        on_delete=models.CASCADE,
+        related_name="ai_provider",
+        help_text=_("The vendor whose catalogue texts this provider writes."),
+    )
+    provider = models.CharField(
+        max_length=20,
+        choices=AIProvider,
+        help_text=_("Which AI provider writes this vendor's product texts."),
+    )
+    model = models.CharField(max_length=80, help_text=_("The model of the provider to use."))
+    api_key = EncryptedCharField(
+        max_length=300,
+        blank=True,
+        help_text=_("The vendor's own key. It is never shown again."),
+    )
+    key_version = models.PositiveIntegerField(
+        default=0, help_text=_("How many times the key was set. It grows with every rotation.")
+    )
+    key_set_at = models.DateTimeField(
+        null=True, blank=True, help_text=_("When the key was last set.")
+    )
+
+    objects = VendorScopedManager()
+
+    class Meta:
+        constraints = [_in("provider", AIProvider, "ingest_vendoraiprovider_provider_valid")]
+
+    def __str__(self) -> str:
+        return f"{self.vendor_id} {self.provider}"
+
+    def __repr__(self) -> str:  # never the key
+        return f"<VendorAIProvider vendor={self.vendor_id} provider={self.provider}>"
+
+    @property
+    def has_key(self) -> bool:
+        return bool(self.api_key)
 
 
 class ImportRun(BaseModel):

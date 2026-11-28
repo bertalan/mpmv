@@ -162,6 +162,7 @@ def _manager_pages() -> dict[str, str]:
         "manager:shop:statements": "shop",
         "manager:shop:sales_terms": "shop",
         "manager:shop:return_policy": "shop",
+        "manager:shop:ai_provider": "shop",
         "manager:shop:closures": "shop",  # VEN.20
         "manager:shop:closure_edit": "shop",
         "manager:shop:closure_remove": "shop",

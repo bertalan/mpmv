@@ -1,6 +1,7 @@
 """factory_boy factories for ingest (ING.1). Vendors are pseudonyms, URLs use example.* domains."""
 
 import datetime as dt
+import secrets
 from typing import Any
 
 import factory
@@ -23,6 +24,7 @@ from apps.ingest.models import (
     SourceStateVersion,
     SourceVariation,
     SupplierSource,
+    VendorAIProvider,
 )
 from apps.vendors.tests.factories import VendorFactory
 
@@ -175,3 +177,14 @@ class EnrichmentVersionFactory(DjangoModelFactory[EnrichmentVersion]):
     model = "fake-1"
     prompt_version = "v1"
     outcome = EnrichmentVersion.Outcome.ACCEPTED
+
+
+class VendorAIProviderFactory(DjangoModelFactory[VendorAIProvider]):
+    class Meta:
+        model = VendorAIProvider
+
+    vendor = factory.SubFactory(VendorFactory)
+    provider = "claude"
+    model = "model-1"
+    api_key = factory.LazyFunction(lambda: secrets.token_urlsafe(24))
+    key_version = 1

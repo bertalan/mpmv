@@ -10,6 +10,7 @@ from wagtail.rich_text import features as feature_registry
 
 from apps.core.nfc_forms import NFCForm
 from apps.core.text import nfc
+from apps.ingest.models import AIProvider
 from apps.orders import engine as orders_engine
 from apps.vendors import return_engine
 from apps.vendors.engine import LOGO_ALT_MAX_LENGTH, PROFILE_MAX_LENGTH
@@ -403,3 +404,35 @@ class ClosureForm(NFCForm):
         max_value=60,
         initial=14,
     )
+
+
+class AIProviderForm(NFCForm):
+    """The shop's own AI provider and key (ING.14). The key is write-only: it is never rendered
+    back, blank keeps the stored one. The service owns the rules."""
+
+    nfc_exact_fields = ("model",)
+
+    provider = forms.ChoiceField(
+        label=_("AI provider"),
+        choices=AIProvider.choices,
+        help_text=_("The service that writes the texts of your own products. Required."),
+    )
+    model = forms.CharField(
+        label=_("Model"),
+        max_length=80,
+        help_text=_(
+            "The model name as the provider writes it, for example the current small model."
+        ),
+    )
+    api_key = forms.CharField(
+        label=_("API key"),
+        required=False,
+        max_length=300,
+        strip=True,
+        widget=forms.PasswordInput(render_value=False, attrs={"autocomplete": "off"}),
+        help_text=_(
+            "Your key for this provider. It is stored encrypted and never shown again. "
+            "Leave it empty to keep the key you saved before."
+        ),
+    )
+    remove_key = forms.BooleanField(label=_("Remove the saved key"), required=False)

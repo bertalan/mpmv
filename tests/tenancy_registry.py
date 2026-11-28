@@ -110,6 +110,7 @@ from apps.ingest.models import (
     SourceStateVersion,
     SourceVariation,
     SupplierSource,
+    VendorAIProvider,
 )
 from apps.ingest.tests.factories import (
     EnrichmentVersionFactory,
@@ -125,6 +126,7 @@ from apps.ingest.tests.factories import (
     SourceStateVersionFactory,
     SourceVariationFactory,
     SupplierSourceFactory,
+    VendorAIProviderFactory,
 )
 from apps.ledger.models import LedgerEntry, Refund
 from apps.ledger.tests.factories import LedgerEntryFactory, RefundFactory
@@ -291,6 +293,7 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     GpsrInfo: lambda vendor: GpsrInfoFactory.create(product=ProductFactory.create(vendor=vendor)),
     VendorGpsrDefaults: lambda vendor: VendorGpsrDefaultsFactory.create(vendor=vendor),
     SupplierSource: lambda vendor: SupplierSourceFactory.create(vendor=vendor),
+    VendorAIProvider: lambda vendor: VendorAIProviderFactory.create(vendor=vendor),
     SourceItem: lambda vendor: SourceItemFactory.create(source__vendor=vendor),
     SourceObservation: lambda vendor: SourceObservationFactory.create(item__source__vendor=vendor),
     ProductDraft: lambda vendor: ProductDraftFactory.create(item__source__vendor=vendor),
@@ -735,6 +738,7 @@ ENDPOINTS: dict[str, Access] = {
     "manager:shop:return_policy": VendorScopedList(
         make=manager_vendor, identify=vendor_display_name
     ),
+    "manager:shop:ai_provider": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     "manager:shop:termination": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     # The statements of reasons of the selected shop (DSA art. 17); another shop's are never listed.
     "manager:shop:statements": VendorScopedList(

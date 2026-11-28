@@ -39,6 +39,7 @@ from apps.manager.fitment_forms import (
 )
 from apps.manager.fitment_shop_forms import ProposalForm
 from apps.manager.forms import (
+    AIProviderForm,
     EndEverySessionForm,
     EndUserSessionsForm,
     ReturnPolicyForm,
@@ -144,6 +145,7 @@ FORMS: dict[str, tuple[Callable[[dict[str, str]], NFCForm], tuple[str, ...], tup
     "staff_role": (lambda d: StaffRoleForm(d), ("reason",), ("email",)),
     "sales_terms": (lambda d: SalesTermsForm(d), ("body", "governing_law"), ()),
     "return_policy": (lambda d: ReturnPolicyForm(d), (), ("returns_page_url", "return_country")),
+    "ai_provider": (lambda d: AIProviderForm(d), (), ("model",)),
     "user_lookup": (lambda d: UserLookupForm(d), (), ("email",)),
     "end_sessions": (lambda d: EndUserSessionsForm(d), ("reason",), ()),
     "end_every_session": (lambda d: EndEverySessionForm(d), ("confirm",), ()),

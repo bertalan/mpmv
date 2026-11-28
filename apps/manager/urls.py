@@ -8,6 +8,7 @@ outside `/manager/`.
 from django.urls import include, path
 
 from . import (
+    ai_provider_views,
     amendment_views,
     closure_views,
     event_block_views,
@@ -52,6 +53,7 @@ shop = (
         path(
             "return-policy/", return_policy_views.ReturnPolicyView.as_view(), name="return_policy"
         ),
+        path("ai-provider/", ai_provider_views.AIProviderView.as_view(), name="ai_provider"),
         # VEN.20: the shop's holidays and closures (list and add, edit, remove).
         path("settings/closures/", closure_views.ClosuresView.as_view(), name="closures"),
         path(
