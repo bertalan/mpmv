@@ -5,6 +5,13 @@ class IngestConfig(AppConfig):
     name = "apps.ingest"
     label = "ingest"
 
+    def ready(self) -> None:
+        from django.core import checks
+
+        from .checks import check_enricher_settings
+
+        checks.register(check_enricher_settings)
+
     # Audit policy (SEC.4, docs/dev/audit-trail.md). Sources, mappings, runs and review
     # decisions change what the catalogue imports: written through the audited services.
     audited_models = (
