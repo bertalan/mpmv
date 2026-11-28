@@ -17,6 +17,7 @@ from django.urls import URLPattern, path
 from django.utils import timezone
 
 from apps.core.audit import audit_context
+from apps.core.tasks import business_tz
 
 from . import engine, reports, services
 from .models import (
@@ -101,7 +102,7 @@ class ImportRunAdmin(_ReadOnly, admin.ModelAdmin[ImportRun]):
         """The daily report (ING.10) in the admin: same content as the email, any day."""
         if not self.has_view_permission(request):
             raise PermissionDenied
-        today = timezone.now().astimezone(dt.UTC).date()
+        today = timezone.localdate(timezone.now(), business_tz())
         try:
             day = dt.date.fromisoformat(request.GET.get("day", ""))
         except ValueError:

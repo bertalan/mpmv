@@ -14,7 +14,9 @@ from django.db.models import Count
 
 from apps.core.alerts import alert_address
 from apps.core.audit import AuditContext, record
+from apps.core.observability import redact_text
 from apps.core.services import enqueue_email
+from apps.core.tasks import business_tz
 
 from . import engine
 from .models import ImportRun, ReviewItem, SourceItem, SupplierSource
@@ -26,8 +28,19 @@ EMAIL_TEMPLATE = "ingest.daily_report"
 
 
 def _window(day: dt.date) -> tuple[dt.datetime, dt.datetime]:
-    start = dt.datetime.combine(day, dt.time.min, tzinfo=dt.UTC)
-    return start, start + dt.timedelta(days=1)
+    """The business day `day` as two UTC instants: 23 or 25 hours long on a DST change day."""
+    tz = business_tz()
+    start = dt.datetime.combine(day, dt.time.min, tzinfo=tz)
+    end = dt.datetime.combine(day + dt.timedelta(days=1), dt.time.min, tzinfo=tz)
+    return start.astimezone(dt.UTC), end.astimezone(dt.UTC)
+
+
+def _error_text(run: ImportRun) -> str:
+    """The first log line of a failed run, redacted like any log (secrets, URLs' tokens, emails)."""
+    if run.status != "failed":
+        return ""
+    line = (run.log.splitlines() or [""])[0]
+    return redact_text(line, limit=engine.REPORT_ERROR_CHARS)
 
 
 def _source_rows(
@@ -49,7 +62,7 @@ def _source_rows(
             unchanged=run.unchanged,
             skipped=run.skipped,
             errors=run.errors,
-            error_text=(run.log.splitlines() or [""])[0] if run.status == "failed" else "",
+            error_text=_error_text(run),
         )
         for run in ImportRun.objects.filter(
             source=source, created_at__gte=start, created_at__lt=end
@@ -97,7 +110,7 @@ def _first_source_of_vendor(source: SupplierSource) -> bool:
 
 
 def gather_daily_report(day: dt.date) -> engine.DailyReport:
-    """The report of `day` (UTC) over every active source."""
+    """The report of the business day `day` over every active source."""
     runs: list[engine.ReportRun] = []
     reviews: list[engine.ReportReview] = []
     collisions: list[engine.ReportCollision] = []

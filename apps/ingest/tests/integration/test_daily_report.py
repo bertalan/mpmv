@@ -158,3 +158,47 @@ def test_a_vendor_member_cannot_open_the_admin_report(
     client = mfa_login(client, cross_tenant.a.owner)
     response = client.get(reverse("admin:ingest_importrun_daily_report"))
     assert response.status_code in (302, 403, 404)
+
+
+def _local(day: dt.date, hour: int, minute: int) -> dt.datetime:
+    from apps.core.tasks import business_tz
+
+    return dt.datetime.combine(day, dt.time(hour, minute), tzinfo=business_tz())
+
+
+@pytest.mark.parametrize("day", [dt.date(2026, 3, 29), dt.date(2026, 10, 25), dt.date(2026, 7, 1)])
+def test_the_window_is_the_whole_business_day_also_on_a_time_change(day: dt.date) -> None:
+    source = SupplierSourceFactory.create()
+    inside = [_local(day, 0, 0), _local(day, 23, 59)]
+    outside = [
+        _local(day, 0, 0) - dt.timedelta(minutes=1),
+        _local(day + dt.timedelta(days=1), 0, 0),
+    ]
+    for moment in inside + outside:
+        run = ImportRunFactory.create(source=source)
+        ImportRun.objects.filter(pk=run.pk).update(created_at=moment)
+    assert reports.gather_daily_report(day).runs_total == 2
+    start, end = reports._window(day)
+    assert end - start in {
+        dt.timedelta(hours=23), dt.timedelta(hours=24), dt.timedelta(hours=25)
+    }  # fmt: skip
+
+
+def test_the_job_just_after_business_midnight_reports_the_day_that_ended() -> None:
+    source = SupplierSourceFactory.create()
+    late = ImportRunFactory.create(source=source)
+    ImportRun.objects.filter(pk=late.pk).update(created_at=_local(dt.date(2026, 3, 28), 23, 50))
+    run_time = _local(dt.date(2026, 3, 29), 0, 10)  # the night the clocks go forward
+    tasks.daily_report.func(timestamp=int(run_time.timestamp()))
+    mail = OutboxEmail.objects.get(template_key="ingest.daily_report")
+    assert mail.idempotency_key == "ingest:daily-report:2026-03-28"
+    assert "2026-03-28" in mail.text_body
+
+
+def test_the_error_line_of_a_failed_run_is_redacted() -> None:
+    source = SupplierSourceFactory.create()
+    _run(source, status="failed", errors=1, log="boom for ada@example.org token=abcdef123456")
+    report = reports.gather_daily_report(DAY)
+    text = report.error_runs[0].error_text
+    assert "ada@example.org" not in text
+    assert "abcdef123456" not in text
