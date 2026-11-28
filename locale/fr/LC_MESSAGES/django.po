@@ -3774,6 +3774,10 @@ msgstr "Événements"
 msgid "Events awaiting review"
 msgstr "Événements en attente de relecture"
 
+#: apps/events/templates/events/_filters.html
+msgid "Events for everyone, with no vehicle, are left out."
+msgstr "Les événements pour tous, sans véhicule, sont masqués."
+
 #: apps/events/templates/events/event_calendar.html
 msgid "Events in %(month)s"
 msgstr "Événements de %(month)s"

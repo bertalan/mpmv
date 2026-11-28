@@ -146,3 +146,14 @@ def test_the_checkbox_label_is_translated(events: dict[str, EventPage]) -> None:
     with translation.override(primary_language()):
         label = translation.gettext("Only events for my garage")
     assert label in _list(client)
+
+
+def test_the_checkbox_says_that_general_events_are_left_out(events: dict[str, EventPage]) -> None:
+    client = Client()
+    _garage(client, "Roadster")
+    with translation.override(primary_language()):
+        help_text = translation.gettext("Events for everyone, with no vehicle, are left out.")
+    page = _list(client)
+    assert help_text in page
+    assert 'aria-describedby="event-filter-garage-help"' in page
+    assert 'id="event-filter-garage-help"' in page
