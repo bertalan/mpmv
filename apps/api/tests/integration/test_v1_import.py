@@ -212,6 +212,34 @@ def test_stock_for_another_vendors_sku_is_404_and_nothing_is_written(
         assert product.stock_qty == 1
 
 
+def test_the_stock_sku_check_runs_inside_the_write_transaction(
+    client: Client, vendor: Vendor, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from django.db import connection
+
+    from apps.catalog import services
+
+    product = ProductFactory.create(vendor=vendor, stock_qty=1)
+    real = services.match_skus
+    seen: list[bool] = []
+
+    def spy(*args: Any, **kwargs: Any) -> Any:
+        seen.append(len(connection.savepoint_ids) > 0)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(services, "match_skus", spy)
+    response = _put(
+        client,
+        STOCK,
+        {"items": [{"sku": product.sku, "stock_qty": 3}]},
+        _headers(vendor, ["stock:write"]),
+    )
+
+    assert response.status_code == 200, response.content
+    assert seen
+    assert all(seen)
+
+
 @pytest.mark.parametrize(
     "item",
     [
