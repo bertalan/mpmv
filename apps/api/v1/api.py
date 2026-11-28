@@ -16,6 +16,7 @@ from ninja.openapi.docs import Swagger
 
 from .catalog import router as catalog_router
 from .closures import router as closures_router
+from .docs_gate import restrict_docs
 from .endpoints import router as v1_router
 from .errors import install_problem_handlers
 from .events import router as events_router
@@ -34,7 +35,10 @@ DESCRIPTION = (
     "in a minute the IP is blocked for 5 minutes. While it is blocked every request from it "
     "gets 429, even one with a valid key, because the block is checked before the key. "
     "An address shared behind a NAT can therefore be blocked by someone else's bad keys; "
-    "wait for the seconds in `Retry-After` and retry."
+    "wait for the seconds in `Retry-After` and retry.\n\n"
+    "On LIVE this documentation is not public. A key holder fetches `openapi.json` with an "
+    "`Authorization` header (for example with curl); the Swagger page in a browser needs a "
+    "signed-in staff session, because a browser sends no `Authorization` header."
 )
 
 
@@ -55,6 +59,7 @@ def create_api(*, urls_namespace: str = "api-v1") -> ApiV1:
         description=DESCRIPTION,
         urls_namespace=urls_namespace,
         docs=Swagger(settings={"persistAuthorization": False}),
+        docs_decorator=restrict_docs,
     )
     install_problem_handlers(api)
     api.add_decorator(track_calls, mode="view")

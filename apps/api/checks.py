@@ -4,10 +4,12 @@
   `API_RATE_LIMIT_CLIENTS`, CORE.12) cannot be read; every API call would fail.
 - api.E004: the refused-key limit settings (`API_REFUSED_KEY_RATE_LIMIT`,
   `API_REFUSED_KEY_BLOCK_SECONDS`, CORE.20) cannot be read; every API call would fail.
+- api.E005: the API documentation is public on LIVE (`API_DOCS_PUBLIC`, CORE.29).
 """
 
 from typing import Any
 
+from django.conf import settings
 from django.core.checks import CheckMessage, Error, Tags, register
 
 from .engine import InvalidRateLimit
@@ -39,6 +41,19 @@ def check_refused_key_settings(app_configs: Any = None, **kwargs: Any) -> list[C
                 f"Invalid API_REFUSED_KEY_* setting: {exc}",
                 hint="The limit reads like 30/minute; the block is a whole number of seconds.",
                 id="api.E004",
+            )
+        ]
+    return []
+
+
+@register(Tags.security)
+def check_docs_not_public_on_live(app_configs: Any = None, **kwargs: Any) -> list[CheckMessage]:
+    if getattr(settings, "LIVE_DATA", False) and getattr(settings, "API_DOCS_PUBLIC", False):
+        return [
+            Error(
+                "API_DOCS_PUBLIC is on with LIVE_DATA: the API documentation would be public.",
+                hint="LIVE serves it only to a valid API key or staff (CORE.29, Q-13).",
+                id="api.E005",
             )
         ]
     return []

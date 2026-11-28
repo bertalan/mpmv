@@ -115,6 +115,16 @@ def _attempt_cost(client: Client, email: str, calls: list[str]) -> tuple[int, in
     return len(calls), response.status_code, shown
 
 
+def _locked_attempt(
+    client: Client, email: str, calls: list[str]
+) -> tuple[int, int, tuple[str, ...]]:
+    """(hashes computed, status code, form errors shown) for one login on a locked account."""
+    calls.clear()
+    response = _login(client, email, _password())
+    form = response.context["form"]
+    return len(calls), response.status_code, tuple(form.non_field_errors())
+
+
 def test_login_does_the_same_work_whether_or_not_the_account_exists(
     client: Client, hash_calls: list[str]
 ) -> None:
@@ -142,11 +152,16 @@ def test_a_locked_login_does_the_same_work_whether_or_not_the_account_exists(
         for _ in range(services.ACCOUNT_LOCKOUT.free_attempts):
             _login(client, email, _password(), ip=f"198.51.100.{len(email)}")
     locked = {
-        email: _attempt_cost(client, email, hash_calls)
+        email: _locked_attempt(client, email, hash_calls)
         for email in ("staff@example.com", "nobody@example.com")
     }
-    # Refused before any password check, for a real account and an unknown one alike.
-    assert set(locked.values()) == {(0, 200, True)}, locked
+    # Refused before any password check, for a real account and an unknown one alike, with the
+    # same waiting-time text (CORE.29), not the generic wrong-password error.
+    assert len(set(locked.values())) == 1, locked
+    hashes, status, errors = locked["staff@example.com"]
+    assert (hashes, status) == (0, 200)
+    assert errors
+    assert GENERIC_ERROR not in errors
     assert AuditLog.objects.filter(action=services.LOCKED_OUT).count() == 2
 
 
