@@ -12,7 +12,6 @@ parsing, and reports a bad row instead of raising, so one bad row never hides th
 Parsing is a read: a dry-run is the default and writes nothing; the caller stores the result.
 """
 
-import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
@@ -128,6 +127,20 @@ MAX_AMOUNT: Final = Decimal(10) ** 9
 FIELD_MAX_CHARS: Final = 65_536
 
 
+def _is_grouped(text: str, sep: str) -> bool:
+    """True for `1,234,567`: 1-3 leading digits (optional sign), then groups of exactly three.
+    Plain string checks, no regex, so a hostile cell cannot cost more than linear time."""
+    first, *groups = text.split(sep)
+    digits = first[1:] if first[:1] in {"+", "-"} else first
+    return (
+        1 <= len(digits) <= 3
+        and digits.isascii()
+        and digits.isdigit()
+        and bool(groups)
+        and all(len(g) == 3 and g.isascii() and g.isdigit() for g in groups)
+    )
+
+
 def parse_decimal(raw: str, decimal: str | None = None) -> Decimal:
     """A finite decimal with |value| <= 10**9, or ValueError.
 
@@ -150,7 +163,7 @@ def parse_decimal(raw: str, decimal: str | None = None) -> Decimal:
             sep = found[0]
             head, _, tail = cleaned.partition(sep)
             if cleaned.count(sep) > 1:
-                if not re.fullmatch(rf"[+-]?\d{{1,3}}(?:{re.escape(sep)}\d{{3}})+", cleaned):
+                if not _is_grouped(cleaned, sep):
                     raise ValueError("bad grouping")
                 cleaned = cleaned.replace(sep, "")
             elif len(tail) == 3 and tail.isdigit() and head.lstrip("+-") not in {"", "0"}:

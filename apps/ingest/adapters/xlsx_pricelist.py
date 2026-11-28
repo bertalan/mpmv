@@ -11,8 +11,8 @@ import io
 import zipfile
 from collections.abc import Sequence
 from typing import Final
-from xml.etree.ElementTree import ParseError
 
+from defusedxml.ElementTree import ParseError  # same class as the stdlib one; we only catch it
 from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 
