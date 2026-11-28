@@ -53,7 +53,9 @@ def _put(client: Client, url: str, body: Any, headers: dict[str, str], query: st
     return client.put(url + query, body, content_type="application/json", headers=headers)
 
 
-def test_upsert_creates_then_updates_by_sku_and_is_idempotent(client: Client, vendor: Vendor) -> None:
+def test_upsert_creates_then_updates_by_sku_and_is_idempotent(
+    client: Client, vendor: Vendor
+) -> None:
     headers = _headers(vendor, ["catalog:write"])
     first = _post(client, UPSERT, {"items": [_row()]}, headers)
     assert first.status_code == 200, first.content
@@ -90,7 +92,7 @@ def test_upsert_dry_run_returns_the_changeset_and_writes_nothing(
 
 def test_a_bad_row_is_reported_and_the_others_apply(client: Client, vendor: Vendor) -> None:
     headers = _headers(vendor, ["catalog:write"])
-    body = {"items": [_row("OK-1"), _row("BAD-1", price_net="-1.00")]}
+    body: dict[str, Any] = {"items": [_row("OK-1"), _row("BAD-1", price_net="-1.00")]}
     response = _post(client, UPSERT, body, headers)
 
     assert response.status_code == 200, response.content
@@ -103,7 +105,12 @@ def test_a_bad_row_is_reported_and_the_others_apply(client: Client, vendor: Vend
 
 def test_upsert_validation_failures_are_problem_details(client: Client, vendor: Vendor) -> None:
     headers = _headers(vendor, ["catalog:write"])
-    for body in ({"items": [{"sku": "X"}]}, {"items": []}, {"items": [_row()] * 501}):
+    bodies: list[dict[str, Any]] = [
+        {"items": [{"sku": "X"}]},
+        {"items": []},
+        {"items": [_row()] * 501},
+    ]
+    for body in bodies:
         response = _post(client, UPSERT, body, headers)
         assert response.status_code == 422
         assert response["Content-Type"].startswith("application/problem+json")
@@ -148,7 +155,9 @@ def test_the_wrong_scope_is_refused(
     client: Client, vendor: Vendor, method: str, url: str, scope: str
 ) -> None:
     headers = _headers(vendor, [scope])
-    response = getattr(client, method)(url, {"items": []}, content_type="application/json", headers=headers)
+    response = getattr(client, method)(
+        url, {"items": []}, content_type="application/json", headers=headers
+    )
     assert response.status_code == 403
     assert response.json()["code"] == "insufficient_scope"
 
@@ -162,7 +171,7 @@ def test_stock_sets_quantities_by_sku(client: Client, vendor: Vendor) -> None:
     assert response.status_code == 200, response.content
     product.refresh_from_db()
     assert product.stock_qty == 7
-    assert AuditLog.objects.filter(action="catalog.sku_rows.updated").exists()
+    assert AuditLog.objects.filter(action="catalog.sku_rows_updated").exists()
 
 
 def test_stock_dry_run_writes_nothing(client: Client, vendor: Vendor) -> None:
@@ -199,7 +208,12 @@ def test_stock_for_another_vendors_sku_is_404_and_nothing_is_written(
 
 @pytest.mark.parametrize(
     "item",
-    [{"sku": "A", "stock_qty": -1}, {"sku": "A", "stock_qty": 2**31}, {"sku": "A"}, {"stock_qty": 1}],
+    [
+        {"sku": "A", "stock_qty": -1},
+        {"sku": "A", "stock_qty": 2**31},
+        {"sku": "A"},
+        {"stock_qty": 1},
+    ],
 )
 def test_stock_validation_errors_are_problems(client: Client, vendor: Vendor, item: Any) -> None:
     response = _put(client, STOCK, {"items": [item]}, _headers(vendor, ["stock:write"]))
