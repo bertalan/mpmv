@@ -61,7 +61,7 @@ def http_transport(base_url: str, api_key: str) -> Transport:
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
         )
         try:
-            with urllib.request.urlopen(request, timeout=60) as response:  # noqa: S310
+            with urllib.request.urlopen(request, timeout=60) as response:  # noqa: S310 (https base URL checked above)
                 return response.status, _json(response.read())
         except urllib.error.HTTPError as error:  # RFC 9457 problem details
             return error.code, _json(error.read())
