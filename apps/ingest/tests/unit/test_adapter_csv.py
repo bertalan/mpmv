@@ -162,3 +162,11 @@ def test_a_long_hostile_cell_is_rejected_fast() -> None:
     with pytest.raises(ValueError, match=r"grouping|number"):
         base.parse_decimal("1," + "123," * 20_000 + "x")
     assert time.monotonic() - start < 2.0
+
+
+def test_the_adapter_leaves_the_process_wide_csv_limit_as_it_found_it() -> None:
+    import csv
+
+    before = csv.field_size_limit()
+    _adapter().parse(b"Code,Name,Price,Qty\nA-1,Pan,1.50,3\n")
+    assert csv.field_size_limit() == before
