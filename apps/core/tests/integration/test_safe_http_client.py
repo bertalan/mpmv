@@ -1,7 +1,11 @@
 """MIG.12: `safe_get` end to end with a fake resolver and a fake transport (no real network)."""
 
 import http.client
+import secrets
 import socket
+import ssl
+import threading
+import time
 from collections.abc import Callable, Iterator, Mapping, Sequence
 
 import pytest
@@ -16,6 +20,8 @@ from apps.core.safe_http import (
     Target,
     TooManyRedirects,
     TransportFailure,
+    UnsafeHeader,
+    UnsafeUrl,
     safe_get,
 )
 
@@ -27,11 +33,18 @@ class FakeTransport:
         self.responses = list(responses)
         self.calls: list[tuple[Target, str]] = []
         self.closed = 0
+        self.sent: list[dict[str, str]] = []
 
     def get(
-        self, target: Target, ip: str, headers: Mapping[str, str], timeouts: tuple[float, float]
+        self,
+        target: Target,
+        ip: str,
+        headers: Mapping[str, str],
+        timeouts: tuple[float, float],
+        budget: float,
     ) -> RawResponse:
         self.calls.append((target, ip))
+        self.sent.append(dict(headers))
         status, hdrs, chunks = self.responses.pop(0)
 
         def it() -> Iterator[bytes]:
@@ -198,9 +211,7 @@ def test_an_oversize_declared_length_is_refused_before_reading() -> None:
         yield b""
 
     class T(FakeTransport):
-        def get(
-            self, target: Target, ip: str, headers: Mapping[str, str], timeouts: tuple[float, float]
-        ) -> RawResponse:
+        def get(self, *args: object) -> RawResponse:
             return RawResponse(200, {"Content-Length": "5000"}, explode)
 
     with pytest.raises(ResponseTooLarge):
@@ -354,10 +365,15 @@ def test_credential_headers_do_not_cross_origins() -> None:
 
     class Spy(FakeTransport):
         def get(
-            self, target: Target, ip: str, headers: Mapping[str, str], timeouts: tuple[float, float]
+            self,
+            target: Target,
+            ip: str,
+            headers: Mapping[str, str],
+            timeouts: tuple[float, float],
+            budget: float,
         ) -> RawResponse:
             seen.append(dict(headers))
-            return super().get(target, ip, headers, timeouts)
+            return super().get(target, ip, headers, timeouts, budget)
 
     safe_get(
         "https://feed.example/",
@@ -405,3 +421,243 @@ def test_the_host_header_omits_the_default_port() -> None:
     assert conn.default_port == 443
     http_conn = safe_http._PinnedConnection("feed.example", 80, PUBLIC, 1.0)
     assert http_conn.default_port == 80
+
+
+# ---- review fixes (lane-a 2026-11-28): headers, deadline, downgrade, TLS pinning -----------------
+
+
+def _fetch(
+    transport: FakeTransport, url: str = "https://feed.example/", **kwargs: object
+) -> object:
+    return safe_get(
+        url,
+        max_bytes=1000,
+        resolver=resolver_for({"feed.example": [PUBLIC], "other.example": [PUBLIC]}),
+        transport=transport,
+        **kwargs,  # type: ignore[arg-type]
+    )
+
+
+@pytest.mark.parametrize("suffix", ["\n", "\r\nX-Evil: 1", "\x00", "caf\u00e9\u20ac"])
+def test_a_header_value_with_control_characters_never_leaks_in_an_error(suffix: str) -> None:
+    canary = "tok-" + secrets.token_urlsafe(16)
+    transport = FakeTransport([])
+    with pytest.raises(UnsafeHeader) as info:
+        _fetch(transport, headers={"Authorization": canary + suffix})
+    assert canary not in str(info.value)
+    assert "Authorization" in str(info.value)
+    assert transport.calls == []
+
+
+def test_a_bad_header_name_is_refused_without_echoing_it() -> None:
+    with pytest.raises(UnsafeHeader) as info:
+        _fetch(FakeTransport([]), headers={"X Bad\nName": "v"})
+    assert "Bad" not in str(info.value)
+
+
+def test_the_real_transport_never_leaks_a_header_value_either(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Even if a bad value got past the validation, http.client's ValueError is typed."""
+    canary = "tok-" + secrets.token_urlsafe(16)
+    a, b = socket.socketpair()
+    monkeypatch.setattr(socket, "create_connection", lambda *a_, **k: a)
+    target = Target("http", "feed.example", 80, "/")
+    with pytest.raises(TransportFailure) as info:
+        safe_http.HttpClientTransport().get(
+            target, PUBLIC, {"Authorization": canary + "\n"}, (1.0, 1.0), 5.0
+        )
+    assert canary not in str(info.value)
+    b.close()
+
+
+def test_host_and_hop_by_hop_headers_are_not_forwarded_and_encoding_is_identity() -> None:
+    transport = FakeTransport([(200, {}, [b"ok"])])
+    _fetch(
+        transport,
+        headers={
+            "Host": "internal.example",
+            "Connection": "keep-alive",
+            "Transfer-Encoding": "chunked",
+            "Content-Length": "5",
+            "Proxy-Authorization": "x",
+            "proxy-connection": "x",
+            "Accept-Encoding": "gzip",
+            "X-Api-Key": "k",
+        },
+    )
+    sent = {k.lower(): v for k, v in transport.sent[0].items()}
+    assert sent["accept-encoding"] == "identity"
+    assert sent["x-api-key"] == "k"
+    for name in ("host", "connection", "transfer-encoding", "content-length"):
+        assert name not in sent
+    assert not any(k.startswith("proxy-") for k in sent)
+
+
+def test_an_https_to_http_redirect_is_refused_even_when_http_is_allowed() -> None:
+    transport = FakeTransport([(302, {"Location": "http://feed.example/x"}, [])])
+    with pytest.raises(UnsafeUrl):
+        _fetch(transport, max_redirects=2, allowed_schemes=("https", "http"))
+    assert len(transport.calls) == 1
+
+
+def test_an_http_to_https_redirect_is_followed() -> None:
+    transport = FakeTransport(
+        [(302, {"Location": "https://feed.example/x"}, []), (200, {}, [b"ok"])]
+    )
+    response = _fetch(
+        transport, url="http://feed.example/", max_redirects=2, allowed_schemes=("https", "http")
+    )
+    assert response.body == b"ok"  # type: ignore[attr-defined]
+
+
+def test_header_lookups_are_case_insensitive() -> None:
+    redirect = FakeTransport(
+        [(301, {"LOCATION": "https://other.example/"}, []), (200, {"CONTENT-TYPE": "t/x"}, [b"k"])]
+    )
+    response = _fetch(redirect, max_redirects=1)
+    assert response.headers["content-type"] == "t/x"  # type: ignore[attr-defined]
+    big = FakeTransport([(200, {"CONTENT-LENGTH": "999999"}, [b"x"])])
+    with pytest.raises(ResponseTooLarge):
+        _fetch(big)
+
+
+def test_the_dns_lookup_is_inside_the_overall_deadline() -> None:
+    release = threading.Event()
+
+    def hanging(host: str, port: int) -> list[str]:
+        release.wait(5)
+        return [PUBLIC]
+
+    started = time.monotonic()
+    with pytest.raises(safe_http.DeadlineExceeded):
+        safe_get(
+            "https://feed.example/",
+            max_bytes=10,
+            deadline=0.2,
+            resolver=hanging,
+            transport=FakeTransport([]),
+        )
+    release.set()
+    assert time.monotonic() - started < 2
+
+
+def test_a_resolver_error_still_propagates_typed() -> None:
+    with pytest.raises(ResolutionFailed):
+        _fetch(FakeTransport([]), url="https://nowhere.example/")
+
+
+def _slow_peer(peer: socket.socket, payload: bytes, stop: threading.Event) -> threading.Thread:
+    def run() -> None:
+        try:
+            for byte in payload:
+                if stop.is_set():
+                    return
+                peer.sendall(bytes([byte]))
+                time.sleep(0.05)
+        except OSError:
+            return
+
+    thread = threading.Thread(target=run, daemon=True)
+    thread.start()
+    return thread
+
+
+def test_a_status_line_trickled_byte_by_byte_hits_the_overall_deadline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, peer = socket.socketpair()
+    stop = threading.Event()
+    monkeypatch.setattr(socket, "create_connection", lambda *a, **k: client)
+    _slow_peer(peer, b"HTTP/1.1 200 OK" + b"x" * 400, stop)
+    started = time.monotonic()
+    try:
+        with pytest.raises(safe_http.DeadlineExceeded):
+            safe_get(
+                "http://feed.example/",
+                max_bytes=10,
+                deadline=0.4,
+                allowed_schemes=("https", "http"),
+                resolver=resolver_for({"feed.example": [PUBLIC]}),
+            )
+    finally:
+        stop.set()
+        peer.close()
+    assert time.monotonic() - started < 3
+
+
+def test_a_tls_handshake_that_never_ends_hits_the_overall_deadline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, peer = socket.socketpair()  # the peer never answers the ClientHello
+    monkeypatch.setattr(socket, "create_connection", lambda *a, **k: client)
+    started = time.monotonic()
+    try:
+        with pytest.raises(safe_http.DeadlineExceeded):
+            safe_get(
+                "https://feed.example/",
+                max_bytes=10,
+                deadline=0.4,
+                resolver=resolver_for({"feed.example": [PUBLIC]}),
+            )
+    finally:
+        peer.close()
+    assert time.monotonic() - started < 3
+
+
+def test_a_truncated_body_after_the_deadline_is_not_returned_as_complete(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, peer = socket.socketpair()
+    stop = threading.Event()
+    monkeypatch.setattr(socket, "create_connection", lambda *a, **k: client)
+    peer.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 500\r\n\r\n")
+    _slow_peer(peer, b"y" * 400, stop)
+    try:
+        with pytest.raises(safe_http.DeadlineExceeded):
+            safe_get(
+                "http://feed.example/",
+                max_bytes=1000,
+                deadline=0.4,
+                allowed_schemes=("https", "http"),
+                resolver=resolver_for({"feed.example": [PUBLIC]}),
+            )
+    finally:
+        stop.set()
+        peer.close()
+
+
+def test_tls_keeps_the_name_for_sni_and_verifies_the_certificate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: dict[str, object] = {}
+    client, peer = socket.socketpair()
+
+    def fake_wrap(
+        self: ssl.SSLContext,
+        sock: socket.socket,
+        *,
+        server_hostname: str | None = None,
+        **kw: object,
+    ) -> None:
+        seen.update(
+            server_hostname=server_hostname,
+            verify_mode=self.verify_mode,
+            check_hostname=self.check_hostname,
+        )
+        raise OSError("stop here")
+
+    monkeypatch.setattr(socket, "create_connection", lambda *a, **k: client)
+    monkeypatch.setattr(ssl.SSLContext, "wrap_socket", fake_wrap)
+    with pytest.raises(TransportFailure):
+        safe_get(
+            "https://feed.example/",
+            max_bytes=10,
+            resolver=resolver_for({"feed.example": [PUBLIC]}),
+        )
+    peer.close()
+    assert seen == {
+        "server_hostname": "feed.example",
+        "verify_mode": ssl.CERT_REQUIRED,
+        "check_hostname": True,
+    }

@@ -1,5 +1,7 @@
 """MIG.12: pure URL and address checks of the SSRF guard (no network, no database)."""
 
+import secrets
+
 import pytest
 
 from apps.core.safe_http import (
@@ -16,6 +18,7 @@ BLOCKED_IPS = [
     "198.18.0.1", "192.0.2.1", "::1", "::", "fe80::1", "fc00::1", "fd00:ec2::254",
     "ff02::1", "::ffff:127.0.0.1", "::ffff:10.1.2.3", "::ffff:169.254.169.254",
     "64:ff9b::7f00:1", "2002:7f00:1::1", "2001:0:4136:e378:8000:63bf:3fff:fdd2",
+    "192.88.99.1", "192.88.99.255",
 ]  # fmt: skip
 ALLOWED_IPS = ["93.184.216.34", "8.8.8.8", "1.1.1.1", "2606:4700:4700::1111", "::ffff:8.8.8.8"]
 
@@ -130,7 +133,8 @@ def test_an_unknown_scheme_cannot_be_allowed() -> None:
 
 
 def test_errors_never_echo_the_url() -> None:
+    secret = secrets.token_urlsafe(16)
     with pytest.raises(UnsafeUrl) as info:
-        check_url("https://user:secretvalue@example.com/?token=abc")
-    assert "secretvalue" not in str(info.value)
+        check_url(f"https://user:{secret}@example.com/?token=abc")
+    assert secret not in str(info.value)
     assert "abc" not in str(info.value)

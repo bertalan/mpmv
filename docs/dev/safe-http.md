@@ -18,12 +18,19 @@ What the guard does:
   that form.
 - Resolves the host itself and refuses the host if any answer is loopback, private, link-local,
   CGNAT, multicast, reserved, unspecified, a cloud metadata address, or an IPv4-mapped, NAT64 or
-  6to4 wrapper of one of those.
+  6to4 wrapper of one of those (also the deprecated 192.88.99.0/24 relay range).
 - Connects to the vetted IP (no second lookup); the name is kept for SNI, certificate and `Host`.
 - Refuses redirects by default. With `max_redirects=n` every hop repeats all the checks.
 - Tries each vetted address in turn when a connection fails; all of them were vetted.
-- Enforces a total `deadline` (default 30 s) over connect, headers and body, checked while
-  streaming, besides the per-step `timeout`; a trickling server cannot hold a worker.
+- Enforces a total `deadline` (default 30 s) over the DNS lookup, the dial, the TLS handshake, the
+  status and header lines and the body, besides the per-step `timeout`: a watchdog shuts the
+  socket down when it runs out, so a trickling server cannot hold a worker.
+- Validates caller headers before any I/O: a value with CR, LF, NUL or other control characters,
+  or outside latin-1, raises `UnsafeHeader` naming the header, never the value. `Host`,
+  hop-by-hop headers, `Content-Length` and `Proxy-*` are dropped; `Accept-Encoding` is always
+  `identity` (the client never decompresses, so a caller must not either without its own cap).
+- Never follows an https to http redirect, even when `http` is allowed for the first hop.
+- Response headers are looked up case-insensitively; repeated headers are joined with ", ".
 - On a redirect to another origin it drops the caller's credential headers (only Accept,
   Accept-Language and User-Agent survive).
 - Reads the body in chunks and raises `ResponseTooLarge` past `max_bytes`.
