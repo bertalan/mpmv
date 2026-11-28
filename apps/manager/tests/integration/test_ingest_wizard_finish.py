@@ -123,3 +123,13 @@ def SupplierSourceFactoryCreate() -> SupplierSource:
     from apps.ingest.tests.factories import SupplierSourceFactory
 
     return SupplierSourceFactory.create(is_active=False)
+
+
+def test_a_refused_sample_shows_the_reason_on_the_mapping_page() -> None:
+    source = SupplierSourceFactoryCreate()
+    source.adapter_code = "xlsx_pricelist"
+    source.save()
+    url = f"/manager/platform/sources/{source.public_id}/mapping/"
+    response = staff().post(url, {"action": "headers", "sample": sample(b"not a workbook")})
+    assert response.status_code == 400
+    assert b'role="alert"' in response.content

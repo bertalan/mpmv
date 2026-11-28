@@ -764,7 +764,8 @@ msgstr "Un intervallo concluso resta nello storico."
 msgid "A real export of the supplier. It is read once to show you the result and is not kept."
 msgstr "Un'esportazione reale del fornitore. Viene letta una sola volta per mostrarLe il risultato e non viene conservata."
 "Un'esportazione reale del fornitore. Viene letta una sola volta per mostrarLe il risultato e non "
-"viene conservata."
+"viene conservata.Un'esportazione reale del fornitore. Viene letta una sola volta per mostrarLe il "
+"risultato e non viene conservata."
 
 #: apps/manager/amendment_views.py
 msgid "a refund to the customer"
@@ -1003,7 +1004,8 @@ msgid ""
 "writing code."
 msgstr "Una fonte legge il listino o il flusso di un fornitore. Aggiunga un nuovo venditore da un file campione, senza scrivere codice."
 "Una fonte legge il listino o il flusso di un fornitore. Aggiunga un nuovo venditore da un file "
-"campione, senza scrivere codice."
+"campione, senza scrivere codice.Una fonte legge il listino o il flusso di un fornitore. Aggiunga "
+"un nuovo venditore da un file campione, senza scrivere codice."
 
 #: apps/manager/money_views.py
 msgid "A statement needs a start and an end date. The current month is shown."
@@ -10782,6 +10784,10 @@ msgid "The fields this change sets, as true flags."
 msgstr "I campi che questa modifica imposta, come flag veri."
 
 #: apps/manager/ingest_views.py
+msgid "The file has no columns."
+msgstr "Il file non ha colonne."
+
+#: apps/manager/ingest_views.py
 msgid "The file is larger than the allowed size."
 msgstr "Il file supera la dimensione consentita."
 
@@ -11379,6 +11385,10 @@ msgstr "L'indirizzo postale del produttore, con via, città e paese."
 #: apps/events/templates/events/admin/map_picker_panel.html
 msgid "The map shows the typed point."
 msgstr "La mappa mostra il punto digitato."
+
+#: apps/manager/templates/manager/platform/ingest_source_mapping.html
+msgid "The mapping belongs to the vendor: it applies to all of this vendor's sources."
+msgstr "L'associazione appartiene al venditore: vale per tutte le fonti di questo venditore."
 
 #: apps/manager/ingest_views.py
 msgid "The mapping is saved. Read the sample again to confirm it."

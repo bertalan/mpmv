@@ -6,6 +6,8 @@ Map the columns of a supplier source (ING.13, step 2). The sample gives the colu
 {% block manager_content %}
   <h1>{% translate "Map the columns" %}</h1>
   <p>{{ source.vendor }} / {{ source.code }}</p>
+  <p>{% translate "The mapping belongs to the vendor: it applies to all of this vendor's sources." %}</p>
+  {% if failure %}<p role="alert">{{ failure }}</p>{% endif %}
   {% if can_write %}
     {% if columns %}
       <form method="post" class="manager-form" novalidate>

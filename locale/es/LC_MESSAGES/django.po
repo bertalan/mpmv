@@ -762,7 +762,8 @@ msgstr "Un periodo terminado queda en el historial."
 msgid "A real export of the supplier. It is read once to show you the result and is not kept."
 msgstr "Una exportación real del proveedor. Se lee una sola vez para mostrarle el resultado y no se conserva."
 "Una exportación real del proveedor. Se lee una sola vez para mostrarle el resultado y no se "
-"conserva."
+"conserva.Una exportación real del proveedor. Se lee una sola vez para mostrarle el resultado y no "
+"se conserva."
 
 #: apps/manager/amendment_views.py
 msgid "a refund to the customer"
@@ -1002,7 +1003,8 @@ msgid ""
 "writing code."
 msgstr "Una fuente lee la lista de precios o el flujo de un proveedor. Añada un vendedor nuevo a partir de un archivo de muestra, sin escribir código."
 "Una fuente lee la lista de precios o el flujo de un proveedor. Añada un vendedor nuevo a partir de"
-" un archivo de muestra, sin escribir código."
+" un archivo de muestra, sin escribir código.Una fuente lee la lista de precios o el flujo de un "
+"proveedor. Añada un vendedor nuevo a partir de un archivo de muestra, sin escribir código."
 
 #: apps/manager/money_views.py
 msgid "A statement needs a start and an end date. The current month is shown."
@@ -10782,6 +10784,10 @@ msgid "The fields this change sets, as true flags."
 msgstr "Los campos que establece este cambio, como indicadores verdaderos."
 
 #: apps/manager/ingest_views.py
+msgid "The file has no columns."
+msgstr "El archivo no tiene columnas."
+
+#: apps/manager/ingest_views.py
 msgid "The file is larger than the allowed size."
 msgstr "El archivo supera el tamaño permitido."
 
@@ -11369,6 +11375,10 @@ msgstr "La dirección postal del fabricante, con calle, ciudad y país."
 #: apps/events/templates/events/admin/map_picker_panel.html
 msgid "The map shows the typed point."
 msgstr "El mapa muestra el punto escrito."
+
+#: apps/manager/templates/manager/platform/ingest_source_mapping.html
+msgid "The mapping belongs to the vendor: it applies to all of this vendor's sources."
+msgstr "La asignación pertenece al vendedor: se aplica a todas las fuentes de este vendedor."
 
 #: apps/manager/ingest_views.py
 msgid "The mapping is saved. Read the sample again to confirm it."
@@ -12642,6 +12652,7 @@ msgstr "La fuente está activa"
 #: apps/manager/ingest_views.py
 msgid "The source is active. Runs stay dry until writing is enabled."
 msgstr "La fuente está activa. Las ejecuciones siguen siendo de prueba hasta que se habilite la escritura."
+"La fuente está activa. Las ejecuciones siguen siendo de prueba hasta que se habilite la escritura."
 
 #: apps/manager/ingest_views.py
 msgid "The source is created. It stays inactive until the checklist is met."

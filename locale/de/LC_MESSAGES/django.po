@@ -771,7 +771,8 @@ msgstr "Ein beendeter Zeitraum bleibt als Verlauf erhalten."
 msgid "A real export of the supplier. It is read once to show you the result and is not kept."
 msgstr "Ein echter Export des Lieferanten. Er wird einmal gelesen, um Ihnen das Ergebnis zu zeigen, und nicht aufbewahrt."
 "Ein echter Export des Lieferanten. Er wird einmal gelesen, um Ihnen das Ergebnis zu zeigen, und "
-"nicht aufbewahrt."
+"nicht aufbewahrt.Ein echter Export des Lieferanten. Er wird einmal gelesen, um Ihnen das Ergebnis "
+"zu zeigen, und nicht aufbewahrt."
 
 #: apps/manager/amendment_views.py
 msgid "a refund to the customer"
@@ -1015,7 +1016,9 @@ msgid ""
 "writing code."
 msgstr "Eine Quelle liest die Preisliste oder den Feed eines Lieferanten. Legen Sie einen neuen Verkäufer aus einer Probedatei an, ohne Code zu schreiben."
 "Eine Quelle liest die Preisliste oder den Feed eines Lieferanten. Legen Sie einen neuen Verkäufer "
-"aus einer Probedatei an, ohne Code zu schreiben."
+"aus einer Probedatei an, ohne Code zu schreiben.Eine Quelle liest die Preisliste oder den Feed "
+"eines Lieferanten. Legen Sie einen neuen Verkäufer aus einer Probedatei an, ohne Code zu "
+"schreiben."
 
 #: apps/manager/money_views.py
 msgid "A statement needs a start and an end date. The current month is shown."
@@ -10882,6 +10885,10 @@ msgid "The fields this change sets, as true flags."
 msgstr "Die Felder, die diese Änderung setzt, als wahre Flags."
 
 #: apps/manager/ingest_views.py
+msgid "The file has no columns."
+msgstr "Die Datei hat keine Spalten."
+
+#: apps/manager/ingest_views.py
 msgid "The file is larger than the allowed size."
 msgstr "Die Datei ist größer als erlaubt."
 
@@ -11489,6 +11496,10 @@ msgstr "Die Postanschrift des Herstellers, mit Straße, Ort und Land."
 #: apps/events/templates/events/admin/map_picker_panel.html
 msgid "The map shows the typed point."
 msgstr "Die Karte zeigt den eingegebenen Punkt."
+
+#: apps/manager/templates/manager/platform/ingest_source_mapping.html
+msgid "The mapping belongs to the vendor: it applies to all of this vendor's sources."
+msgstr "Die Zuordnung gehört zum Verkäufer: Sie gilt für alle Quellen dieses Verkäufers."
 
 #: apps/manager/ingest_views.py
 msgid "The mapping is saved. Read the sample again to confirm it."

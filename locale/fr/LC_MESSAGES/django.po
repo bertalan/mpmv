@@ -771,7 +771,8 @@ msgstr "Une période terminée reste dans l'historique."
 msgid "A real export of the supplier. It is read once to show you the result and is not kept."
 msgstr "Un export réel du fournisseur. Il est lu une seule fois pour vous montrer le résultat et n'est pas conservé."
 "Un export réel du fournisseur. Il est lu une seule fois pour vous montrer le résultat et n'est pas"
-" conservé."
+" conservé.Un export réel du fournisseur. Il est lu une seule fois pour vous montrer le résultat et"
+" n'est pas conservé."
 
 #: apps/manager/amendment_views.py
 msgid "a refund to the customer"
@@ -1011,7 +1012,8 @@ msgid ""
 "writing code."
 msgstr "Une source lit la liste de prix ou le flux d'un fournisseur. Ajoutez un nouveau vendeur à partir d'un fichier échantillon, sans écrire de code."
 "Une source lit la liste de prix ou le flux d'un fournisseur. Ajoutez un nouveau vendeur à partir "
-"d'un fichier échantillon, sans écrire de code."
+"d'un fichier échantillon, sans écrire de code.Une source lit la liste de prix ou le flux d'un "
+"fournisseur. Ajoutez un nouveau vendeur à partir d'un fichier échantillon, sans écrire de code."
 
 #: apps/manager/money_views.py
 msgid "A statement needs a start and an end date. The current month is shown."
@@ -10862,6 +10864,10 @@ msgid "The fields this change sets, as true flags."
 msgstr "Les champs que cette modification définit, sous forme d'indicateurs vrais."
 
 #: apps/manager/ingest_views.py
+msgid "The file has no columns."
+msgstr "Le fichier n'a pas de colonnes."
+
+#: apps/manager/ingest_views.py
 msgid "The file is larger than the allowed size."
 msgstr "Le fichier dépasse la taille autorisée."
 
@@ -11464,6 +11470,10 @@ msgstr "L'adresse postale du fabricant, avec rue, ville et pays."
 #: apps/events/templates/events/admin/map_picker_panel.html
 msgid "The map shows the typed point."
 msgstr "La carte affiche le point saisi."
+
+#: apps/manager/templates/manager/platform/ingest_source_mapping.html
+msgid "The mapping belongs to the vendor: it applies to all of this vendor's sources."
+msgstr "L'association appartient au vendeur : elle s'applique à toutes les sources de ce vendeur."
 
 #: apps/manager/ingest_views.py
 msgid "The mapping is saved. Read the sample again to confirm it."

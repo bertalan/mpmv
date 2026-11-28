@@ -190,7 +190,7 @@ def save_column_mappings(
         raise ValidationError("Too many columns.")
     for header, name in columns.items():
         if name not in base.FIELDS:
-            raise ValidationError({"field": f"{name!r} is not a field a column can map to."})
+            raise ValidationError({"field": f"{name[:40]!r} is not a field a column can map to."})
         if not engine.mapping_key(header):
             raise ValidationError({"header": "A column name cannot be empty."})
     changes = ChangeSet()

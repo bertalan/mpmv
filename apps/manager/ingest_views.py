@@ -225,6 +225,7 @@ class SourceMappingView(_SourceView):
         context["can_write"] = writer(SECTION)(self.manager)
         context.setdefault("form", SampleForm())
         context.setdefault("columns", None)
+        context.setdefault("failure", "")
         context["fields"] = base.FIELDS
         return context
 
@@ -253,6 +254,11 @@ class SourceMappingView(_SourceView):
         if not form.is_valid():
             return self.render_to_response(self.get_context_data(form=form), status=400)
         report = onboarding.run_sample(source, form.cleaned_data["sample"].read())
+        if not report.headers:
+            return self.render_to_response(
+                self.get_context_data(failure=report.failure or _("The file has no columns.")),
+                status=400,
+            )
         current = {
             e.key.casefold(): e.target_value for e in onboarding.column_entries(source.vendor)
         }
