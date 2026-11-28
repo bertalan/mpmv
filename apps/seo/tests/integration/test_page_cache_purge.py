@@ -195,3 +195,65 @@ def test_the_seo_app_registers_the_page_cache_as_a_purge_listener() -> None:
     from apps.seo import signals
 
     assert signals.purge_on_request in public_cache._listeners
+
+
+def test_an_editor_autosave_of_a_live_page_does_not_purge_but_publishing_does(
+    seeded: SeedReport,
+) -> None:
+    page = StandardPageFactory.create(title="Live", slug="autosave-seo6", parent=home())
+    before = generation()
+    page.title = "Draft edit"
+    page.save_revision()  # the editor's autosave: only revision bookkeeping is written
+    assert generation() == before
+    page.latest_revision.publish()
+    assert generation() != before
+
+
+def test_a_platform_operator_change_purges(seeded: SeedReport) -> None:
+    from apps.core.tests.factories import PlatformOperatorFactory
+
+    before = generation()
+    PlatformOperatorFactory.create()  # rows are versions: a change is a new row
+    assert generation() != before
+
+
+def test_a_purge_makes_a_stored_page_a_miss_and_a_rollback_keeps_it(
+    django_capture_on_commit_callbacks: Callable[..., Any],
+    monkeypatch: pytest.MonkeyPatch,
+    settings: Any,
+) -> None:
+    monkeypatch.undo()  # keep Django's own on_commit, so a savepoint rollback discards callbacks
+    from django.db import transaction
+    from django.http import HttpRequest, HttpResponse
+    from django.test import RequestFactory
+    from django.urls import ResolverMatch
+
+    from apps.core.public_cache import purge_public_pages
+    from apps.seo.middleware import PageCacheMiddleware
+
+    def request() -> HttpRequest:
+        built = RequestFactory().get("/stub-seo6/", HTTP_HOST="testserver")
+        built.LANGUAGE_CODE = "en"
+        built.resolver_match = ResolverMatch(lambda r: None, (), {}, url_name="wagtail_serve")
+        built._page_cache_unrestricted = True  # type: ignore[attr-defined]
+        return built
+
+    def view(_request: HttpRequest) -> HttpResponse:
+        return HttpResponse("<html><body>x</body></html>", content_type="text/html")
+
+    settings.PAGE_CACHE_ENABLED = True
+    middleware = PageCacheMiddleware(view)
+    middleware(request())
+    assert middleware(request())["X-Page-Cache"] == "HIT"
+    with django_capture_on_commit_callbacks(execute=True) as callbacks:
+        try:
+            with transaction.atomic():
+                purge_public_pages("rolled back")
+                raise RuntimeError
+        except RuntimeError:
+            pass
+    assert callbacks == []
+    assert middleware(request())["X-Page-Cache"] == "HIT"  # a rollback never purges
+    with django_capture_on_commit_callbacks(execute=True):
+        purge_public_pages("committed")
+    assert middleware(request())["X-Page-Cache"] == "MISS"

@@ -23,6 +23,7 @@ from wagtail.models import (
 from wagtail.signals import page_published, page_unpublished, post_page_move
 
 from apps.core import public_cache
+from apps.core.models import PlatformOperator
 
 from . import page_cache
 
@@ -36,6 +37,7 @@ def drop_cache(**_kwargs: Any) -> None:
 
 
 CONTENT_MODELS = (
+    PlatformOperator,  # the legal and tax text of the footer
     Page,
     Site,
     Locale,
@@ -46,10 +48,27 @@ CONTENT_MODELS = (
 )
 
 
-def drop_for_content_model(instance: Any = None, **_kwargs: Any) -> None:
+# What Wagtail's `save_revision` writes on the live row (an editor's autosave): nothing a visitor
+# sees changes until the revision is published, which fires `page_published`.
+REVISION_BOOKKEEPING = frozenset(
+    {
+        "latest_revision",
+        "latest_revision_created_at",
+        "draft_title",
+        "has_unpublished_changes",
+        "wagtail_admin_comments",
+    }
+)
+
+
+def drop_for_content_model(instance: Any = None, **kwargs: Any) -> None:
     """A change to a model a public page renders from."""
-    if isinstance(instance, Page) and not instance.live:
-        return  # a draft is not served to the public
+    if isinstance(instance, Page):
+        if not instance.live:
+            return  # a draft is not served to the public
+        fields = kwargs.get("update_fields")
+        if fields and set(fields) <= REVISION_BOOKKEEPING:
+            return  # an autosave: purge on publish only
     drop_cache()
 
 

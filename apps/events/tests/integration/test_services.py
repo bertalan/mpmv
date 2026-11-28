@@ -882,6 +882,15 @@ def test_publish_cancel_and_hide_purge_the_public_pages(owner: User, purges: lis
     assert purges
 
 
+def test_restore_purges_the_public_pages(owner: User, purges: list[str]) -> None:
+    staff = UserFactory.create(platform_staff=True)
+    page = _published(owner)
+    hide_event(staff, page, "Misleading offer")
+    purges.clear()
+    services.restore_event(staff, _fresh(page))
+    assert purges
+
+
 def test_a_dry_run_event_service_purges_nothing(owner: User, purges: list[str]) -> None:
     page = _published(owner)
     purges.clear()

@@ -113,9 +113,16 @@ rendered between the signal and the commit would be stored under the new generat
 - save or delete of a live page, a `Site`, a `Locale`, every site or generic setting (theme,
   events, the SEO panel), and a `PageViewRestriction` or `CollectionViewRestriction`;
 - `apps.core.public_cache.purge_public_pages(reason)`, called by the **vendors** services (closure
-  add, update and delete; storefront profile save; vendor status change) and the **events**
+  add, update and delete; storefront profile save, revert and logo; vendor status change) and the **events**
   services (publish, cancel, hide, restore). `vendors` and `events` do not import `seo`: the SEO app
   registers its listener in `AppConfig.ready`. A dry run purges nothing (the commit never happens).
+
+An editor's autosave (`save_revision` on a live page, which writes only revision bookkeeping
+fields) does not purge: publishing does. A change of the platform operator (a new row) purges too,
+because its legal and tax text shows in the footer. The vendor and event purges also cover storefront
+and catalog routes that are not in `PAGE_CACHE_URL_NAMES` yet: forward looking, they only matter now
+for storefront content embedded in Wagtail pages. A listener that fails is logged and the page
+stays stale until its 300 s lifetime ends.
 
 Signals are connected per content model, never without a `sender`: a sender-less `post_delete`
 receiver makes Django load every row before a delete and changes unrelated SQL.

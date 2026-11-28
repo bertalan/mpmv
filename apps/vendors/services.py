@@ -2731,6 +2731,7 @@ def set_vendor_logo(
                 logo=image, logo_alt=alt, updated_at=timezone.now()
             )
             audit_changes(changes, ctx=ctx, action=LOGO_CHANGED)
+            purge_public_pages("vendor logo")
             # The previous file stays until the review window closes or staff confirm the change,
             # so a revert can put it back (owner decision Q1; `purge_retained_logos`).
             _notify_profile_changed(vendor, "all languages", ["logo"])
@@ -2777,6 +2778,7 @@ def remove_vendor_logo(
             logo=None, logo_alt="", updated_at=timezone.now()
         )
         audit_changes(changes, ctx=ctx, action=LOGO_CHANGED)
+        purge_public_pages("vendor logo")
         # The image file stays, like a replaced one (see `set_vendor_logo`).
     vendor.logo, vendor.logo_alt = None, ""
     return changes
@@ -3696,6 +3698,7 @@ def revert_profile_change(
         row.full_clean()
         row.save()
         audit_changes(changes, ctx=ctx, action=PROFILE_REVERTED)
+        purge_public_pages("vendor storefront profile reverted")
         # As an edit of the source text: reviewed and published translations go back to review.
         _audit_stale_translations(vendor, language, siblings, ctx=ctx)
         _notify_profile_reverted(vendor, language, fields, reason)
