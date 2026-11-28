@@ -32,7 +32,7 @@ def refund_pending_duplicates(timestamp: int) -> None:
     logger.info("payments.refund_pending_duplicates: %d refunded", done)
 
 
-@periodic("13 3 * * *")  # 03:13 Europe/Rome
+@periodic("13 3 * * *")  # 03:13 in the business time zone
 @locked()
 @task("payments.sweep_stray_captures", retry=NO_RETRY)
 def sweep_stray_captures(timestamp: int) -> None:

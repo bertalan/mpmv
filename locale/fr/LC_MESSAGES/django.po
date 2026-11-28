@@ -3749,6 +3749,14 @@ msgstr "Demandes d'effacement"
 msgid "Error"
 msgstr "Erreur"
 
+#: apps/orders/ui/present.py
+msgid "estimated delivery from %(first)s to %(last)s"
+msgstr "livraison prévue du %(first)s au %(last)s"
+
+#: apps/orders/ui/present.py
+msgid "estimated delivery on %(day)s"
+msgstr "livraison prévue le %(day)s"
+
 #: apps/events/templates/events/admin/review.html apps/manager/templates/manager/shop/events.html
 msgid "Event"
 msgstr "Événement"
@@ -11734,15 +11742,6 @@ msgstr ""
 "L'ordre des versions : les nombres les plus bas passent en premier, par exemple 1, 2, 3. Laissez 0"
 " pour conserver l'ordre dans lequel elles ont été ajoutées."
 
-#: apps/orders/tz.py
-msgid ""
-"The order records still compute their retention dates in %(zone)s, so the business time zone must "
-"stay %(zone)s until a developer updates them (ORD.41)."
-msgstr ""
-"Les données des commandes calculent encore leurs dates de conservation en %(zone)s : le fuseau "
-"horaire de l’activité doit donc rester %(zone)s jusqu’à ce qu’un développeur les mette à jour "
-"(ORD.41)."
-
 #: apps/manager/views.py
 msgid "The order was updated."
 msgstr "La commande a été mise à jour."
@@ -12419,6 +12418,11 @@ msgid ""
 msgstr ""
 "Le vendeur te dira comment retourner les biens. Conserve ce message comme preuve de ta "
 "rétractation."
+
+#: apps/orders/templates/email/orders/order_confirmation/body.html
+#: apps/orders/templates/email/orders/order_confirmation/body.txt
+msgid "The seller's shop is closed: your package will be dispatched from %(dispatch_on)s."
+msgstr "La boutique du vendeur est fermée : ton colis sera expédié à partir du %(dispatch_on)s."
 
 #: apps/vendors/models.py
 msgid "The seller."
@@ -16430,6 +16434,14 @@ msgstr ""
 "doivent en indiquer un : les acheteurs le voient dans les informations sur la rétractation et dans"
 " la confirmation de commande. Veuillez l’envoyer à l’équipe de la plateforme ; d’ici là, vous ne "
 "pouvez pas publier de produits."
+
+#: apps/orders/templates/email/orders/vendor_new_order/body.html
+#: apps/orders/templates/email/orders/vendor_new_order/body.txt
+msgid ""
+"Your shop is closed: the buyer was told that the package will be dispatched from %(dispatch_on)s."
+msgstr ""
+"Votre boutique est fermée : l'acheteur a été informé que le colis sera expédié à partir du "
+"%(dispatch_on)s."
 
 #: apps/manager/event_views.py
 msgid "Your shop is not active yet, so events cannot be changed."

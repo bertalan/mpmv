@@ -19,7 +19,9 @@
 - Site flags (ARC.29): `check --deploy` refuses `MPMV_DEMO_MODE` and `MPMV_FORCE_NOINDEX` where
   live data is held (core.E801).
 - Image formats (THM.12): a warning when Pillow cannot encode AVIF (core.W501).
-- Business time zone (ARC.27): `MPMV_BUSINESS_TIME_ZONE` is a known IANA name (core.E931).
+- Business time zone (ARC.27): `MPMV_BUSINESS_TIME_ZONE` is a known IANA name (core.E931), and
+  every operator zone is one PostgreSQL knows too, since the order triggers use it (ORD.41,
+  core.E932, a database check).
 """
 
 import ast
@@ -575,6 +577,50 @@ def check_business_time_zone(
             id="core.E931",
         )
     ]
+
+
+#: ORD.41: the operator zones (past and current rows) PostgreSQL does not know.
+UNKNOWN_DATABASE_ZONES = """
+SELECT DISTINCT o.business_time_zone FROM core_platformoperator o
+ WHERE NOT EXISTS (SELECT 1 FROM pg_timezone_names t WHERE t.name = o.business_time_zone)
+ ORDER BY 1
+"""
+
+
+def check_operator_zones_in_database(
+    app_configs: Iterable[AppConfig] | None,
+    databases: Iterable[str] | None = None,
+    **kwargs: Any,
+) -> list[checks.CheckMessage]:
+    """ORD.41 (core.E932): every operator row's business time zone is in PostgreSQL's
+    `pg_timezone_names`. The order guard trigger computes `AT TIME ZONE` with it, so a name
+    Python's tzdata knows but the database's does not would make every order write fail."""
+    if not databases:
+        return []
+    from .migration_safety import migrations_pending
+
+    messages: list[checks.CheckMessage] = []
+    for alias in databases:
+        connection = connections[alias]
+        if connection.vendor != "postgresql" or migrations_pending("core", database=alias):
+            continue  # CORE.27: `migrate` checks first; the column may not exist yet
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(UNKNOWN_DATABASE_ZONES)
+                unknown = [str(row[0]) for row in cursor.fetchall()]
+        except DatabaseError:
+            continue
+        if unknown:
+            messages.append(
+                checks.Error(
+                    f"The operator configuration uses time zones the database does not know: "
+                    f"{', '.join(unknown)}. Every order write would fail on them.",
+                    hint="Update the database server's time zone data, or configure the "
+                    "operator with a zone listed in pg_timezone_names.",
+                    id="core.E932",
+                )
+            )
+    return messages
 
 
 def check_privacy_pepper(

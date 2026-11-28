@@ -9,7 +9,8 @@
 {% endif %}{% for line in lines %}- {{ line.title }}{% if line.variant %} ({{ line.variant }}){% endif %} x {{ line.quantity }}: {{ line.total }} EUR
 {% endfor %}{% blocktranslate %}Shipping: {{ shipping }} EUR{% endblocktranslate %}
 {% blocktranslate %}Total: {{ total }} EUR{% endblocktranslate %}
-{% if seller %}
+{% if dispatch_on %}{% blocktranslate %}The seller's shop is closed: your package will be dispatched from {{ dispatch_on }}.{% endblocktranslate %}
+{% endif %}{% if seller %}
 {% translate "Seller details" %}
 {{ seller.legal_name }}
 {% if seller.address %}{{ seller.address }}

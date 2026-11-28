@@ -1,9 +1,6 @@
 """ARC.27 (D-31): the business time zone is part of the versioned operator configuration and
-`business_tz()` is its one reader; storage stays UTC.
-
-Until ORD.41 the order triggers compute in Europe/Rome and orders refuse any other zone
-(apps/orders/tests/integration/test_business_tz_orders.py). The tests that show how the code
-follows another zone write that zone past the guard (`past_the_guard`), as ORD.41 will allow."""
+`business_tz()` is its one reader; storage stays UTC. Any known zone may be configured: the
+order triggers read the same zone (ORD.41, test_business_time_zone_at.py)."""
 
 import datetime as dt
 from typing import Any
@@ -14,7 +11,6 @@ from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 
-from apps.core import services
 from apps.core.audit import AuditContext
 from apps.core.models import PlatformOperator
 from apps.core.services import (
@@ -47,18 +43,12 @@ def rome() -> None:
     PlatformOperatorFactory.create(open_ended=True, valid_from=utc(2020))
 
 
-@pytest.fixture
-def past_the_guard(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The zone guards of the apps are lifted, as ORD.41 will do for orders."""
-    monkeypatch.setattr(services, "_ZONE_GUARDS", [])
-
-
 def test_a_new_operator_is_in_europe_rome(rome: None) -> None:
     assert current_operator().business_time_zone == "Europe/Rome"
     assert business_tz() == ROME
 
 
-def test_changing_the_field_changes_the_helper(rome: None, past_the_guard: None) -> None:
+def test_changing_the_field_changes_the_helper(rome: None) -> None:
     operator_in("UTC", start=dt.datetime.now(dt.UTC) - JUST_NOW)
     assert business_tz() == ZoneInfo("UTC")
 
@@ -88,9 +78,7 @@ def test_a_moment_before_the_first_configuration_reads_the_current_zone(rome: No
     assert business_tz(utc(2001)) == ROME
 
 
-def test_a_past_moment_reads_the_operator_version_valid_then(
-    rome: None, past_the_guard: None
-) -> None:
+def test_a_past_moment_reads_the_operator_version_valid_then(rome: None) -> None:
     """F3: a document date keeps the zone it was issued in after a later change."""
     operator_in("UTC", start=dt.datetime(2031, 6, 1, tzinfo=dt.UTC))
     assert business_tz(NEW_YEAR_EVE) == ROME
@@ -106,9 +94,7 @@ def test_an_unknown_configured_zone_is_a_clear_error(settings: Any) -> None:
 # --- F5: one lookup per request ------------------------------------------------------------------
 
 
-def test_a_request_asks_the_operator_once(
-    rome: None, past_the_guard: None, django_assert_num_queries: Any
-) -> None:
+def test_a_request_asks_the_operator_once(rome: None, django_assert_num_queries: Any) -> None:
     with business_tz_memo():
         with django_assert_num_queries(1):
             assert business_tz() == ROME
@@ -129,9 +115,7 @@ def test_outside_a_request_nothing_is_remembered(
 
 
 @pytest.mark.django_db(transaction=True)
-def test_the_scheduler_reads_the_operator_zone_once_from_its_own_thread(
-    rome: None, past_the_guard: None
-) -> None:
+def test_the_scheduler_reads_the_operator_zone_once_from_its_own_thread(rome: None) -> None:
     """ARC.27: the schedules follow the operator, not the setting; the lookup works from
     Procrastinate's async loop (a thread of its own) and is kept until the worker restarts."""
     import asyncio

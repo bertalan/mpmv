@@ -11,7 +11,7 @@ import contextlib
 import datetime as dt
 import logging
 import uuid
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, Protocol
@@ -41,6 +41,7 @@ from apps.core.services import (
     flag_enabled,
     scrub_order_emails,
 )
+from apps.shipping.engine import ClosureNotice
 from apps.shipping.models import Carrier
 from apps.vendors import services as vendors_services
 from apps.vendors.models import Vendor
@@ -104,6 +105,7 @@ class VendorOrderInput:
     shipping_choice: dict[str, Any] = field(default_factory=dict)
     commission_snapshot: dict[str, Any] = field(default_factory=dict)
     tax_profile_snapshot: dict[str, Any] = field(default_factory=dict)
+    expected_dispatch_on: dt.date | None = None  # VEN.20
 
 
 logger = logging.getLogger(__name__)
@@ -121,8 +123,8 @@ MAX_PREFIX_LENGTH = 14  # number = prefix + "YYYY-" + 6+ digits must fit in 32 c
 
 
 def _year_and_prefix(now: dt.datetime | None) -> tuple[int, str]:
-    """The numbering year is the business year (`business_tz()`, ARC.27; Europe/Rome), so an
-    order placed at 00:30 on 1 January in Rome starts the new year even when UTC says 31 Dec."""
+    """The numbering year is the business year (`business_tz()`, ARC.27), so with the operator
+    in Rome an order placed at 00:30 on 1 January starts the new year even when UTC says 31 Dec."""
     prefix = str(getattr(settings, "ORDER_NUMBER_PREFIX", ""))
     if len(prefix) > MAX_PREFIX_LENGTH:
         raise ImproperlyConfigured(
@@ -288,6 +290,7 @@ def _build_vendor_order(
         shipping_choice=item.shipping_choice,
         commission_snapshot=_frozen_commission(item.commission_snapshot),
         tax_profile_snapshot=item.tax_profile_snapshot,
+        expected_dispatch_on=item.expected_dispatch_on,
     )
     lines = [
         OrderLine(
@@ -934,6 +937,7 @@ class PlaceVendor:
     commission_snapshot: dict[str, Any] = field(default_factory=dict)
     tax_profile_snapshot: dict[str, Any] = field(default_factory=dict)
     shipping_portions: Sequence[ShippingPortion] = ()
+    expected_dispatch_on: dt.date | None = None  # VEN.20, from the checkout
 
     def __post_init__(self) -> None:
         if self.shipping_net > 0 and self.shipping_tax is None and not self.shipping_portions:
@@ -966,6 +970,10 @@ class CheckoutPreview:
     packages: Sequence[engine.PackageSummary] = ()
     blocks: Sequence[engine.Block] = ()
     totals: engine.Totals | None = None
+    # VEN.20: the business day the preview was built for and each vendor's closure notice, read
+    # with the dispatch dates, so the page shows what the checkout used.
+    business_day: dt.date | None = None
+    closure_notices: Mapping[int, ClosureNotice | None] = field(default_factory=dict)
 
     @property
     def placeable(self) -> bool:
@@ -1175,6 +1183,7 @@ def place_order(
                 **_shipping_tax_fields(item),
                 commission_snapshot=item.commission_snapshot,
                 tax_profile_snapshot=item.tax_profile_snapshot,
+                expected_dispatch_on=item.expected_dispatch_on,
             )
             for item in preview.vendors
         ]

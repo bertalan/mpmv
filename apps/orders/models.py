@@ -345,6 +345,11 @@ class VendorOrder(_StateGuarded):
         default=dict, blank=True, help_text="Snapshot of compute_commission: rule, percentage, fee."
     )
     tax_profile_snapshot = models.JSONField(default=dict, blank=True)
+    # VEN.20: the dispatch date the checkout told the buyer (a vendor closure moves it). A later
+    # change of the vendor's schedule never rewrites it; empty on orders placed before VEN.20.
+    expected_dispatch_on = models.DateField(
+        null=True, blank=True, help_text="Snapshot: the expected dispatch date shown at checkout."
+    )
     # Non-fiscal: dropped by `restrict_order` when the order becomes restricted_tax_only (D-30).
     carrier_contact_phone = models.CharField(max_length=32, blank=True)
     support_notes = models.TextField(blank=True)

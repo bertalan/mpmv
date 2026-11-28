@@ -11,6 +11,7 @@ Tax and shipping never import orders; this module is the one place that joins th
 
 import datetime as dt
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from decimal import Decimal
 from typing import Any
 
@@ -27,7 +28,7 @@ from apps.core.countries import InvalidCountry
 from apps.core.money import round_line
 from apps.core.services import flag_enabled
 from apps.shipping import engine as shipping_engine
-from apps.shipping.services import quote_shipping
+from apps.shipping.services import closure_outlooks, quote_shipping
 from apps.tax import engine as tax_engine
 from apps.tax import prices as tax_prices
 from apps.tax import services as tax_services
@@ -228,6 +229,11 @@ def build_checkout(
             if not cart_services.has_price(line.item.product, line.item.variant, prices)
         }
 
+    # VEN.20: one read of the closures of every vendor in the cart gives each package its notice
+    # and its dispatch date (a chain of closures is followed to its end); "today" is the business
+    # day of `now`, so the cart page and the checkout agree.
+    today = vendors_services.business_today(now)
+    outlooks = closure_outlooks({package.vendor_id for package in cart_packages}, today)
     summaries: list[engine.PackageSummary] = []
     ready: list[PlaceVendor] = []
     customer_ctx: tax_engine.TaxContext | None = None
@@ -261,10 +267,14 @@ def build_checkout(
         if refused is not None:
             summary = _blocked(summary, refused)
             place = None
+        # A closed vendor still takes the order; the package leaves after the closure.
+        outlook = outlooks.get(vendor.pk)
+        dispatch_on = outlook.dispatch_on if outlook is not None else today
+        summary = replace(summary, dispatch_on=dispatch_on)
         summaries.append(summary)
         blocks.extend(summary.blocks)
         if place is not None:
-            ready.append(place)
+            ready.append(replace(place, expected_dispatch_on=dispatch_on))
             customer_ctx = customer_ctx or ctx
     totals = (
         engine.add_totals(
@@ -293,6 +303,8 @@ def build_checkout(
         packages=summaries,
         blocks=blocks,
         totals=totals,
+        business_day=today,
+        closure_notices={vendor_id: o.notice for vendor_id, o in outlooks.items()},
     )
 
 
