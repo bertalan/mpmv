@@ -11,6 +11,7 @@ from typing import Any
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 
 from apps.accounts.models import User
 from apps.core.audit import AuditContext
@@ -76,13 +77,13 @@ def save_provider(
         raise PermissionDenied("Only the vendor owner chooses the AI provider.")
     errors: dict[str, str] = {}
     if provider not in AIProvider.values:
-        errors["provider"] = "Choose one of the listed providers."
+        errors["provider"] = _("Choose one of the listed providers.")
     if not MODEL_NAME.match(model):
-        errors["model"] = "Use the model name as the provider writes it."
+        errors["model"] = _("Use the model name as the provider writes it.")
     if api_key and not (
         MIN_KEY_LENGTH <= len(api_key) <= MAX_KEY_LENGTH and _KEY_SHAPE.match(api_key)
     ):
-        errors["api_key"] = "This does not look like an API key."
+        errors["api_key"] = _("This does not look like an API key.")
     if errors:
         raise ValidationError(errors)
     with transaction.atomic():
