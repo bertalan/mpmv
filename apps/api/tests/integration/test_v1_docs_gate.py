@@ -78,7 +78,11 @@ def test_a_refused_key_on_the_docs_counts_against_the_ip_limit(client: Client) -
 @override_settings(**LIVE)
 def test_live_does_not_serve_staff_without_a_second_factor(client: Client) -> None:
     client.force_login(UserFactory.create(staff=True))
-    assert client.get(DOCS).status_code != 200
+    # Not a lucky 404: the MFA middleware sends staff without a verified second factor to the
+    # setup page before the view (and the docs gate) runs.
+    response = client.get(DOCS)
+    assert response.status_code == 302
+    assert response["Location"].startswith("/account/mfa/setup/")
 
 
 @pytest.mark.parametrize("url", [DOCS, SCHEMA])
