@@ -13885,7 +13885,8 @@ msgstr ""
 
 #: apps/manager/forms.py
 msgid "Tick this to delete the key you saved. Without a key, no AI writes your texts."
-msgstr "Marque esta casilla para eliminar la clave guardada. Sin clave, ninguna IA escribe sus textos."
+msgstr ""
+"Marque esta casilla para eliminar la clave guardada. Sin clave, ninguna IA escribe sus textos."
 
 #: apps/orders/ui/forms.py
 msgid ""
@@ -16198,7 +16199,10 @@ msgid ""
 "Your key for this provider. It is stored encrypted and never shown again. Leave it empty to keep "
 "the key you saved before. If you change the provider, enter the key for the new one: the old key "
 "is deleted."
-msgstr "Su clave para este proveedor. Se guarda cifrada y no se vuelve a mostrar. Déjela vacía para conservar la clave guardada antes. Si cambia de proveedor, introduzca la clave del nuevo: la clave anterior se elimina."
+msgstr ""
+"Su clave para este proveedor. Se guarda cifrada y no se vuelve a mostrar. Déjela vacía para "
+"conservar la clave guardada antes. Si cambia de proveedor, introduzca la clave del nuevo: la clave"
+" anterior se elimina."
 
 #: apps/compliance/forms.py
 msgid "Your name. Required, except for a report of child sexual abuse material."
@@ -16240,6 +16244,11 @@ msgstr ""
 #: themes/ride/templates/orders/customer_orders.html
 msgid "Your orders, newest first"
 msgstr "Tus pedidos, del más reciente al más antiguo"
+
+#: apps/ingest/provider_services.py
+msgid ""
+"Your own AI provider has no key, so no AI texts were written. Enter a key on the AI provider page."
+msgstr "Su propio proveedor de IA no tiene clave, por lo que no se escribió ningún texto con IA. Introduzca una clave en la página del proveedor de IA."
 
 #: apps/catalog/models.py
 msgid ""

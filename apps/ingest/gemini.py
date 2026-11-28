@@ -127,7 +127,7 @@ class GeminiEnricher(KeyHolder):
         )
 
 
-def get_enricher() -> TextEnricher:
+def get_enricher(*, transport: Transport = http_post_json) -> TextEnricher:
     """The enricher chosen by ``settings.INGEST_ENRICHER`` (default ``fake``).
 
     A real provider retries with pauses (``RETRY_DELAYS``, up to a few seconds in the calling
@@ -139,7 +139,11 @@ def get_enricher() -> TextEnricher:
         return GeminiEnricher(
             settings.INGEST_GEMINI_API_KEY,
             settings.INGEST_GEMINI_MODEL,
-            transport=http_post_json,
+            transport=transport,
             timeout=settings.INGEST_ENRICH_TIMEOUT,
         )
+    if choice in ("claude", "openai"):
+        from .providers import platform_enricher
+
+        return platform_enricher(choice, transport=transport)
     raise ProviderError(f"unknown enricher {choice!r}")

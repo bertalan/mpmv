@@ -13,7 +13,7 @@ from typing import Any
 
 from django.views.decorators.debug import sensitive_variables
 
-from .enrichment import EnrichmentOutput, ProductFacts, ProviderError, TextPolicy
+from .enrichment import EnrichmentOutput, ProductFacts, ProviderError, TextEnricher, TextPolicy
 from .gemini import MODEL_NAME, build_prompt
 from .provider_http import (
     RETRY_DELAYS,
@@ -153,3 +153,25 @@ class OpenAIEnricher(_HttpEnricher):
         if not isinstance(text, str):
             raise TypeError
         return text
+
+
+def platform_enricher(choice: str, *, transport: Transport = http_post_json) -> TextEnricher:
+    """The operator's Claude or OpenAI enricher, with the key and model from the settings."""
+    from django.conf import settings
+
+    timeout = settings.INGEST_ENRICH_TIMEOUT
+    if choice == "claude":
+        return ClaudeEnricher(
+            settings.INGEST_CLAUDE_API_KEY,
+            settings.INGEST_CLAUDE_MODEL,
+            transport=transport,
+            timeout=timeout,
+        )
+    if choice == "openai":
+        return OpenAIEnricher(
+            settings.INGEST_OPENAI_API_KEY,
+            settings.INGEST_OPENAI_MODEL,
+            transport=transport,
+            timeout=timeout,
+        )
+    raise ProviderError(f"unknown enricher {choice!r}")

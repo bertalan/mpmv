@@ -30,3 +30,9 @@ def test_the_page_is_cacheable_and_indexable(monkeypatch: pytest.MonkeyPatch) ->
 
 def test_the_page_is_read_only() -> None:
     assert Client().post(reverse("subprocessors")).status_code == 405
+
+
+def test_the_register_lists_the_vendor_chosen_ai_provider_with_the_vendor_as_controller() -> None:
+    entry = next(e for e in subprocessors.public_register() if e.key == "ai_vendor")
+    assert "controller" in str(entry.safeguard)
+    assert "customer" in str(entry.data).lower()

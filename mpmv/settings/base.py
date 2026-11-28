@@ -651,10 +651,14 @@ GEOCODING_ACCESS_POLICIES: list[str] = ["apps.vendors.services.is_vendor_member"
 
 # AI text enrichment (ING.5, D-13): which `TextEnricher` runs. "fake" (the default, also in tests
 # and local runs) never leaves the machine; "gemini" calls the API with the key from the
-# environment only. Other providers are ING.14.
+# environment only. "claude" and "openai" likewise (ING.14); a vendor may bring its own key.
 INGEST_ENRICHER = env_str("MPMV_INGEST_ENRICHER", "fake")
 INGEST_GEMINI_API_KEY = env_str("MPMV_INGEST_GEMINI_API_KEY", "")
 INGEST_GEMINI_MODEL = env_str("MPMV_INGEST_GEMINI_MODEL", "gemini-2.0-flash")
+INGEST_CLAUDE_API_KEY = env_str("MPMV_INGEST_CLAUDE_API_KEY", "")
+INGEST_CLAUDE_MODEL = env_str("MPMV_INGEST_CLAUDE_MODEL", "claude-haiku-4-5")
+INGEST_OPENAI_API_KEY = env_str("MPMV_INGEST_OPENAI_API_KEY", "")
+INGEST_OPENAI_MODEL = env_str("MPMV_INGEST_OPENAI_MODEL", "gpt-4o-mini")
 INGEST_ENRICH_TIMEOUT = 20.0  # seconds per provider call
 
 # Maps (EVT.13, spec 15 "Maps"): the Leaflet tile URL template, its attribution and the view of
