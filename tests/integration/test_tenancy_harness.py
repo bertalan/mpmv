@@ -12,6 +12,7 @@ from django.db import models
 from django.test import Client
 
 from apps.api.models import ApiClient
+from apps.events.models import EventFitment
 from apps.vendors.models import Vendor, VendorMember
 from apps.vendors.tests.factories import VendorMemberFactory, VendorTranslationFactory
 from tests.tenancy import (
@@ -30,6 +31,27 @@ from tests.tenancy import (
     vendor_api_key,
 )
 from tests.tenancy_registry import OWNED_OBJECTS
+
+# Vendor-owned child rows with no public id of their own: model -> (parent attribute, reason).
+# The seeding check then wants the parent's public id among the markers instead.
+CHILD_ROWS: dict[type[models.Model], tuple[str, str]] = {
+    EventFitment: ("page", "reached through its EventPage"),
+}
+
+
+def check_seeded_identifiers(seeded: list[models.Model], markers: tuple[str, ...]) -> None:
+    """Every seeded object shows its public id, or is a listed child row whose parent does."""
+    for obj in seeded:
+        if hasattr(obj, "public_id"):
+            assert public_id_of(obj) in markers, f"{type(obj).__name__}: public id not in markers"
+            continue
+        assert type(obj) in CHILD_ROWS, (
+            f"{type(obj).__name__} has no public_id: give it one or list it in CHILD_ROWS "
+            "with its parent and the reason"
+        )
+        parent = getattr(obj, CHILD_ROWS[type(obj)][0])
+        assert public_id_of(parent) in markers, f"{type(obj).__name__}: parent not in markers"
+
 
 URLCONF = "tests.integration.urls_tenancy"
 pytestmark = [pytest.mark.django_db, pytest.mark.urls(URLCONF)]
@@ -136,9 +158,19 @@ def test_vendor_b_is_seeded_with_every_vendor_owned_model(cross_tenant: CrossTen
     seeded = cross_tenant.seed_b()
     assert {type(obj) for obj in seeded} == set(OWNED_OBJECTS)
     assert all(obj.pk is not None for obj in seeded)
-    markers = cross_tenant.markers(*seeded)
-    # Child rows such as an event fitment have no public id; they are reached through their page.
-    assert all(public_id_of(obj) in markers for obj in seeded if hasattr(obj, "public_id"))
+    parents = [getattr(o, CHILD_ROWS[type(o)][0]) for o in seeded if type(o) in CHILD_ROWS]
+    markers = cross_tenant.markers(*seeded, *parents)
+    check_seeded_identifiers(list(seeded), markers)
+
+
+def test_a_seeded_model_without_a_public_id_and_not_listed_is_caught() -> None:
+    class Unlisted(models.Model):  # noqa: DJ008
+        class Meta:
+            app_label = "vendors"
+            managed = False
+
+    with pytest.raises(AssertionError, match="CHILD_ROWS"):
+        check_seeded_identifiers([Unlisted()], ())
 
 
 def test_a_list_of_vendor_data_wrongly_declared_without_vendor_data_is_caught(
