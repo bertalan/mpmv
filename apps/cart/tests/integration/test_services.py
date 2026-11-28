@@ -453,3 +453,55 @@ def test_add_many_writes_one_audit_entry_without_personal_data() -> None:
             {"product": str(second.public_id), "variant": None, "quantity": 1},
         ]
     }
+
+
+@pytest.mark.parametrize("quantity", [0, -1, 1.5, True, "2"])
+def test_add_many_refuses_what_count_error_refuses(quantity: Any) -> None:
+    from apps.cart import engine
+
+    cart = guest_cart()
+    expected = engine.count_error(quantity)
+    assert expected is not None
+    with pytest.raises(ValidationError) as caught:
+        services.add_many_to_cart(cart, [(sellable(), None, quantity)], ctx=CTX)
+    assert caught.value.message_dict == {"quantity": [expected]}
+    assert not CartLine.objects.filter(cart=cart).exists()
+    assert not AuditLog.objects.filter(action=services.BULK_ADD_ACTION).exists()
+
+
+def test_add_many_refuses_a_new_line_above_the_available_stock() -> None:
+    cart = guest_cart()
+    with pytest.raises(ValidationError) as caught:
+        services.add_many_to_cart(cart, [(sellable(stock_qty=3), None, 4)], ctx=CTX)
+    assert caught.value.message_dict == {"quantity": ["Only 3 available."]}
+    assert not CartLine.objects.filter(cart=cart).exists()
+
+
+def test_add_many_refuses_an_existing_line_whose_total_goes_above_the_maximum() -> None:
+    cart = guest_cart()
+    product = sellable(stock_qty=5)
+    services.add_to_cart(cart, product, quantity=3)
+    with pytest.raises(ValidationError) as caught:
+        services.add_many_to_cart(cart, [(product, None, 2), (product, None, 1)], ctx=CTX)
+    assert caught.value.message_dict == {"quantity": ["Only 5 available."]}
+    assert CartLine.objects.get(cart=cart, product=product).quantity == 3
+    assert not AuditLog.objects.filter(action=services.BULK_ADD_ACTION).exists()
+
+
+def test_add_many_refuses_more_than_the_line_cap_even_with_plenty_of_stock() -> None:
+    from apps.cart import engine
+
+    cart = guest_cart()
+    product = sellable(stock_qty=engine.MAX_LINE_QUANTITY + 500)
+    expected = f"Only {engine.MAX_LINE_QUANTITY} available."
+    for items in (
+        [(product, None, engine.MAX_LINE_QUANTITY + 1)],
+        [(product, None, 600), (product, None, 600)],  # listed twice: the total counts
+    ):
+        with pytest.raises(ValidationError) as caught:
+            services.add_many_to_cart(cart, items, ctx=CTX)
+        assert caught.value.message_dict == {"quantity": [expected]}
+    assert not CartLine.objects.filter(cart=cart).exists()
+    assert not AuditLog.objects.filter(action=services.BULK_ADD_ACTION).exists()
+    services.add_many_to_cart(cart, [(product, None, engine.MAX_LINE_QUANTITY)], ctx=CTX)
+    assert CartLine.objects.get(cart=cart).quantity == engine.MAX_LINE_QUANTITY

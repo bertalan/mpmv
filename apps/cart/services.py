@@ -275,8 +275,10 @@ def add_many_to_cart(
     All or nothing: one refused item raises ValidationError and nothing is written. A real call
     writes one AuditLog entry (`BULK_ADD_ACTION`) with the product and variant public ids and the
     quantities added, no personal data; a dry run writes none."""
-    if any(quantity < 1 for _, _, quantity in items):
-        raise ValidationError({"quantity": "The quantity must be at least 1."})
+    for _, _, quantity in items:
+        error = engine.count_error(quantity)
+        if error is not None:
+            raise ValidationError({"quantity": error})
     wanted: dict[tuple[int, int | None], int] = {}
     for product, variant, quantity in items:
         key = (product.pk, None if variant is None else variant.pk)

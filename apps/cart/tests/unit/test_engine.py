@@ -72,6 +72,11 @@ def test_a_quantity_must_be_a_whole_number(quantity: object) -> None:
     assert engine.count_error(2) is None
 
 
+@pytest.mark.parametrize("quantity", [0, -1])
+def test_a_count_below_one_is_refused_with_the_at_least_one_text(quantity: int) -> None:
+    assert engine.count_error(quantity) == "The quantity must be at least 1."
+
+
 # --- Purchasability
 
 
