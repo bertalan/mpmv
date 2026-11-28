@@ -327,7 +327,7 @@ class ReturnPolicyForm(NFCForm):
         ),
         max_length=return_engine.URL_MAX,
         required=False,
-        widget=forms.URLInput(attrs={"autocomplete": "off"}),
+        widget=forms.URLInput(attrs={"autocomplete": "new-password"}),
     )
     return_country = forms.CharField(
         label=_("Country returns are sent to"),
@@ -432,13 +432,16 @@ class AIProviderForm(NFCForm):
         widget=forms.PasswordInput(render_value=False, attrs={"autocomplete": "off"}),
         help_text=_(
             "Your key for this provider. It is stored encrypted and never shown again. "
-            "Leave it empty to keep the key you saved before."
+            "Leave it empty to keep the key you saved before. If you change the provider, "
+            "enter the key for the new one: the old key is deleted."
         ),
     )
     remove_key = forms.BooleanField(
         label=_("Remove the saved key"),
         required=False,
-        help_text=_("Tick this to delete the key you saved. The platform default applies again."),
+        help_text=_(
+            "Tick this to delete the key you saved. Without a key, no AI writes your texts."
+        ),
     )
 
     def clean(self) -> dict[str, Any]:
