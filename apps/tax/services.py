@@ -16,7 +16,6 @@ import datetime as dt
 import logging
 from dataclasses import dataclass, field
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -29,7 +28,13 @@ from apps.core.audit import VENDOR_FIELD, AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.countries import normalize_country
 from apps.core.models import Versioned
-from apps.core.services import NoPlatformOperator, current_operator, run_mutation, save_audited
+from apps.core.services import (
+    NoPlatformOperator,
+    business_tz,
+    current_operator,
+    run_mutation,
+    save_audited,
+)
 from apps.core.validity import NoValidRow, next_start_error, pick_valid
 from apps.vendors import engine as vendors_engine
 from apps.vendors.engine import VendorAction, split_vat_number
@@ -429,8 +434,9 @@ REQUEST_FIELDS = (
 
 
 def business_date(at: dt.datetime) -> dt.date:
-    """The date of `at` in business time (`settings.BUSINESS_TIME_ZONE`), as invoices see it."""
-    return timezone.localdate(at, ZoneInfo(settings.BUSINESS_TIME_ZONE))
+    """The date of `at` in business time, as invoices see it: the zone of the operator version
+    valid at `at` (`business_tz(at)`, ARC.27), so a later zone change leaves past dates alone."""
+    return timezone.localdate(at, business_tz(at))
 
 
 def _public_id(obj: Any) -> str | None:

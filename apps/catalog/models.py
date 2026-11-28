@@ -1683,7 +1683,8 @@ class ProductImage(BaseModel):
         ],
         help_text=_(
             "Say so when AI made the image or changed what it shows. The product page then "
-            "shows an 'AI-generated image' or 'AI-edited image' label next to it."
+            "shows an 'AI-generated image' or 'AI-edited image' label next to it. The library "
+            "image's own flag counts too: 'Not made with AI' here does not lower it."
         ),
     )
 

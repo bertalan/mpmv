@@ -37,7 +37,8 @@ def test_the_product_response_has_no_description_field_and_no_vendor_endpoint() 
     from apps.api.v1.api import api
 
     paths = set(api.get_openapi_schema()["paths"])
-    assert not [p for p in paths if "vendor" in p.lower()], paths
+    # The closures of VEN.20 are dates only: no vendor text goes through them.
+    assert not [p for p in paths if "vendor" in p.lower() and "/closures" not in p], paths
 
 
 def test_event_text_is_served_as_json_data(client: Client) -> None:

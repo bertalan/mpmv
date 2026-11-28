@@ -47,6 +47,10 @@ ensure_env_file() {
     grep -q '^MPMV_FIELD_ENCRYPTION_KEYS=' "$ENV_FILE" || printf 'MPMV_FIELD_ENCRYPTION_KEYS=local:%s\n' \
       "$(python3 -c 'import base64, secrets; print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())')" \
       >>"$ENV_FILE"
+    # Business time zone (ARC.27): the zone the order triggers compute in until ORD.41; without
+    # it the zone is UTC and `migrate` stops on orders.E101.
+    grep -q '^MPMV_BUSINESS_TIME_ZONE=' "$ENV_FILE" || printf 'MPMV_BUSINESS_TIME_ZONE=Europe/Rome\n' \
+      >>"$ENV_FILE"
   )
 }
 

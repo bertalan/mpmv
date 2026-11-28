@@ -24,6 +24,7 @@ def _form() -> dict[str, str]:
         "tax_regime": "small_business",
         "commission_vat_mode": "none",
         "dac7_authority_country": "AT",
+        "business_time_zone": "Europe/Rome",
         "valid_from_0": "2027-01-01",
         "valid_from_1": "00:00:00",
     }

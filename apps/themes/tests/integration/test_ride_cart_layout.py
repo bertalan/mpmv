@@ -22,6 +22,8 @@ LINE: dict[str, Any] = {
 
 PACKAGE: dict[str, Any] = {
     "summary_id": "pkg-1",
+    "vendor_id": 1,
+    "closure_notice": None,
     "vendor": "Vendor A",
     "messages": [],
     "quote_url": "",

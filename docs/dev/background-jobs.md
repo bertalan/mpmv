@@ -65,8 +65,10 @@ Rules:
 
 ## Schedules
 
-`@periodic(cron)` reads the cron expression as wall-clock time in `settings.BUSINESS_TIME_ZONE`
-(Europe/Rome), so `30 7 * * *` stays at 07:30 across daylight saving time changes; Procrastinate
+`@periodic(cron)` reads the cron expression as wall-clock time in the operator's business time
+zone (ARC.27: `scheduler_tz()` reads `business_tz()` once per worker process, so a change applies
+after a worker restart; Europe/Rome on STAGE and LIVE), so `30 7 * * *` stays at 07:30 across
+daylight saving time changes; Procrastinate
 alone would read it in UTC. The job receives `timestamp`, the Unix time of the tick. Each tick
 is queued once even with several workers. A worker that starts within 10 minutes of a missed
 tick still queues it; older ticks are skipped. `schedules()` lists what the scheduler sees, and

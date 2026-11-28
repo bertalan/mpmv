@@ -2,4 +2,5 @@
 <figure>
   {% responsive_image value.image "content" alt=value.alt_text %}
   {% if value.caption or credit %}<figcaption>{{ value.caption }}{% if credit %} {% include "core/components/image_credit.html" %}{% endif %}</figcaption>{% endif %}
+  {% include "components/ai_image_label.html" with image=value.image only %}
 </figure>

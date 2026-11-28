@@ -53,13 +53,20 @@ class CatalogConfig(AppConfig):
     }
 
     def ready(self) -> None:
+        from apps.core import media_ai_origin
         from apps.vendors.services import consumer_phone_publish_messages
 
-        from . import signals  # noqa: F401  (connects the CAT.14 upsell guard)
+        from . import media, signals  # noqa: F401  (signals connects the CAT.14 upsell guard)
         from .publishing import register_publication_check
 
         # CMP.41 follow-up (owner decision 2026-11-19): a seller to consumers needs a phone
         # before its products go live. The rule is the vendors app's; the catalog registers it.
         register_publication_check(
             "vendor_phone", lambda product: consumer_phone_publish_messages(product.vendor)
+        )
+
+        # CMP.8: the Wagtail image form (apps.core, below the catalog) changes a library image's AI
+        # origin through the audited service: editors raise it, platform staff lower it.
+        media_ai_origin.register(
+            setter=media.set_media_ai_origin, may_lower=media.may_lower_media_ai_origin
         )

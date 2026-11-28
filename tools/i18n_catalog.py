@@ -63,6 +63,7 @@ SCOPES = (
     "apps/orders/templates",
     "apps/seo",
     "apps/orders/ui",
+    "apps/shipping/templates/shipping",  # the closure notice (VEN.20)
     "apps/vendors/templates/email",  # the vendor emails (I18N.20 3c)
     "apps/events/templates/email",  # the event moderation emails (EVT.11)
     "apps/catalog/templates/email",  # brand rejected notice to the vendor (I18N.20 3c)
@@ -192,9 +193,11 @@ FILES = (
     "apps/orders/amendment_engine.py",  # the classification reasons and refusals (ORD.20)
     "apps/orders/amendment_notices.py",
     "apps/orders/models.py",  # the state labels staff and the order pages show
+    "apps/core/forms.py",  # the image form refusals (CMP.8 AI origin)
     "apps/core/models.py",  # the image licence and author labels, the seeded "Own work"
     "apps/themes/models.py",  # the theme settings field labels
     "apps/orders/staff_drafts.py",  # the refusals staff read on a prepared cart (ORD.32)
+    "apps/orders/tz.py",  # the business time zone refusal in the operator admin (ARC.27)
 )
 # Apps scanned for `help_text=` strings only (ARC.31: field help is translated; the rest of these
 # apps joins SCOPES with I18N.7). Python files, each string inside a `help_text=` argument.

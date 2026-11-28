@@ -12,3 +12,14 @@ def test_machine_text_leaves_draft_only_after_a_person_reviewed_it() -> None:
     assert not ai_labels.may_leave_draft("machine", reviewed_by_person=False)
     assert ai_labels.may_leave_draft("machine", reviewed_by_person=True)
     assert ai_labels.may_leave_draft("human", reviewed_by_person=False)
+
+
+def test_any_decrease_of_the_origin_is_a_lowering() -> None:
+    from apps.core.ai_origin import is_lowering
+
+    assert is_lowering(ai_labels.AI_GENERATED, ai_labels.AI_EDITED)
+    assert is_lowering(ai_labels.AI_GENERATED, ai_labels.AI_NONE)
+    assert is_lowering(ai_labels.AI_EDITED, ai_labels.AI_NONE)
+    assert not is_lowering(ai_labels.AI_NONE, ai_labels.AI_EDITED)
+    assert not is_lowering(ai_labels.AI_EDITED, ai_labels.AI_GENERATED)
+    assert not is_lowering(ai_labels.AI_EDITED, ai_labels.AI_EDITED)

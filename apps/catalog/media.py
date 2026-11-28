@@ -21,6 +21,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from wagtail.models import Collection
 
+from apps.core import ai_origin as ai_origin_rules
 from apps.core import tasks as core_tasks
 from apps.core import translations
 from apps.core.audit import AuditContext
@@ -46,6 +47,8 @@ IMAGE_COVER_LOCK_CHANGED = "catalog.product_image.cover_lock_changed"
 IMAGE_LANGUAGE_SET = "catalog.product_image.language_set"
 IMAGE_REORDERED = "catalog.product_image.reordered"
 IMAGE_AI_ORIGIN_SET = "catalog.product_image.ai_origin_set"
+MEDIA_IMAGE_MODEL = "core.mediaimage"
+MEDIA_IMAGE_AI_ORIGIN_SET = "catalog.media_image.ai_origin_set"
 IMAGE_DELETED = "catalog.product_image.deleted"
 IMAGE_TEXT_SET = "catalog.product_image.text_set"
 
@@ -345,6 +348,50 @@ def set_ai_origin(
             return changes
         ProductImage.objects.filter(pk=stored.pk).update(ai_origin=ai_origin)
         audit_changes(changes, ctx=ctx, action=IMAGE_AI_ORIGIN_SET)
+    return changes
+
+
+def may_lower_media_ai_origin(user: Any) -> bool:
+    """Whether `user` may lower a library image's AI origin: platform staff only."""
+    return bool(is_platform_staff(user))
+
+
+def set_media_ai_origin(
+    image: MediaImage, ai_origin: str, *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Say whether AI made or edited a library image (CMP.8): every CMS block and product page
+    that shows it then labels it (the figure, gallery and product blocks). Raising the origin
+    (none, then edited, then generated) is open to any signed-in editor or a pipeline; lowering it,
+    even from generated to edited, is for platform staff with the catalog write right, never a
+    pipeline. Every change is audited."""
+    _check_ai_origin(ai_origin)
+    require_catalog_editor(ctx)
+    user = None
+    if ctx.actor_id is None:
+        if ctx.source not in PIPELINE_SOURCES:
+            raise PermissionDenied("An image's AI origin is changed by a signed-in person.")
+    else:
+        user = get_user_model().objects.filter(pk=ctx.actor_id).first()
+        if user is None:
+            raise PermissionDenied("An image's AI origin is changed by a signed-in person.")
+    changes = ChangeSet()
+    with transaction.atomic():
+        stored = MediaImage.objects.select_for_update().get(pk=image.pk)
+        if ai_origin_rules.is_lowering(stored.ai_origin, ai_origin) and (
+            user is None or not may_lower_media_ai_origin(user)
+        ):  # a pipeline (no user) is raise-only too: a re-run never drops a label
+            raise PermissionDenied("Only platform staff lower an image's AI origin.")
+        changes.update(
+            MEDIA_IMAGE_MODEL,
+            str(stored.pk),
+            {"ai_origin": stored.ai_origin},
+            {"ai_origin": ai_origin},
+        )
+        if dry_run or changes.is_empty:
+            return changes
+        MediaImage.objects.filter(pk=stored.pk).update(ai_origin=ai_origin)
+        audit_changes(changes, ctx=ctx, action=MEDIA_IMAGE_AI_ORIGIN_SET)
+    image.ai_origin = ai_origin
     return changes
 
 
