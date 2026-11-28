@@ -1,0 +1,4 @@
+{% load i18n %}{% comment %}
+The "For <profile> owners" badge (FIT.11): text, never colour alone. Context: `label`, the
+visitor's own active vehicle or profile name.
+{% endcomment %}{% if label %}<p class="event-fitment"><span class="event-fitment-badge">{% blocktranslate with name=label %}For {{ name }} owners{% endblocktranslate %}</span></p>{% endif %}

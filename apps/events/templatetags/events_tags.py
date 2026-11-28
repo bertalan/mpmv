@@ -33,3 +33,16 @@ def storefront_events(vendor: Any, language: str) -> dict[str, Any]:
     items = listing.upcoming(events, timezone.now())[:STOREFRONT_EVENTS]
     link = f"{index.url}?vendor={vendor.slug}" if index is not None and index.url else ""
     return {"items": items, "events_url": link, "vendor": vendor}
+
+
+@register.inclusion_tag("events/_fitment_badge.html", takes_context=True)
+def event_fitment_badge(context: template.Context, page: Any) -> dict[str, Any]:
+    """The "For <profile> owners" badge when the active garage matches a tag of the event (FIT.11).
+    Empty without a request, on error pages and for a general event or a generic visitor."""
+    from apps.events import fitment
+    from apps.fitment.garage_state import garage_state
+
+    request = context.get("request")
+    if request is None or "exception" in context or not fitment.matches_garage(request, page):
+        return {}
+    return {"label": garage_state(request)["active_label"]}

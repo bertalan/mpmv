@@ -49,7 +49,7 @@ from django.db.models import F, Q
 from django.http import Http404, HttpRequest
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from modelcluster.fields import ParentalManyToManyField
+from modelcluster.fields import ParentalKey, ParentalManyToManyField
 from wagtail import blocks
 from wagtail.admin.panels import FieldPanel
 from wagtail.contrib.routable_page.models import RoutablePageMixin, path
@@ -1259,6 +1259,36 @@ class EventPage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is 
 
 
 # --- Moderation policy and settings
+
+
+class EventFitment(models.Model):
+    """One fitment node an event is for (FIT.11, spec 17 §17.5.5); none means a general event.
+
+    Set on the original-language page: translations read those tags (`events.fitment`). The node
+    is protected, merged by the fitment references registry and never deleted under an event.
+    """
+
+    vendor_scope: ClassVar[str] = "page__vendor"
+
+    page = ParentalKey(EventPage, on_delete=models.CASCADE, related_name="fitment_rows")
+    node = models.ForeignKey(
+        "fitment.FitmentNode",
+        verbose_name=_("vehicle"),
+        on_delete=models.PROTECT,
+        related_name="event_rows",
+        help_text=_(
+            "A make covers all its models. Leave the list empty for an event for everyone."
+        ),
+    )
+    objects = VendorScopedManager()
+
+    class Meta:
+        constraints: ClassVar[list[models.BaseConstraint]] = [
+            models.UniqueConstraint(fields=["page", "node"], name="events_eventfitment_unique")
+        ]
+
+    def __str__(self) -> str:
+        return str(self.node)
 
 
 class PolicyMode(models.TextChoices):

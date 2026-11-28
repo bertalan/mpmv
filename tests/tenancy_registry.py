@@ -87,11 +87,16 @@ from apps.compliance.tests.factories import (
 )
 from apps.core.models import TranslationStatus
 from apps.core.tests.factories import utc
-from apps.events.models import EventPage, VendorEventPolicy
-from apps.events.tests.factories import EventPageFactory, VendorEventPolicyFactory
+from apps.events.models import EventFitment, EventPage, VendorEventPolicy
+from apps.events.tests.factories import (
+    EventFitmentFactory,
+    EventPageFactory,
+    VendorEventPolicyFactory,
+)
 from apps.fitment.models import FitmentNodeProposal, ProductFitment, ProductFitmentState
 from apps.fitment.tests.factories import (
     FitmentCategoryFactory,
+    FitmentNodeFactory,
     FitmentNodeProposalFactory,
     ProductFitmentFactory,
     ProductFitmentStateFactory,
@@ -363,6 +368,9 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     ConnectedAccount: lambda vendor: ConnectedAccountFactory.create(vendor=vendor),
     # EVT.1: a draft event page under the primary language's events index.
     EventPage: lambda vendor: EventPageFactory.create(vendor=vendor),
+    EventFitment: lambda vendor: EventFitmentFactory.create(
+        page=EventPageFactory.create(vendor=vendor), node=FitmentNodeFactory.create()
+    ),
     VendorEventPolicy: lambda vendor: VendorEventPolicyFactory.create(vendor=vendor),
     # CMS.4: a vendor's story page under the primary language's home.
     VendorLandingPage: lambda vendor: VendorLandingPageFactory.create(vendor=vendor),

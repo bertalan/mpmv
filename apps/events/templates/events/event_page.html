@@ -1,5 +1,5 @@
 {% extends "layouts/content.html" %}
-{% load i18n l10n tz wagtailcore_tags cms_tags event_feeds seo_seller %}
+{% load i18n l10n tz wagtailcore_tags cms_tags event_feeds seo_seller events_tags %}
 {% comment %}
 Event page (EVT.1 part 2/2, spec 15 "Public pages"): a minimal page on the base theme layout.
 Dates are in the page's language and the event's own time zone, with machine-readable
@@ -16,6 +16,7 @@ when the event has an address and no coordinates.
     <header>
       <h1>{{ page.title }}</h1>
       {% if page.cancelled_at %}<p role="status" class="event-status">{% translate "Cancelled" %}</p>{% elif page.postponed %}<p role="status" class="event-status">{% translate "Postponed" %}</p>{% endif %}
+      {% event_fitment_badge page %}
       <p>{{ page.summary }}</p>
     </header>
     <dl class="event-facts">

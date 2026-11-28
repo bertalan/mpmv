@@ -79,6 +79,10 @@ def _data(page: EventPage, **changes: str) -> dict[str, str]:
         "longitude": "",
         "geo_source": "",
         "body-count": "0",
+        "fitment_rows-TOTAL_FORMS": "0",
+        "fitment_rows-INITIAL_FORMS": "0",
+        "fitment_rows-MIN_NUM_FORMS": "0",
+        "fitment_rows-MAX_NUM_FORMS": "1000",
         "exdates": "",
         "exdate_days": "",
     }

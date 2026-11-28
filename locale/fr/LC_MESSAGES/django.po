@@ -603,6 +603,10 @@ msgstr ""
 "officiels. Les moteurs de recherche les utilisent pour reconnaître l'entreprise. Exemple : "
 "[\"https://www.wikidata.org/wiki/Q7\"]."
 
+#: apps/events/models.py
+msgid "A make covers all its models. Leave the list empty for an event for everyone."
+msgstr "Une marque couvre tous ses modèles. Laissez la liste vide pour un événement ouvert à tous."
+
 #: apps/events/templates/email/events/event_changes_requested/body.html
 #: apps/events/templates/email/events/event_changes_requested/body.txt
 msgid "A moderator asked for changes to your event %(title)s before it can be published."
@@ -4059,6 +4063,10 @@ msgstr "Convient à tout."
 #: themes/base/templates/components/footer.html themes/ride/templates/components/footer.html
 msgid "Footer"
 msgstr "Pied de page"
+
+#: apps/events/templates/events/_fitment_badge.html
+msgid "For %(name)s owners"
+msgstr "Pour les propriétaires de %(name)s"
 
 #: apps/manager/event_image_form.py
 msgid "For a licence that needs a written permission: where it is kept."
@@ -9755,6 +9763,13 @@ msgstr "Changer"
 #: apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "Switch names by language"
 msgstr "Nommer par langue"
+
+#: apps/events/panels.py
+msgid ""
+"Tag the event with the vehicles it is for. Visitors whose garage matches see a badge. Leave it "
+"empty for an event for everyone. Edit the tags on the page in the original language: translations "
+"follow it."
+msgstr "Indiquez les véhicules concernés par l'événement. Les visiteurs dont le garage correspond voient un badge. Laissez vide pour un événement ouvert à tous. Modifiez les véhicules sur la page dans la langue d'origine : les traductions la suivent."
 
 #: apps/manager/forms.py
 msgid "Tagline"
