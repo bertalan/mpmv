@@ -15,11 +15,13 @@ import pytest
 from django.apps import apps
 from django.contrib.auth.models import Group
 from django.core.cache import cache
-from django.test import Client
+from django.test import Client, RequestFactory
+from django.urls import resolve, reverse
 from django.utils import translation
-from wagtail.models import PageViewRestriction, Site
+from wagtail.models import Page, PageViewRestriction, Site
 
 from apps.catalog.tests.factories import RedirectFactory
+from apps.cms import views
 from apps.cms.models import LegalPage
 from apps.cms.tests.factories import (
     BlogAuthorFactory,
@@ -31,6 +33,11 @@ from apps.core.i18n import configured_languages, primary_language
 from tests.i18n import language_prefix, other_language
 
 pytestmark = pytest.mark.django_db
+
+# Measured on the seeded site, warm caches (a fallback does two route lookups; a 404 adds the
+# legacy-path lookup). A rise means a new query, so raise it only on purpose.
+QUERIES_FALLBACK = 39
+QUERIES_404 = 26
 
 NOTICE = "Not yet available in this language; shown in %(endonym)s"
 
@@ -87,7 +94,7 @@ def test_an_untranslated_page_is_served_in_place_with_the_notice(
 
 def test_the_primary_url_shows_no_notice(client: Client, primary_only: Any) -> None:
     html = client.get(f"{language_prefix(primary_language())}/primary-only/").content.decode()
-    assert translated_notice(primary_language()).split("%")[0] not in html
+    assert 'class="alert alert--info' not in html
 
 
 @pytest.mark.usefixtures("_indexing_on")
@@ -99,6 +106,50 @@ def test_the_fallback_is_canonical_to_the_primary_page_without_its_own_hreflang(
     assert canonical(html) == "http://localhost/primary-only/"
     assert lang not in hreflangs(html)
     assert primary_language() in hreflangs(html)
+
+
+def test_the_fallback_notice_is_an_alert_element(client: Client, primary_only: Any) -> None:
+    """The positive twin of the test above: the notice is the one `alert` box."""
+    html = client.get(f"{language_prefix(other_language())}/primary-only/").content.decode()
+    assert html.count('class="alert alert--info') == 1
+
+
+def test_wagtail_still_caches_the_route_on_the_request(primary_only: Any) -> None:
+    """`serve_page` deletes and reassigns Wagtail's private `_wagtail_route_for_request`; if an
+    upgrade renames it, this fails instead of the fallback silently serving a stale route."""
+    request = RequestFactory().get("/primary-only/")
+    route = Page.route_for_request(request, "primary-only/")
+    assert route is not None
+    assert getattr(request, "_wagtail_route_for_request") is route  # noqa: B009
+
+
+def test_a_fallback_page_costs_a_fixed_number_of_queries(
+    client: Client, primary_only: Any, django_assert_max_num_queries: Any
+) -> None:
+    path = f"{language_prefix(other_language())}/primary-only/"
+    client.get(path)  # warm the caches (site root, content types)
+    with django_assert_max_num_queries(QUERIES_FALLBACK):
+        assert client.get(path).status_code == 200
+
+
+def test_a_404_costs_a_fixed_number_of_queries(
+    client: Client, seeded: Any, django_assert_max_num_queries: Any
+) -> None:
+    path = f"{language_prefix(other_language())}/nowhere-at-all/"
+    client.get(path)
+    with django_assert_max_num_queries(QUERIES_404):
+        assert client.get(path).status_code == 404
+
+
+def test_a_language_switch_home_view_never_reaches_the_cms_route(seeded: Any) -> None:
+    """I18N.22 relies on it: a secret-bearing URL is resolved by its own view, before the CMS
+    catch-all, so the fallback (and its notice) never applies to it."""
+    for code in configured_languages():
+        with translation.override(code):
+            path = reverse("action_link:open", args=["token"])
+            match = resolve(path)
+        assert match.func is not views.serve_page
+        assert getattr(match.func, "language_switch_home", False)
 
 
 def test_a_slug_in_no_language_is_still_a_404(client: Client, seeded: Any) -> None:

@@ -33,6 +33,10 @@ def serve_page(request: HttpRequest, path: str) -> HttpResponseBase:
         return response
     if catalog_services.resolve_legacy_path(request.path_info) is not None:
         raise Http404
+    # `_wagtail_route_for_request` is Wagtail's private per-request route cache (checked against
+    # Wagtail 8.1, `Page.route_for_request`). It is dropped so the lookup runs again under the
+    # primary language; `test_wagtail_still_caches_the_route_on_the_request` fails loudly if a
+    # Wagtail upgrade renames it.
     del request._wagtail_route_for_request  # type: ignore[attr-defined]  # Wagtail's cache
     with translation.override(primary):
         route = Page.route_for_request(request, path)
