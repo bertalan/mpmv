@@ -34,6 +34,7 @@ from . import crypto, encryption, flags, mail
 from .audit import VENDOR_MODEL, AuditContext, record, user_context
 from .changeset import ChangeSet, to_jsonable
 from .countries import InvalidCountry, default_allowed_vendor_countries, normalize_countries
+from .fields import EncryptedFieldMixin
 from .models import (
     PLATFORM_OWNER_CODENAME,
     VENDOR_OVERRIDES,
@@ -744,33 +745,43 @@ def _key_label(raw: str) -> str:
     return f"key {key_id}" if key_id else "cleartext"
 
 
-def rotate_field_keys(*, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
+def rotate_field_keys(
+    *, ctx: AuditContext, dry_run: bool = False, keyring: str = encryption.KEYS_SETTING
+) -> ChangeSet:
     """Re-encrypt with the primary key every encrypted value that uses an older key or is
     stored in clear (e.g. restored from an old dump). Rows are locked while they are rewritten.
+
+    `keyring` is the settings entry of the keyring to rotate: the SEC.3 field keys by default, or
+    `AI_KEY_ENCRYPTION_KEYS` for the vendors' AI provider keys. Each keyring rotates its own
+    columns only, with its own primary key.
 
     One change (and one audit entry) per object, naming only key ids: `{"iban": "key k1"}` to
     `{"iban": "key k2"}`, never values. Every value is decrypted first, also on dry-run, so a
     wrong or missing key raises `DecryptionError` before anything is written. Afterwards the
     older keys can be removed from the configuration.
     """
-    keyring = encryption.configured_keyring()
-    after_label = f"key {keyring.primary_id}"
+    ring = encryption.configured_keyring(keyring)
+    after_label = f"key {ring.primary_id}"
     by_model: dict[type[Any], list[encryption.EncryptedColumn]] = defaultdict(list)
-    for column in encryption.encrypted_columns():
+    for column in encryption.encrypted_columns(keyring):
         by_model[column.model].append(column)
 
     changeset = ChangeSet()
     updates: list[tuple[type[Any], Any, dict[str, str]]] = []
     with transaction.atomic():
         for model, columns in by_model.items():
-            contexts = {column.field.name: column.context for column in columns}
-            for pk, key, stale in encryption.stale_rows(connection, model, columns):
+            by_name = {column.field.name: column for column in columns}
+            for pk, key, stale, bound in encryption.stale_rows(connection, model, columns, ring):
                 plaintext = {
-                    name: keyring.decrypt(raw, context=contexts[name])
+                    name: ring.decrypt(raw, context=by_name[name].context_for(bound[name]))
                     if crypto.is_encrypted(raw)
                     else raw
                     for name, raw in stale.items()
                 }
+                for name in plaintext:  # a bound field is written sealed with its row's value
+                    field = by_name[name].field
+                    if isinstance(field, EncryptedFieldMixin) and by_name[name].bound_column:
+                        plaintext[name] = field.seal(plaintext[name], bound[name])
                 changeset.update(
                     model._meta.label_lower,
                     key,

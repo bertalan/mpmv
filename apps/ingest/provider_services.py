@@ -11,6 +11,8 @@ from typing import Any
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
+from django_stubs_ext import StrOrPromise
 
 from apps.accounts.models import User
 from apps.core.audit import AuditContext
@@ -61,25 +63,32 @@ def save_provider(
     remove_key: bool = False,
     actor: User,
     ctx: AuditContext,
+    passkey_confirmed: bool,
     dry_run: bool = False,
 ) -> ChangeSet:
     """Set the vendor's provider and model; a non-blank `api_key` sets or rotates the key.
 
-    A blank key keeps the stored one; `remove_key` deletes it. Owners only (`profile`). Invalid
-    input raises `ValidationError` naming the field, never the key. The audit action tells what
+    A blank key keeps the stored one, unless the provider changes (the old key is deleted, never
+    sent to the new provider); `remove_key` deletes it. Owners only (`profile`), and only
+    with `passkey_confirmed`: the caller has passed the passkey window or a passkey "once" for
+    `ai_provider_key` (the service refuses without it). Invalid input raises
+    `ValidationError` naming the field, never the key. The audit action tells what
     happened: `saved` (choice only), `key_set`, `key_rotated`, `key_removed`.
     """
+    if not passkey_confirmed:
+        # The view gates it (CORE.25 `ai_provider_key`); a caller that skips the view says so.
+        raise PermissionDenied("Setting the AI provider needs a passkey confirmation.")
     if not has_vendor_permission(actor, vendor, "profile"):
         raise PermissionDenied("Only the vendor owner chooses the AI provider.")
-    errors: dict[str, str] = {}
+    errors: dict[str, StrOrPromise] = {}
     if provider not in AIProvider.values:
-        errors["provider"] = "Choose one of the listed providers."
+        errors["provider"] = _("Choose one of the listed providers.")
     if not MODEL_NAME.match(model):
-        errors["model"] = "Use the model name as the provider writes it."
+        errors["model"] = _("Use the model name as the provider writes it.")
     if api_key and not (
         MIN_KEY_LENGTH <= len(api_key) <= MAX_KEY_LENGTH and _KEY_SHAPE.match(api_key)
     ):
-        errors["api_key"] = "This does not look like an API key."
+        errors["api_key"] = _("This does not look like an API key.")
     if errors:
         raise ValidationError(errors)
     with transaction.atomic():
@@ -89,6 +98,7 @@ def save_provider(
         row = VendorAIProvider.objects.select_for_update().filter(vendor=vendor).first()
         before = _snapshot(vendor, row)
         had_key = bool(row and row.has_key)
+        changed_provider = row is not None and row.provider != provider
         target = row or VendorAIProvider(vendor=vendor)
         target.provider, target.model = provider, model
         if api_key:
@@ -96,7 +106,8 @@ def save_provider(
             target.api_key = api_key
             target.key_version += 1
             target.key_set_at = timezone.now()
-        elif remove_key and had_key:
+        elif had_key and (remove_key or changed_provider):
+            # A key belongs to the provider that issued it: a new provider never receives it.
             action = KEY_REMOVED
             target.api_key = ""
         else:

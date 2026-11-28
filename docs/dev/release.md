@@ -218,6 +218,20 @@ the vendor events API and the Manager fixes of #212 (which came after the v0.1.3
   departments and others) without overwriting rows staff changed. The postcode lists are for
   the owner to review in the tax admin; Northern Ireland is not seeded (D-02).
 
+### Vendor AI provider keys: a new key ring (ING.14)
+
+**Operator note: `MPMV_AI_KEY_ENCRYPTION_KEYS` is a new environment variable.** The vendors' own
+AI provider keys are encrypted with a keyring separate from `MPMV_FIELD_ENCRYPTION_KEYS`.
+
+- Before the release that carries `ingest/0007`: add the variable to `mpmv.env` (template:
+  `deploy/server/mpmv.env.example`) with a key from `manage generate_field_key <id>`, or point
+  `MPMV_AI_KEY_ENCRYPTION_KEYS_FILE` at a key file (not both). Keep it out of the database
+  backups' reach, like the field keys.
+- Without it the site still starts and no vendor key exists yet, but `manage check --database
+  default` (and `migrate`) fails with `core.E305` as soon as a vendor key is stored, and a vendor
+  save fails. Rotate it with `manage rotate_field_keys --keyring ai`.
+- After deploy: `manage check --deploy` and `manage verify_encrypted_data` pass.
+
 ### Django admin network allow-list (OPS.5, MQ-24)
 
 On STAGE and LIVE set `MPMV_ADMIN_ALLOWED_NETWORKS` to loopback only in both `mpmv.env` and

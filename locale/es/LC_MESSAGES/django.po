@@ -2545,6 +2545,10 @@ msgstr "Elija cómo se repite el evento. Los campos de abajo dependen de la elec
 msgid "Choose how you will confirm it is you after your password."
 msgstr "Elija cómo confirmará su identidad después de la contraseña."
 
+#: apps/ingest/provider_services.py
+msgid "Choose one of the listed providers."
+msgstr "Elija uno de los proveedores indicados."
+
 #: apps/orders/ui/present.py
 msgid "Choose one of the shipping options."
 msgstr "Elige una de las opciones de envío."
@@ -5910,9 +5914,8 @@ msgid "No item found."
 msgstr "No se encontró ningún elemento."
 
 #: apps/manager/templates/manager/shop/ai_provider.html
-msgid "No key is saved. Without one the platform default applies."
-msgstr ""
-"No hay ninguna clave guardada. Sin clave se aplica el valor predeterminado de la plataforma."
+msgid "No key is saved. Without one, no AI writes your texts."
+msgstr "No hay ninguna clave guardada. Sin clave, ninguna IA escribe sus textos."
 
 #: apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "No level yet."
@@ -13325,6 +13328,10 @@ msgstr ""
 msgid "This content is not available in this language."
 msgstr "Este contenido no está disponible en este idioma."
 
+#: apps/ingest/provider_services.py
+msgid "This does not look like an API key."
+msgstr "Esto no parece una clave de API."
+
 #: apps/orders/ui/forms.py
 msgid "This does not look like an EU VAT number. Check the prefix and the digits."
 msgstr "Esto no parece un número de IVA de la UE. Comprueba el prefijo y los dígitos."
@@ -13877,8 +13884,8 @@ msgstr ""
 "normal."
 
 #: apps/manager/forms.py
-msgid "Tick this to delete the key you saved. The platform default applies again."
-msgstr "Marque esta casilla para eliminar la clave guardada. Vuelve a aplicarse la opción predeterminada de la plataforma."
+msgid "Tick this to delete the key you saved. Without a key, no AI writes your texts."
+msgstr "Marque esta casilla para eliminar la clave guardada. Sin clave, ninguna IA escribe sus textos."
 
 #: apps/orders/ui/forms.py
 msgid ""
@@ -14391,6 +14398,10 @@ msgstr "Usar en este sitio"
 #: apps/accounts/templates/accounts/mfa/verify.html themes/ride/templates/accounts/mfa/verify.html
 msgid "Use recovery code"
 msgstr "Usar un código de recuperación"
+
+#: apps/ingest/provider_services.py
+msgid "Use the model name as the provider writes it."
+msgstr "Use el nombre del modelo tal como lo escribe el proveedor."
 
 #: apps/manager/product_views.py
 msgid "Use the shop's default"
@@ -16185,10 +16196,9 @@ msgstr "Su factura ya está emitida"
 #: apps/manager/forms.py
 msgid ""
 "Your key for this provider. It is stored encrypted and never shown again. Leave it empty to keep "
-"the key you saved before."
-msgstr ""
-"Su clave para este proveedor. Se guarda cifrada y ya no se muestra. Déjela vacía para conservar la"
-" clave guardada antes."
+"the key you saved before. If you change the provider, enter the key for the new one: the old key "
+"is deleted."
+msgstr "Su clave para este proveedor. Se guarda cifrada y no se vuelve a mostrar. Déjela vacía para conservar la clave guardada antes. Si cambia de proveedor, introduzca la clave del nuevo: la clave anterior se elimina."
 
 #: apps/compliance/forms.py
 msgid "Your name. Required, except for a report of child sexual abuse material."

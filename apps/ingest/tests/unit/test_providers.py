@@ -1,16 +1,22 @@
 """ING.14 1/3: Claude and OpenAI adapters behind TextEnricher, transports mocked (no network)."""
 
+import copy
 import json
+import pickle
 import secrets
+import traceback
+import urllib.error
 from collections.abc import Mapping
 from typing import Any
 
 import pytest
 
 from apps.ingest import enrich_engine as eng
+from apps.ingest import provider_http
 from apps.ingest.enrichment import ProductFacts, ProviderError, TextPolicy
-from apps.ingest.gemini import GeminiEnricher, RetryableProviderError
-from apps.ingest.providers import ClaudeEnricher, OpenAIEnricher
+from apps.ingest.gemini import GeminiEnricher
+from apps.ingest.provider_http import RetryableProviderError
+from apps.ingest.providers import CLAUDE_MAX_TOKENS, ClaudeEnricher, OpenAIEnricher
 
 FACTS = ProductFacts(sku="SKU-1", title="Ceramic mug", attributes={"colour": "black"})
 POLICY = TextPolicy()
@@ -88,10 +94,56 @@ def test_key_in_a_header_only_and_payload_is_product_data(name: str) -> None:
 def test_repr_and_errors_never_hold_the_key(name: str) -> None:
     enricher = build(name, Recorder(ProviderError("HTTP 401")))
     assert KEY not in repr(enricher)
-    assert KEY not in str(vars(enricher).get("model"))
     with pytest.raises(ProviderError) as info:
         enricher.describe(FACTS, "en", POLICY)
-    assert KEY not in str(info.value)
+    assert KEY not in "".join(traceback.format_exception(info.value))  # the whole chain
+
+
+@pytest.mark.parametrize("name", ["gemini", "claude", "openai"])
+def test_a_real_http_error_through_the_transport_never_shows_the_key(
+    name: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def refuse(request: Any, *, timeout: float) -> Any:
+        # What the request carried (the key header) must not come back in the error.
+        raise urllib.error.HTTPError(request.full_url, 401, "denied", request.headers, None)
+
+    monkeypatch.setattr("apps.ingest.provider_http.open_url", refuse)
+    cls = {"gemini": GeminiEnricher, "claude": ClaudeEnricher, "openai": OpenAIEnricher}[name]
+    enricher: Any = cls(KEY, "m-1", transport=provider_http.http_post_json)
+    with pytest.raises(ProviderError) as info:
+        enricher.describe(FACTS, "en", POLICY)
+    text = "".join(traceback.format_exception(info.value))
+    assert KEY not in text
+    assert info.value.__cause__ is None
+    assert "401" in str(info.value)
+
+
+@pytest.mark.parametrize("name", ["gemini", "claude", "openai"])
+def test_an_enricher_cannot_be_pickled_or_copied_so_the_key_never_enters_a_job(name: str) -> None:
+    enricher = build(name, Recorder())
+    for attempt in (pickle.dumps, copy.copy, copy.deepcopy):
+        with pytest.raises(TypeError):
+            attempt(enricher)
+
+
+def test_the_frames_that_hold_the_key_are_hidden_from_error_reports() -> None:
+    assert provider_http.http_post_json.sensitive_variables == ("headers",)  # type: ignore[attr-defined]
+    for cls in (GeminiEnricher, ClaudeEnricher, OpenAIEnricher):
+        assert cls._call.sensitive_variables == "__ALL__"  # type: ignore[union-attr]
+
+
+def test_claude_json_in_a_code_fence_is_accepted() -> None:
+    fenced = {
+        "content": [{"type": "text", "text": f"```json\n{json.dumps(GOOD)}\n```"}],
+        "stop_reason": "end_turn",
+    }
+    assert build("claude", Recorder(fenced)).describe(FACTS, "en", POLICY).raw == GOOD
+    bare = {**fenced, "content": [{"type": "text", "text": f"```\n{json.dumps(GOOD)}```"}]}
+    assert build("claude", Recorder(bare)).describe(FACTS, "en", POLICY).raw == GOOD
+
+
+def test_claude_has_room_for_the_longest_answer() -> None:
+    assert CLAUDE_MAX_TOKENS >= 8192
 
 
 @pytest.mark.parametrize("name", ["claude", "openai"])

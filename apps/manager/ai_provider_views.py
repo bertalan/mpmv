@@ -65,6 +65,7 @@ class AIProviderView(ManagerView):
                 remove_key=data["remove_key"],
                 actor=actor,
                 ctx=ctx,
+                passkey_confirmed=True,  # `requires_level_method` above passed
             )
         except ValidationError as error:
             for name, messages_ in error.message_dict.items():

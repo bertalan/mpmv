@@ -156,3 +156,54 @@ def test_the_facts_and_the_limits_are_read_only() -> None:
 def test_default_limits_cannot_be_changed_in_place() -> None:
     with pytest.raises(TypeError):
         POLICY.max_lengths["title"] = 1000  # type: ignore[index]
+
+
+# --- The one gate (lane-a review of #1150)
+
+
+def test_the_gate_has_three_outcomes() -> None:
+    accepted = eng.gate(good(), "en", POLICY)
+    assert (accepted.outcome, accepted.violations) == ("accepted", [])
+    assert accepted.text is not None
+
+    broken = eng.gate({**good(), "extra": "x"}, "en", POLICY)
+    assert (broken.text, broken.outcome) == (None, "schema_invalid")
+    assert broken.violations == ["unknown field: extra"]
+
+    outside = eng.gate(good(description="An eco-friendly mug"), "en", POLICY)
+    assert outside.outcome == "out_of_policy"
+    assert outside.text is not None  # the schema held; the text must still not be used
+    assert any("environmental" in v for v in outside.violations)
+
+
+def test_the_gate_applies_the_policy_to_every_language_it_is_given() -> None:
+    assert eng.gate(good(), "it", TextPolicy(languages=("en",))).outcome == "out_of_policy"
+
+
+def test_the_gate_is_the_schema_then_the_policy_and_nothing_else() -> None:
+    raw = good(title="Visit www.example.com")
+    text, errors = eng.validate_schema(raw, "en")
+    assert errors == []
+    assert text is not None  # the schema alone lets it through
+    assert eng.gate(raw, "en", POLICY).outcome == "out_of_policy"  # the gate does not
+
+
+# --- Immutable value objects
+
+
+def test_the_provider_answer_cannot_be_changed_after_the_call() -> None:
+    output = FakeEnricher().describe(FACTS, "en", POLICY)
+    with pytest.raises(TypeError):
+        output.raw["title"] = "changed"  # type: ignore[index]
+
+
+def test_the_policy_coerces_its_sequences_to_tuples() -> None:
+    policy = TextPolicy(languages=["en"], required=["title"], banned_terms=["x"])  # type: ignore[arg-type]
+    assert (policy.languages, policy.required, policy.banned_terms) == (("en",), ("title",), ("x",))
+    with pytest.raises(TypeError):
+        TextPolicy(languages="en")  # type: ignore[arg-type]  # not ("e", "n")
+
+
+def test_an_empty_language_entry_counts_as_not_written() -> None:
+    assert eng.can_write_language("en", POLICY, {"en": {}})
+    assert not eng.can_write_language("en", POLICY, {"en": {"title": "x"}})

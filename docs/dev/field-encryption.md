@@ -11,6 +11,7 @@ not expose them (spec 12, backlog SEC.3). The key lives outside the database and
 | `vendors.Vendor` | `tax_code` | DAC7 TIN; for a sole proprietor, a personal identifier (codice fiscale) |
 | `vendors.Vendor` | `date_of_birth` | DAC7, sole proprietors: personal data (VEN.23; `EncryptedDateField`) |
 | `vendors.Vendor` | `place_of_birth` | DAC7, sole proprietors whose TIN country issues no TIN: personal data (VEN.23) |
+| `ingest.VendorAIProvider` | `api_key` | A vendor's own AI provider key (ING.14). **Own keyring** (`MPMV_AI_KEY_ENCRYPTION_KEYS`, below) and **bound to the vendor** |
 
 Deliberately in clear: the VAT number (public in VIES, searched by staff, checked against
 VIES), names and addresses (printed on order confirmations and commission statements, and searched). A company's tax code is often
@@ -69,6 +70,26 @@ uv run python manage.py generate_field_key 2026-11     # prints "2026-11:<key>"
 
 Back the keys up **separately** from the database backups (pgBackRest, OPS.1): a backup and
 its key in the same place protect nothing, and a lost key means lost data.
+
+### The AI provider key ring (ING.14)
+
+The vendors' own AI provider keys are credentials for a third party, not personal data, so
+they have their own keyring: `MPMV_AI_KEY_ENCRYPTION_KEYS` (or `MPMV_AI_KEY_ENCRYPTION_KEYS_FILE`),
+same format, setting `AI_KEY_ENCRYPTION_KEYS`. It is parametrised on the field:
+`EncryptedCharField(keyring_setting="AI_KEY_ENCRYPTION_KEYS", bound_to="vendor")`.
+
+- The keyring is **empty by default**. Set it before the first vendor saves a key: with a stored
+  vendor key and no keyring, `core.E305` stops `migrate` (and `check --database default`); a set but
+  malformed keyring is `core.E306`. Tests and local dev generate their own, like the SEC.3 keys
+  (dev: `~/.config/mpmv/dev-ai-keys`).
+- Rotation is separate: put the new key first, then `manage rotate_field_keys --keyring ai`
+  (`--dry-run` first). The SEC.3 rotation never touches these columns, and the other way round.
+  Back it up apart from the database and from the SEC.3 keys.
+- **Bound to the vendor** (`bound_to`): the associated data is `ingest.vendoraiprovider.api_key:<vendor id>`,
+  not only the column, so a ciphertext copied into another vendor's row does not decrypt, and
+  neither does a row whose `vendor_id` was changed. A bound field decrypts when the attribute is
+  read (`row.api_key`), not when the row loads; saving a row that did not change the key does not
+  re-encrypt it. Writing a plaintext through `QuerySet.update()` is refused: save the row.
 
 ### Checks
 

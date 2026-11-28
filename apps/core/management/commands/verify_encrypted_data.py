@@ -2,6 +2,7 @@
 
 from typing import Any
 
+from django.core.exceptions import ImproperlyConfigured
 from django.core.management.base import BaseCommand, CommandError, CommandParser
 from django.db import DEFAULT_DB_ALIAS, connections
 
@@ -51,11 +52,25 @@ class Command(BaseCommand):
         parser.add_argument("--database", default=DEFAULT_DB_ALIAS, help="Database alias.")
 
     def handle(self, *args: Any, database: str = DEFAULT_DB_ALIAS, **options: Any) -> None:
-        keyring = encryption.configured_keyring()
         connection = connections[database]
         errors: list[str] = []
         rotate = False
         for column in encryption.encrypted_columns():
+            try:
+                keyring = encryption.configured_keyring(column.keyring_setting)
+            except ImproperlyConfigured:
+                if column.keyring_setting == encryption.KEYS_SETTING:
+                    raise
+                stored = encryption.key_usage(
+                    connection, column.model._meta.db_table, column.column, column.bound_column
+                )
+                if stored:  # a dedicated keyring (ING.14) matters once it holds a value
+                    errors.append(
+                        f"{column.context}: {sum(c for c, *_ in stored.values())} value(s) are "
+                        f"stored but the keyring is not usable. "
+                        f"{encryption.keys_help(column.keyring_setting)}"
+                    )
+                continue
             report = encryption.verify_column(connection, column, keyring)
             self.stdout.write(_summary(report))
             errors += _errors(report)

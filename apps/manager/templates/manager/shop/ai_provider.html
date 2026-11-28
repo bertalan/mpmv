@@ -7,7 +7,7 @@ No inline script or style.
 {% block manager_content %}
   <h1>{% translate "AI provider" %}</h1>
   <p class="manager-lead">{% translate "Choose the service that writes the texts of your own products, and give it your own key. We send it product data only, never customer data. Every text waits for your review before it is shown." %}</p>
-  <p>{% if has_key %}{% translate "A key is saved. For your safety it is never shown again; enter a new one to replace it." %}{% else %}{% translate "No key is saved. Without one the platform default applies." %}{% endif %}</p>
+  <p>{% if has_key %}{% translate "A key is saved. For your safety it is never shown again; enter a new one to replace it." %}{% else %}{% translate "No key is saved. Without one, no AI writes your texts." %}{% endif %}</p>
   {% include "components/error_summary.html" with form=form autofocus=True only %}
   <form method="post" action="{% url 'manager:shop:ai_provider' %}" class="manager-form" novalidate>
     {% csrf_token %}

@@ -175,7 +175,9 @@ OUTBOUND_CALL_SITES = {
     "apps/tax/vies.py": "settings.VIES_API_URL; the VAT number only in the JSON body",
     "apps/core/maps/adapters.py": "the tile URL template from settings; redirects refused",
     "apps/payments/stripe_client.py": "the fixed Stripe API base (lane A, PAY.2)",
-    "apps/ingest/gemini.py": "the fixed Gemini API base; the key is a header, the text a body",
+    "apps/ingest/provider_http.py": (
+        "the AI providers, fixed bases: Gemini, api.anthropic.com, api.openai.com; key in a header"
+    ),
     "mpmv/healthcheck.py": "the container's own loopback health URL",
 }
 _OUTBOUND = re.compile(
