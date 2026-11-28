@@ -329,3 +329,19 @@ def test_the_worker_applies_the_schedules_every_five_minutes(blog: BlogIndexPage
     tasks.publish_scheduled.func(timestamp=0)
 
     assert BlogPostPage.objects.get().expired
+
+
+def test_an_imported_article_is_stored_in_nfc(blog: BlogIndexPage) -> None:
+    import unicodedata
+
+    def nfd(text: str) -> str:
+        return unicodedata.normalize("NFD", text)
+
+    article = _legacy_article(title=nfd("Café"), summary=nfd("Più"), author=nfd("Zoë"))
+    import_article(blog, article)
+
+    post = BlogPostPage.objects.get(slug="a-visit-to-the-workshop")
+    assert post.title == unicodedata.normalize("NFC", "Café")
+    assert post.summary == unicodedata.normalize("NFC", "Più")
+    assert post.author is not None
+    assert post.author.name == unicodedata.normalize("NFC", "Zoë")

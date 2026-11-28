@@ -17,7 +17,7 @@ import datetime as dt
 import hashlib
 import json
 from collections.abc import Callable, Collection, Iterable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from html import unescape
 from typing import Any
 
@@ -55,6 +55,7 @@ from apps.core.image_licences import Credit
 from apps.core.money import CURRENCY
 from apps.core.services import business_tz, run_mutation
 from apps.core.site_url import absolute_url
+from apps.core.text import nfc_deep
 from apps.vendors.models import Vendor
 from apps.vendors.seller_name import public_name
 
@@ -853,6 +854,20 @@ class ArticleData:
     search_description: str = ""
 
 
+def nfc_article(article: ArticleData) -> ArticleData:
+    """`article` with its texts (and the strings inside the body) in NFC (I18N.10)."""
+    return replace(
+        article,
+        title=nfc_deep(article.title),
+        slug=nfc_deep(article.slug),
+        body=nfc_deep(article.body),
+        summary=nfc_deep(article.summary),
+        author=nfc_deep(article.author),
+        seo_title=nfc_deep(article.seo_title),
+        search_description=nfc_deep(article.search_description),
+    )
+
+
 def article_snapshot(post: BlogPostPage) -> dict[str, Any]:
     body = json.dumps(post.body.get_prep_value(), sort_keys=True, default=str)
     return {
@@ -908,6 +923,7 @@ def import_article(
 
     Wagtail logs the page's creation and publication in its own history, as for an editor.
     """
+    article = nfc_article(article)  # free text in NFC (I18N.10)
     problem = engine.schedule_problem(article.go_live_at, article.expire_at, timezone.now())
     if problem is not None:
         raise ValidationError({"expire_at": SCHEDULE_PROBLEMS[problem]})

@@ -690,3 +690,15 @@ def test_a_prefix_rule_cannot_cover_reserved_paths(source: str) -> None:
             [{"source_path": source, "match": "prefix", "target_kind": "path", "target": "/"}],
             ctx=CTX,
         )
+
+
+def test_a_redirect_map_note_is_stored_in_nfc() -> None:
+    import unicodedata
+
+    from apps.catalog.models import Redirect
+
+    note = unicodedata.normalize("NFD", "Café")
+    row = {"source_path": "/old-nfc", "target_kind": "path", "target": "/new", "note": note}
+    import_redirects([row], ctx=CTX)
+    stored = Redirect.objects.get(source_path="/old-nfc").note
+    assert stored == unicodedata.normalize("NFC", note)

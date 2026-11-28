@@ -181,3 +181,19 @@ def test_a_vendor_mapping_overrides_the_platform_one_and_other_vendors_are_isola
     assert mine["colour"] == "crimson"
     theirs = services.extract_product(other, title="Borsa rosso verde", description="")
     assert theirs["colour"] == "red, green"
+
+
+def test_import_stores_mapping_text_in_nfc() -> None:
+    import unicodedata
+
+    def nfd(text: str) -> str:
+        return unicodedata.normalize("NFD", text)
+
+    vendor = VendorFactory.create()
+    spec = {"kind": "color", "key": nfd("Blé"), "aliases": [nfd("Bleé")], "value": nfd("Blé")}
+    services.import_mappings(vendor, [spec], ctx=CTX)
+    entry = MappingTable.objects.get(vendor=vendor)
+    nfc = unicodedata.normalize
+    assert entry.key == nfc("NFC", "Blé")
+    assert entry.aliases == [nfc("NFC", "Bleé")]
+    assert entry.target_value == nfc("NFC", "Blé")

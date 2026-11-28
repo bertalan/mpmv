@@ -20,6 +20,7 @@ from apps.catalog.models import Product, SkuAlias, Variant
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
 from apps.core.services import run_mutation, save_audited
+from apps.core.text import nfc_deep
 from apps.vendors.models import Vendor
 
 from . import engine, extraction
@@ -393,7 +394,7 @@ def _spec_target(spec: Mapping[str, Any]) -> tuple[ContentType | None, int | Non
     """Resolve a mapping spec's target: a plain `value`, or `target` = model + public_id."""
     target = spec.get("target")
     if not target:
-        value = str(spec.get("value", "")).strip()
+        value = str(nfc_deep(spec.get("value", ""))).strip()
         if not value:
             raise ValidationError(f"Mapping {spec.get('key')!r} needs a value or a target.")
         return None, None, value
@@ -432,7 +433,7 @@ def import_mappings(
             kind = str(spec.get("kind", ""))
             if kind not in valid_kinds:
                 raise ValidationError(f"Unknown mapping kind {kind!r}.")
-            key = str(spec.get("key", ""))
+            key = str(nfc_deep(spec.get("key", "")))
             norm = engine.mapping_key(key)
             if not norm:
                 raise ValidationError("A mapping key cannot be empty.")
@@ -441,7 +442,7 @@ def import_mappings(
             if entry is None:
                 entry = MappingTable(vendor=vendor, kind=kind, key=key)
             entry.key = key
-            entry.aliases = [str(a) for a in spec.get("aliases", [])]
+            entry.aliases = [str(nfc_deep(a)) for a in spec.get("aliases", [])]
             entry.target_type = ctype
             entry.target_id = target_id
             entry.target_value = value

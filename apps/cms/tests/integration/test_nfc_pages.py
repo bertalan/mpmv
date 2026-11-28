@@ -185,3 +185,18 @@ def test_a_url_and_ids_in_a_block_stay_byte_exact() -> None:
 def test_snippet_stream_fields_are_nfc() -> None:
     form_class = get_edit_handler(BlogAuthor).get_form_class()
     assert issubclass(form_class, NFCFormMixin)
+
+
+def test_no_page_model_uses_a_plain_inline_panel() -> None:
+    """Every InlinePanel on a page or snippet model is an NFCInlinePanel (I18N.10)."""
+    from wagtail.admin.panels import InlinePanel
+
+    def panels(node: Any) -> Any:
+        yield node
+        for child in getattr(node, "children", []):
+            yield from panels(child)
+
+    for model in (FormPage, HomePage, StandardPage):
+        for panel in panels(get_edit_handler(model)):
+            if isinstance(panel, InlinePanel):
+                assert type(panel).__name__ == "NFCInlinePanel", (model, panel.relation_name)
