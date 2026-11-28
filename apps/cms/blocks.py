@@ -74,6 +74,7 @@ from apps.catalog.services import (
 from apps.core import translations
 from apps.core.images import rendition_or_original
 from apps.core.money import CURRENCY
+from apps.core.services import business_tz
 from apps.vendors.models import Vendor, VendorTranslation
 from apps.vendors.seller_name import public_name
 from apps.vendors.services import has_public_storefront
@@ -1729,7 +1730,7 @@ class ProductCardsBlock(blocks.StructBlock):  # type: ignore[misc]
 
 def operator_time_zone() -> ZoneInfo:
     """The platform operator's time zone: editors enter launch times in it."""
-    return ZoneInfo(settings.BUSINESS_TIME_ZONE)
+    return business_tz()
 
 
 class OperatorDateTimeField(forms.DateTimeField):

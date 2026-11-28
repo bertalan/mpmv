@@ -10,9 +10,7 @@ import datetime as dt
 import uuid
 from dataclasses import replace
 from typing import Any
-from zoneinfo import ZoneInfo
 
-from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
@@ -33,6 +31,7 @@ from apps.compliance.forms import FreezeReviewForm, TerminationForm, WithdrawTer
 from apps.compliance.models import TerminationNotice
 from apps.core.audit import audit_context
 from apps.core.models import AuditLog
+from apps.core.services import business_tz
 from apps.vendors.models import Vendor
 
 from .views import ManagerView
@@ -51,7 +50,7 @@ def _effective_at(day: dt.date | None) -> dt.datetime | None:
     """The start of `day` in the business time zone, or None when staff chose no date."""
     if day is None:
         return None
-    return dt.datetime.combine(day, dt.time.min, tzinfo=ZoneInfo(settings.BUSINESS_TIME_ZONE))
+    return dt.datetime.combine(day, dt.time.min, tzinfo=business_tz())
 
 
 _MESSAGES = {

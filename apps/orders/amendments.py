@@ -419,7 +419,7 @@ def _recompute(
             raise AmendmentRefused(
                 gettext("VAT cannot be decided for this package (%(why)s).") % {"why": error}
             ) from None
-    tax_on = at.astimezone(business_tz()).date()
+    tax_on = at.astimezone(business_tz(at)).date()
     ctx = am.RecomputeContext(
         tax_on=tax_on,
         tax=replace(tax, on=tax_on),  # the business-zone date, never the UTC one

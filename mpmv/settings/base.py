@@ -127,6 +127,7 @@ MIDDLEWARE = [
     # With the other header middleware, so responses returned early by an inner middleware
     # (CommonMiddleware's APPEND_SLASH redirect, LIVE's static files) carry it too (SEC.5).
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "apps.core.middleware.BusinessZoneMemoMiddleware",  # ARC.27: one zone lookup per request
     "apps.themes.middleware.ThemeMiddleware",  # the site's theme for the template loader (THM.1)
     # EVT.14: no cookie and no `Vary: Accept-Language` on tiles; outside Session and Locale.
     "apps.core.middleware.TileResponseNeutralMiddleware",
@@ -507,10 +508,13 @@ WAGTAILUSERS_PASSWORD_ENABLED = False
 WAGTAIL_GRAVATAR_PROVIDER_URL = None
 WAGTAIL_ENABLE_UPDATE_CHECK = False
 
-# UTC in the database; Europe/Rome for schedules and documents (spec 01 conventions).
+# UTC in the database; the business time zone for schedules and documents (spec 01 conventions).
 USE_TZ = True
 TIME_ZONE = "UTC"
-BUSINESS_TIME_ZONE = "Europe/Rome"
+# ARC.27 (D-31): the bootstrap business time zone, from the environment (owner 2026-11-25: not
+# in the code; UTC when unset). It seeds the operator's `business_time_zone` and stands in before
+# an operator exists; code and cron schedules read `business_tz()`. STAGE and LIVE set it.
+BUSINESS_TIME_ZONE = env_str("MPMV_BUSINESS_TIME_ZONE", "") or "UTC"
 # Public holidays (ISO dates) the GPSR article 22 deadlines skip (CMP.3). Empty: working days are
 # Monday to Friday, the earliest deadline (owner decision 2026-11-09).
 COMPLIANCE_PUBLIC_HOLIDAYS: list[str] = []

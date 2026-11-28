@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("core", "0034_alter_mediaimage_author_alter_mediaimage_licence"),
+        ("core", "0035_platformoperator_business_time_zone"),
     ]
 
     operations = [

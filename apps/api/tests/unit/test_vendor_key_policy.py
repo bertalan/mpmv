@@ -61,6 +61,7 @@ def test_vendor_grantable_scopes_are_well_formed_scopes() -> None:
 def test_vendor_grantable_scopes_cover_the_vendor_pipelines_and_events() -> None:
     expected = {"catalog:read", "catalog:write", "stock:read", "stock:write"}
     expected |= {"events:read", "events:write"}  # EVT.5
+    expected |= {"closures:read", "closures:write"}  # VEN.20
     assert expected <= VENDOR_GRANTABLE_SCOPES
 
 

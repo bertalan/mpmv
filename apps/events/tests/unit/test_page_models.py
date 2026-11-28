@@ -5,6 +5,7 @@ every translation of an event (synchronised, not overridable); title, summary, b
 name are translatable.
 """
 
+import pytest
 from django.db import models
 from wagtail_localize.fields import SynchronizedField, TranslatableField, get_translatable_fields
 
@@ -123,11 +124,17 @@ def test_event_settings_defaults() -> None:
     assert settings.cancelled_retention_days == 30
 
 
-def test_a_new_event_page_is_a_draft_in_the_platform_zone() -> None:
+def test_a_new_event_page_is_a_draft_in_the_platform_zone(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The default zone is the operator's business time zone (ARC.27), whatever it is."""
+    from zoneinfo import ZoneInfo
+
+    from apps.events import models
+
+    monkeypatch.setattr(models, "business_tz", lambda: ZoneInfo("Europe/Lisbon"))
     page = EventPageFactory.build()
     assert page.status == EventPage.Status.DRAFT
     assert page.sequence == 0
-    assert EventPage._meta.get_field("timezone").get_default() == "Europe/Rome"
+    assert EventPage._meta.get_field("timezone").get_default() == "Europe/Lisbon"
 
 
 def test_an_event_body_offers_the_launch_countdown_and_caps_its_cache() -> None:
