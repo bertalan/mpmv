@@ -127,30 +127,15 @@ def resolve_enricher(vendor: Vendor, *, transport: Transport | None = None) -> T
     read raises `ProviderError`: there is no fallback to the platform's provider with the vendor's
     data against its choice. Callers treat the error as "no enrichment" (the text stays as it is).
     """
+    extra: dict[str, Any] = {} if transport is None else {"transport": transport}
     try:  # the field decrypts while the row loads
         row = VendorAIProvider.objects.filter(vendor=vendor).first()
         api_key = row.api_key if row is not None else ""
     except DecryptionError:
         raise ProviderError("the vendor key cannot be read") from None
     if row is None or not api_key:
-        return gemini.get_enricher() if transport is None else _platform(transport)
-    extra: dict[str, Any] = {} if transport is None else {"transport": transport}
+        return gemini.get_enricher(**extra)
     return _ENRICHERS[row.provider](api_key, row.model, **extra)  # type: ignore[no-any-return]
-
-
-def _platform(transport: Transport) -> TextEnricher:
-    from django.conf import settings
-
-    choice = settings.INGEST_ENRICHER
-    if choice == "gemini":
-        return GeminiEnricher(
-            settings.INGEST_GEMINI_API_KEY, settings.INGEST_GEMINI_MODEL, transport=transport
-        )
-    if choice in ("claude", "openai"):
-        from .providers import platform_enricher
-
-        return platform_enricher(choice, transport=transport)
-    return gemini.get_enricher()
 
 
 def usage_count(vendor: Vendor) -> int:
