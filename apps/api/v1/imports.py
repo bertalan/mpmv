@@ -60,6 +60,19 @@ def _not_found() -> ApiProblem:
     return ApiProblem(404, code="not_found", detail="The resource does not exist.")
 
 
+def _refuse_duplicate_skus(skus: list[str]) -> None:
+    """One row per SKU (compared by match key): a repeated SKU answers 400 `duplicate_sku`."""
+    keys = [sku_match_key(sku) for sku in skus]
+    duplicates = sorted({sku for sku, key in zip(skus, keys, strict=True) if keys.count(key) > 1})
+    if duplicates:
+        raise ApiProblem(
+            400,
+            code="duplicate_sku",
+            detail="A SKU is given more than once in the batch; send one row per SKU.",
+            skus=duplicates,
+        )
+
+
 class RowErrorOut(Schema):
     index: int
     sku: str
@@ -154,15 +167,7 @@ def set_stock(request: HttpRequest, payload: StockIn, dry_run: DryRun = False) -
     or nothing: a SKU the vendor does not have, another vendor's included, answers 404."""
     vendor = _own_vendor(request)
     skus = [row.sku for row in payload.items]
-    keys = [sku_match_key(sku) for sku in skus]
-    duplicates = sorted({sku for sku, key in zip(skus, keys, strict=True) if keys.count(key) > 1})
-    if duplicates:
-        raise ApiProblem(
-            400,
-            code="duplicate_sku",
-            detail="A SKU is given more than once in the batch; send one row per SKU.",
-            skus=duplicates,
-        )
+    _refuse_duplicate_skus(skus)
     rows = [
         services.SkuRow(
             row.sku,
@@ -190,7 +195,11 @@ class PriceRowIn(Schema):
         description="Net price, EUR, 2 decimals, not negative; for a variant, its own override "
         "(null clears it). Null on a product is allowed only when it is not for sale."
     )
-    sale_price_net: Decimal | None = Field(None, description="Products only.")
+    sale_price_net: Decimal | None = Field(
+        None,
+        description="Products only. A row without any sale field ends the product's current sale, "
+        "so send the sale fields again to keep one.",
+    )
     sale_from: dt.datetime | None = Field(None, description="Products only.")
     sale_to: dt.datetime | None = Field(None, description="Products only.")
 
@@ -208,9 +217,12 @@ class PricesIn(Schema):
 def set_prices(request: HttpRequest, payload: PricesIn, dry_run: DryRun = False) -> dict[str, Any]:
     """Set the net price (and the optional sale) of products, or the price override of variants,
     by SKU. All or nothing: a SKU the vendor does not have, another vendor's included, answers
-    404; an invalid price answers 422; in both cases nothing is written."""
+    404; an invalid price answers 422; in both cases nothing is written. A product row with no
+    sale field ends the product's current sale (the row states the whole price)."""
     vendor = _own_vendor(request)
-    matches = services.match_skus(vendor, [row.sku for row in payload.items])
+    skus = [row.sku for row in payload.items]
+    _refuse_duplicate_skus(skus)
+    matches = services.match_skus(vendor, skus)
     if any(item is None for item in matches.values()):
         raise _not_found()
     ctx = audit_context(request)

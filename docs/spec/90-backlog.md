@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **499** in **22** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **3722 h** (P1 2713 h · P2 908 h · P3 101 h)
+- Micro-tasks: **500** in **22** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **3727 h** (P1 2713 h · P2 913 h · P3 101 h)
 - P1 critical path (schedule lower bound with full parallelism): **197 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → CAT.1 → ORD.1 → ORD.2 → ORD.4 → PAY.1 → PAY.2 → PAY.3 → PAY.4 → PAY.7 → ORD.20 → ORD.21 → ORD.22 → ORD.23
 
 ## By macro area
@@ -23,7 +23,7 @@
 | ORD | Cart, orders, returns | 41 | 258 | 84 | 5 | 347 |
 | PAY | Payments (Stripe Connect) | 7 | 46 | 4 | 16 | 66 |
 | PRM | Coupons and cart recovery | 16 | 0 | 143 | 10 | 153 |
-| ING | Supplier import and pipelines | 14 | 92 | 36 | 0 | 128 |
+| ING | Supplier import and pipelines | 15 | 92 | 41 | 0 | 133 |
 | I18N | Multilingual | 25 | 115 | 17 | 0 | 132 |
 | CMS | Wagtail content | 18 | 67 | 29 | 0 | 96 |
 | EVT | Events, feeds and maps | 17 | 111 | 12 | 0 | 123 |
@@ -36,7 +36,7 @@
 | SEC | Security | 13 | 82 | 0 | 0 | 82 |
 | OPS | Operations | 17 | 25 | 48 | 9 | 82 |
 | MIG | Migration and cutover | 22 | 141 | 29 | 0 | 170 |
-| **Total** | | **499** | **2713** | **908** | **101** | **3722** |
+| **Total** | | **500** | **2713** | **913** | **101** | **3727** |
 
 ## By phase
 
@@ -401,7 +401,7 @@
 | MIG.20 | Refunds migration (owner decision 2026-11-11, relayed by lane-a, #86): refund child orders and marketplace refund requests are stored inside the historical order (refunded amount, date, reason); there is no separate refund model for legacy data; no new ledger entry and no tax recalculation | P1 | 4 | MIG.4 | A migrated order shows its refunded amount, date and reason; the MIG.5 parity report reconciles order total minus refunds against the legacy figures; a refund amount that does not parse as `Decimal` is rejected with a report; the migration writes no ledger entry for a refund (MIG.8 covers balances); no refund model or table exists for legacy data |
 | MIG.22 | Domains, mail and TLS at cutover (owner decision 2026-11-16, §13.4): DNS inventory exported from the registrar into private storage, a dedicated mail host record and the MX moved to it before the switch when mail is self-managed on the legacy server (a dedicated mail service is a recommended follow-up, and a precondition for shutting the legacy server down), SPF, DKIM and DMARC for the transactional provider (ARC.16), TTL 300 s from T−7, production certificates issued before the switch (ACME DNS-01), legacy site on an internal hostname behind basic auth and `noindex`, Stripe webhook URLs and domain verification updated, staged HSTS | P1 | 6 | MIG.9 | Runbook checklist: the inventory file is in private storage; a mail test send and receive passes after the MX change, before the switch; the TTL check shows 300 s on the switched records; certificates are valid before the switch; the legacy host answers 401 over valid HTTPS without credentials (HSTS `includeSubDomains` applies to it) and carries `noindex`; rollback by DNS was rehearsed in a dress rehearsal |
 
-### F6 — After go-live (P2) (154 tasks, 1022 h)
+### F6 — After go-live (P2) (155 tasks, 1027 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -474,9 +474,10 @@
 | PRM.16 | Retention: cart deletion after 30 days, `RecoveryDispatch` pseudonymisation at 13 months, consent evidence period, personal-coupon unbinding on erasure, integration with the order scrub jobs (D-29, D-30, D-31) | P2 | 5 | PRM.10, PRM.9 | A dry run lists what a run would delete; account erasure removes the cart and the binding but never a concluded order's snapshot |
 | ING.10 | Daily report (email + admin page) with identity anomalies | P2 | 6 | ING.8, ARC.16 | Parity with `daily_report.py` |
 | ING.11 | Supplier review import | P2 | 4 | ING.1, CMS.6 | Reviews imported with original date |
-| ING.12 | `/api/v1` import API for external vendors (upsert, stock, prices, media) | P2 | 8 | CORE.7, CAT.10 | Sample client in dry-run |
+| ING.12 | `/api/v1` import API for external vendors (upsert, stock, prices); media is ING.15 | P2 | 8 | CORE.7, CAT.10 | Sample client in dry-run |
 | ING.13 | Admin checklist and "new vendor from source" wizard | P2 | 8 | ING.9 | Demo vendor activated without code |
 | ING.14 | AI providers for enrichment (owner decision D-13, 2026-11-13): Claude, Gemini and OpenAI clients behind `TextEnricher`, with the same policy, schema validation and archive as ING.5; the operator's default provider and model in the versioned operator settings (ARC.7); a vendor may choose its own provider for its own catalogue texts with its own API key, stored encrypted with a dedicated key-encryption key separate from SECRET_KEY, with a key id and versioning so a rotation keeps old ciphertext readable and a re-encrypt job moves it (added to the SEC.3 field list), set by the vendor owner inside the passkey window (CORE.25, sensitive group) and audited on set, change and delete without the value; the key is vendor-scoped (CORE.3) and only that vendor's jobs can decrypt it, and its usage counted per vendor; a provider failure falls back to no enrichment, never to another provider with the vendor's data without its choice; AI output is never published automatically (review queue); GDPR: the payload sent to a provider is product data only, never customer or personal data; the CMP.4 sub-processor register lists each provider the operator enables; with a vendor-chosen provider the vendor is the controller and the provider its own processor, as the vendor terms say | P2 | 10 | ING.5, ARC.7, SEC.3, CORE.3, CORE.25 | The same product enriched through each of the three providers passes the same schema validation (providers mocked through our interface); a vendor key is never shown again after saving and never logged; a vendor's choice applies only to that vendor's products; a provider error leaves the text unchanged; the key is absent from API serializers, the admin (a write-only masked field), AuditLog payloads, ChangeSet and dry-run output, exceptions, job arguments and the enrichment archive; vendor B can neither read nor use vendor A's key; setting a key without a passkey window is refused; a rotation test decrypts old ciphertext and the re-encrypt job moves it; a test asserts the provider payload holds product data only |
+| ING.15 | `/api/v1` import API media: a vendor gives an image by URL, fetched server side through the SSRF-guarded `safe_http` client (MIG.12) and stored through the catalog media service; no multipart upload on the API (the upload-path guard stays) | P2 | 5 | ING.12, MIG.12 | A URL to a private or loopback address is refused; an image from an allowed host is stored once and audited; the vendor sees only its own products; dry-run fetches nothing |
 | I18N.4 | Translation queue in admin (by language, vendor, status) + AI draft translation (moved to P2 by the owner on 2026-11-15, Q-49: visitor content stays English at go-live, so the queue is first needed with I18N.8; the legal and checkout pages of I18N.9 use Wagtail's native translation) | P2 | 8 | I18N.2, ING.5 | EN edit → every other language goes back to "needs review"; the AI draft instructions ask for British English and standard German (§9.2 content variants) |
 | I18N.8 | Visitor content translation after go-live (D-18): products, categories, taxonomy terms, vendor storefronts, CMS pages, blog and landing pages, with the method the owner chooses (AI, professional or other) through the I18N.4 queue; per-language coverage report | P2 | 6 | I18N.4, I18N.3, I18N.6 | Per-language coverage report; only published translations appear in hreflang and sitemaps |
 | I18N.10 | User text stored in NFC (SEC.5 hostile-input finding F3, proposed on PR #166, registered by coherence check 7; owner: "non-NFC forms (store NFC)"): forms, API schemas and importers normalise free text to Unicode NFC at the service boundary; the SKU match key of spec 03 stays NFKC | P2 | 3 | — | Text entered through a form, the API or an importer is stored in NFC; the F3 strict xfail in `tests/integration/test_hostile_input_outputs.py` passes and its mark is removed |
