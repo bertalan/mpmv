@@ -188,6 +188,7 @@ EXTRA_FILES = (
 )
 # Single Python modules scanned in full: customer-facing messages of apps that are not in SCOPES.
 FILES = (
+    "apps/ingest/onboarding.py",  # the wizard refusals and checklist labels (ING.13)
     "apps/orders/messages.py",
     "apps/orders/amendments.py",
     "apps/orders/amendment_engine.py",  # the classification reasons and refusals (ORD.20)
