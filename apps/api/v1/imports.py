@@ -7,11 +7,18 @@ answers 404, as for a resource that does not exist. `?dry_run=true` returns the 
 writes nothing. Batches are capped at `MAX_ITEMS` rows; the request body size and the per-key
 rate limit are the API-wide ones.
 
+Prices are net `Decimal` amounts (EUR, VAT excluded; the tax position stays with the tax app) set
+through the audited price services, all or nothing. There is no media operation: API v1 takes no
+file upload (tests/integration/test_upload_paths.py); media by URL through the SSRF-guarded client
+is a follow-up.
+
 Rows of an upsert are independent (partial apply, no all-or-nothing mode): a refused row is
 listed in `errors` and in `rows` (index and SKU) and the others apply.
 Stock is all or nothing: one unknown SKU answers 404 and nothing is written.
 """
 
+import datetime as dt
+from decimal import Decimal
 from typing import Any, Literal
 
 from django.db import transaction
@@ -24,6 +31,7 @@ from apps.api.v1.catalog import ProductBody
 from apps.api.v1.errors import ApiProblem
 from apps.catalog import services
 from apps.catalog.engine import MAX_STOCK, SKU_MAX_LENGTH, sku_match_key
+from apps.catalog.models import Variant
 from apps.core.changeset import ChangeSet
 from apps.vendors.models import Vendor
 from apps.vendors.services import ensure_vendor_can_write
@@ -50,6 +58,19 @@ def _own_vendor(request: HttpRequest) -> Vendor:
 
 def _not_found() -> ApiProblem:
     return ApiProblem(404, code="not_found", detail="The resource does not exist.")
+
+
+def _refuse_duplicate_skus(skus: list[str]) -> None:
+    """One row per SKU (compared by match key): a repeated SKU answers 400 `duplicate_sku`."""
+    keys = [sku_match_key(sku) for sku in skus]
+    duplicates = sorted({sku for sku, key in zip(skus, keys, strict=True) if keys.count(key) > 1})
+    if duplicates:
+        raise ApiProblem(
+            400,
+            code="duplicate_sku",
+            detail="A SKU is given more than once in the batch; send one row per SKU.",
+            skus=duplicates,
+        )
 
 
 class RowErrorOut(Schema):
@@ -146,15 +167,7 @@ def set_stock(request: HttpRequest, payload: StockIn, dry_run: DryRun = False) -
     or nothing: a SKU the vendor does not have, another vendor's included, answers 404."""
     vendor = _own_vendor(request)
     skus = [row.sku for row in payload.items]
-    keys = [sku_match_key(sku) for sku in skus]
-    duplicates = sorted({sku for sku, key in zip(skus, keys, strict=True) if keys.count(key) > 1})
-    if duplicates:
-        raise ApiProblem(
-            400,
-            code="duplicate_sku",
-            detail="A SKU is given more than once in the batch; send one row per SKU.",
-            skus=duplicates,
-        )
+    _refuse_duplicate_skus(skus)
     rows = [
         services.SkuRow(
             row.sku,
@@ -173,4 +186,73 @@ def set_stock(request: HttpRequest, payload: StockIn, dry_run: DryRun = False) -
         changes: ChangeSet = services.update_by_sku(
             vendor, rows, ctx=audit_context(request), dry_run=dry_run
         )
+    return changeset_out(changes, dry_run=dry_run)
+
+
+class PriceRowIn(Schema):
+    sku: PlainText = Field(min_length=1, max_length=SKU_MAX_LENGTH)
+    price_net: Decimal | None = Field(
+        description="Net price, EUR, 2 decimals, not negative; for a variant, its own override "
+        "(null clears it). Null on a product is allowed only when it is not for sale."
+    )
+    sale_price_net: Decimal | None = Field(
+        None,
+        description="Products only. A row without any sale field ends the product's current sale, "
+        "so send the sale fields again to keep one.",
+    )
+    sale_from: dt.datetime | None = Field(None, description="Products only.")
+    sale_to: dt.datetime | None = Field(None, description="Products only.")
+
+
+class PricesIn(Schema):
+    items: list[PriceRowIn] = Field(min_length=1, max_length=MAX_ITEMS)
+
+
+@router.put(
+    "/prices",
+    response=ChangeSetOut,
+    auth=ApiKey("catalog:write"),
+    summary="Set net prices by SKU",
+)
+def set_prices(request: HttpRequest, payload: PricesIn, dry_run: DryRun = False) -> dict[str, Any]:
+    """Set the net price (and the optional sale) of products, or the price override of variants,
+    by SKU. All or nothing: a SKU the vendor does not have, another vendor's included, answers
+    404; an invalid price answers 422; in both cases nothing is written. A product row with no
+    sale field ends the product's current sale (the row states the whole price)."""
+    vendor = _own_vendor(request)
+    skus = [row.sku for row in payload.items]
+    _refuse_duplicate_skus(skus)
+    matches = services.match_skus(vendor, skus)
+    if any(item is None for item in matches.values()):
+        raise _not_found()
+    ctx = audit_context(request)
+    changes = ChangeSet()
+    with transaction.atomic():
+        ensure_vendor_can_write(vendor)
+        for row in payload.items:
+            item = matches[row.sku]
+            if item is None:  # pragma: no cover - refused above
+                raise _not_found()
+            if isinstance(item, Variant):
+                if row.sale_price_net is not None or row.sale_from or row.sale_to:
+                    raise ApiProblem(
+                        422,
+                        code="validation_error",
+                        detail="A variant has no sale of its own.",
+                        errors=[{"loc": ["body", "items"], "msg": row.sku, "type": "invalid"}],
+                    )
+                done = services.set_variant_price(
+                    item, price_net_override=row.price_net, ctx=ctx, dry_run=dry_run
+                )
+            else:
+                done = services.set_product_price(
+                    item,
+                    price_net=row.price_net,
+                    sale_price_net=row.sale_price_net,
+                    sale_from=row.sale_from,
+                    sale_to=row.sale_to,
+                    ctx=ctx,
+                    dry_run=dry_run,
+                )
+            changes.changes.extend(done.changes)
     return changeset_out(changes, dry_run=dry_run)
