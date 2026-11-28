@@ -1,6 +1,7 @@
 """ING.10: the daily report gathered from the database, mailed to staff and shown in the admin."""
 
 import datetime as dt
+import secrets
 from collections.abc import Callable
 from typing import Any
 
@@ -197,8 +198,9 @@ def test_the_job_just_after_business_midnight_reports_the_day_that_ended() -> No
 
 def test_the_error_line_of_a_failed_run_is_redacted() -> None:
     source = SupplierSourceFactory.create()
-    _run(source, status="failed", errors=1, log="boom for ada@example.org token=abcdef123456")
+    secret = secrets.token_urlsafe(12)
+    _run(source, status="failed", errors=1, log=f"boom for ada@example.org token={secret}")
     report = reports.gather_daily_report(DAY)
     text = report.error_runs[0].error_text
     assert "ada@example.org" not in text
-    assert "abcdef123456" not in text
+    assert secret not in text
