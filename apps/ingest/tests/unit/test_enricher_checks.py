@@ -14,14 +14,17 @@ def test_the_default_needs_no_key() -> None:
     assert ids() == []
 
 
-@pytest.mark.parametrize("key", ["", None])
-def test_a_selected_provider_without_a_key_is_an_error(key: str | None) -> None:
-    with override_settings(INGEST_ENRICHER="gemini", INGEST_GEMINI_API_KEY=key or ""):
+@pytest.mark.parametrize("choice", ["gemini", "claude", "openai"])
+def test_a_selected_provider_without_a_key_is_an_error(choice: str) -> None:
+    with override_settings(INGEST_ENRICHER=choice, **{f"INGEST_{choice.upper()}_API_KEY": ""}):
         assert ids() == ["ingest.E001"]
 
 
-def test_a_selected_provider_with_a_key_passes() -> None:
-    with override_settings(INGEST_ENRICHER="gemini", INGEST_GEMINI_API_KEY="k" * 20):
+@pytest.mark.parametrize("choice", ["gemini", "claude", "openai"])
+def test_a_selected_provider_with_a_key_passes(choice: str) -> None:
+    with override_settings(
+        INGEST_ENRICHER=choice, **{f"INGEST_{choice.upper()}_API_KEY": "k" * 20}
+    ):
         assert ids() == []
 
 

@@ -14046,7 +14046,9 @@ msgstr ""
 
 #: apps/manager/forms.py
 msgid "Tick this to delete the key you saved. Without a key, no AI writes your texts."
-msgstr "Setzen Sie hier ein Häkchen, um den gespeicherten Schlüssel zu löschen. Ohne Schlüssel schreibt keine KI Ihre Texte."
+msgstr ""
+"Setzen Sie hier ein Häkchen, um den gespeicherten Schlüssel zu löschen. Ohne Schlüssel schreibt "
+"keine KI Ihre Texte."
 
 #: apps/orders/ui/forms.py
 msgid ""
@@ -16390,7 +16392,10 @@ msgid ""
 "Your key for this provider. It is stored encrypted and never shown again. Leave it empty to keep "
 "the key you saved before. If you change the provider, enter the key for the new one: the old key "
 "is deleted."
-msgstr "Ihr Schlüssel für diesen Anbieter. Er wird verschlüsselt gespeichert und nie wieder angezeigt. Lassen Sie das Feld leer, um den zuvor gespeicherten Schlüssel zu behalten. Wenn Sie den Anbieter wechseln, geben Sie den Schlüssel des neuen Anbieters ein: Der alte Schlüssel wird gelöscht."
+msgstr ""
+"Ihr Schlüssel für diesen Anbieter. Er wird verschlüsselt gespeichert und nie wieder angezeigt. "
+"Lassen Sie das Feld leer, um den zuvor gespeicherten Schlüssel zu behalten. Wenn Sie den Anbieter "
+"wechseln, geben Sie den Schlüssel des neuen Anbieters ein: Der alte Schlüssel wird gelöscht."
 
 #: apps/compliance/forms.py
 msgid "Your name. Required, except for a report of child sexual abuse material."
@@ -16435,6 +16440,11 @@ msgstr ""
 #: themes/ride/templates/orders/customer_orders.html
 msgid "Your orders, newest first"
 msgstr "Deine Bestellungen, die neuesten zuerst"
+
+#: apps/ingest/provider_services.py
+msgid ""
+"Your own AI provider has no key, so no AI texts were written. Enter a key on the AI provider page."
+msgstr "Ihr eigener KI-Anbieter hat keinen Schlüssel, daher wurden keine KI-Texte geschrieben. Geben Sie auf der Seite des KI-Anbieters einen Schlüssel ein."
 
 #: apps/catalog/models.py
 msgid ""
