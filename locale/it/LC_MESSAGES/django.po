@@ -1974,8 +1974,8 @@ msgid "Blocked"
 msgstr "Bloccato"
 
 #: apps/themes/templates/themes/admin/palette_builder.html
-msgid "Body text with a <a class=\"pp-link\" href=\"#palette-preview\">link</a>."
-msgstr "Testo del corpo con un <a class=\"pp-link\" href=\"#palette-preview\">link</a>."
+msgid "Body text with a %(link)s."
+msgstr "Testo del corpo con un %(link)s."
 
 #: apps/events/templates/events/event_page.html
 msgid "Booth %(booth)s"
@@ -5369,6 +5369,10 @@ msgstr "Righe"
 #: apps/manager/templates/manager/platform/order_drafts.html
 msgid "Link"
 msgstr "Link"
+
+#: apps/themes/templates/themes/admin/palette_builder.html
+msgid "link"
+msgstr "link"
 
 #: apps/cms/blocks.py
 msgid "Link after the launch"
@@ -9544,7 +9548,7 @@ msgstr "Stelle da cui una recensione viene mostrata"
 
 #: apps/themes/admin_views.py apps/themes/templates/themes/admin/palette_builder.html
 msgid "Start from"
-msgstr "Parti da"
+msgstr "Parta da"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Start review"
@@ -14414,7 +14418,7 @@ msgstr "Usi il blocco schermo di questo dispositivo o una chiave di sicurezza."
 
 #: apps/themes/admin_views.py apps/themes/templates/themes/admin/palette_builder.html
 msgid "Use this: %(colour)s for %(field)s"
-msgstr "Usa questo: %(colour)s per %(field)s"
+msgstr "Usi questo: %(colour)s per %(field)s"
 
 #: apps/manager/fitment_views.py apps/manager/templates/manager/platform/fitment_node.html
 msgid "Used by"

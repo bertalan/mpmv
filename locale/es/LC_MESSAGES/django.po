@@ -1974,8 +1974,8 @@ msgid "Blocked"
 msgstr "Bloqueado"
 
 #: apps/themes/templates/themes/admin/palette_builder.html
-msgid "Body text with a <a class=\"pp-link\" href=\"#palette-preview\">link</a>."
-msgstr "Texto del cuerpo con un <a class=\"pp-link\" href=\"#palette-preview\">enlace</a>."
+msgid "Body text with a %(link)s."
+msgstr "Texto del cuerpo con un %(link)s."
 
 #: apps/events/templates/events/event_page.html
 msgid "Booth %(booth)s"
@@ -5371,6 +5371,10 @@ msgstr "Líneas"
 #: apps/manager/templates/manager/platform/order_drafts.html
 msgid "Link"
 msgstr "Enlace"
+
+#: apps/themes/templates/themes/admin/palette_builder.html
+msgid "link"
+msgstr "enlace"
 
 #: apps/cms/blocks.py
 msgid "Link after the launch"
