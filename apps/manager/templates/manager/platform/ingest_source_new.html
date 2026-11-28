@@ -1,0 +1,35 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+New source from a sample (ING.13, step 1): the sample is read as a dry run and not kept.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{% translate "New source from a sample" %}</h1>
+  {% include "components/error_summary.html" with form=form autofocus=True only %}
+  <form method="post" enctype="multipart/form-data" class="manager-form" novalidate>
+    {% csrf_token %}
+    {% for field in form.visible_fields %}{% include "components/field.html" with field=field only %}{% endfor %}
+    <button type="submit" name="action" value="check" class="button button--secondary">{% translate "Check the sample" %}</button>
+    <button type="submit" name="action" value="create" class="button">{% translate "Create the source" %}</button>
+  </form>
+  {% if report %}
+    <h2>{% translate "Result of the sample" %}</h2>
+    {% if report.failure %}<p role="alert">{{ report.failure }}</p>{% endif %}
+    {% if report.headers %}<p>{% translate "Columns found:" %} {{ report.headers|join:", " }}</p>{% endif %}
+    <p>{% blocktranslate count n=report.rows %}{{ n }} row read.{% plural %}{{ n }} rows read.{% endblocktranslate %}</p>
+    {% if report.preview %}
+      <div class="table-scroll" role="region" aria-labelledby="preview-caption" tabindex="0">
+        <table class="table">
+          <caption id="preview-caption">{% translate "First rows" %}</caption>
+          <thead><tr><th scope="col">SKU</th><th scope="col">{% translate "Title" %}</th><th scope="col">{% translate "Price" %}</th></tr></thead>
+          <tbody>{% for row in report.preview %}<tr><td>{{ row.sku }}</td><td>{{ row.title }}</td><td>{{ row.price|default:"-" }}</td></tr>{% endfor %}</tbody>
+        </table>
+      </div>
+    {% endif %}
+    {% if report.errors %}
+      <h3>{% translate "Rows with errors" %}</h3>
+      <ul>{% for error in report.errors %}<li>{% blocktranslate with n=error.row %}Row {{ n }}:{% endblocktranslate %} {{ error.message }}</li>{% endfor %}</ul>
+    {% endif %}
+  {% endif %}
+  <p><a href="{% url 'manager:platform:ingest_sources' %}">{% translate "Back to the sources" %}</a></p>
+{% endblock %}

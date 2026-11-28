@@ -90,6 +90,7 @@ PLATFORM_PAGES: Final[Pages] = (
     (gettext_noop("Products"), "manager:platform:catalog_products"),
     (gettext_noop("Order changes"), "manager:platform:orders"),
     (gettext_noop("Order drafts"), "manager:platform:order_drafts"),
+    (gettext_noop("Supplier sources"), "manager:platform:ingest_sources"),
     (gettext_noop("Stray payments"), "manager:platform:stray_payments"),
     (gettext_noop("Order change settings"), "manager:platform:amendment_settings"),
     (gettext_noop("Trust rules"), "manager:platform:trust_rules"),
@@ -149,6 +150,8 @@ NOT_LISTED: Final = frozenset(
         "manager:platform:termination",
         "manager:platform:trust_rule",
         "manager:platform:trust_rule_new",
+        "manager:platform:ingest_source",  # ING.13: needs a source record
+        "manager:platform:ingest_source_new",  # ING.13: the wizard, opened from the sources page
         "manager:platform:user_sessions_find",
         "manager:platform:catalog_product",
         "manager:platform:fitment_node_new",

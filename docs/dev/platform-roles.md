@@ -43,6 +43,7 @@ E edit, R read only, A audited support action, I impersonation within the policy
 | Platform: orders and customers |  |  | R | R+A | R |  |
 | Platform: support actions (unlock, resend link) |  |  |  | A | A |  |
 | Platform: carts prepared from a past order, one-time link (ORD.32) |  |  |  | A | A |  |
+| Platform: supplier sources and the new-vendor wizard (ING.13) |  | E |  | R | R |  |
 | Platform: stray-payment alerts, close one by hand (PAY.4) |  |  | R | A | A |  |
 | Platform: a user's sessions, end them (CORE.24) |  |  |  | A | A |  |
 | Platform: end every session, the panic button (CORE.24) |  |  |  |  | E |  |

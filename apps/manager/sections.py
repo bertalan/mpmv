@@ -17,6 +17,7 @@ from .closure_views import SECTION as CLOSURES_SECTION
 from .event_views import SECTION as EVENTS_SECTION
 from .fitment_shop_views import SECTION as SHOP_FITMENT_SECTION
 from .fitment_views import CATEGORIES_SECTION, NODES_SECTION, SCHEME_SECTION
+from .ingest_views import SECTION as INGEST_SECTION
 from .money_views import SECTION as MONEY_SECTION
 from .navigation import Registry, Section, anyone, platform_role, vendor_action
 from .notice_views import SECTION as NOTICES_SECTION
@@ -300,6 +301,15 @@ BUILT_IN = (
         "manager:platform:user_sessions",
         order=70,
         allowed=platform_role(USER_SESSIONS_SECTION),
+    ),
+    # ING.13: supplier sources and the new-vendor wizard (Catalogue writes, Support and owner read).
+    Section(
+        INGEST_SECTION,
+        Space.PLATFORM,
+        _("Supplier sources"),
+        "manager:platform:ingest_sources",
+        order=53,
+        allowed=platform_role(INGEST_SECTION),
     ),
     # PAY.4: the open stray-payment alerts (Support and the owner close; Finance reads).
     Section(
