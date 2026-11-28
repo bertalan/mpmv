@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import connection
+from django.test.utils import CaptureQueriesContext
 
 from apps.accounts.models import User
 from apps.core.audit import AuditContext
@@ -159,3 +160,11 @@ def test_the_key_never_appears_in_repr_str_or_logs(caplog: pytest.LogCaptureFixt
     assert key not in repr(row)
     assert key not in str(row)
     assert key not in caplog.text
+
+
+def test_the_first_save_locks_the_vendor_so_two_first_saves_cannot_clash() -> None:
+    vendor = VendorFactory.create()
+    with CaptureQueriesContext(connection) as queries:
+        svc.save_provider(vendor, provider="claude", model="m-1", actor=owner_of(vendor), ctx=CTX)
+    locks = [q["sql"] for q in queries if "FOR UPDATE" in q["sql"]]
+    assert any('"vendors_vendor"' in sql for sql in locks)

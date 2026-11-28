@@ -565,7 +565,8 @@ msgstr "una cantidad mayor requiere la aceptación del cliente"
 
 #: apps/manager/templates/manager/shop/ai_provider.html
 msgid "A key is saved. For your safety it is never shown again; enter a new one to replace it."
-msgstr "Hay una clave guardada. Por seguridad ya no se muestra; introduzca una nueva para sustituirla."
+msgstr ""
+"Hay una clave guardada. Por seguridad ya no se muestra; introduzca una nueva para sustituirla."
 
 #: apps/compliance/templates/email/compliance/termination_notice/body.html
 #: apps/compliance/templates/email/compliance/termination_notice/body.txt
@@ -2597,7 +2598,10 @@ msgstr ""
 msgid ""
 "Choose the service that writes the texts of your own products, and give it your own key. We send "
 "it product data only, never customer data. Every text waits for your review before it is shown."
-msgstr "Elija el servicio que redacta los textos de sus propios productos y dele su propia clave. Solo enviamos datos de producto, nunca datos de clientes. Cada texto espera su revisión antes de mostrarse."
+msgstr ""
+"Elija el servicio que redacta los textos de sus propios productos y dele su propia clave. Solo "
+"enviamos datos de producto, nunca datos de clientes. Cada texto espera su revisión antes de "
+"mostrarse."
 
 #: apps/cms/blocks.py
 msgid "Choose the shop the card leads to. A card to a shop that is not open is left out."
@@ -3635,6 +3639,10 @@ msgstr "Termina a las"
 #: themes/base/templates/components/gallery.html themes/ride/templates/components/gallery.html
 msgid "Enlarge"
 msgstr "Ampliar"
+
+#: apps/manager/forms.py
+msgid "Enter a new key or remove the saved one, not both."
+msgstr "Introduzca una clave nueva o elimine la guardada, pero no ambas cosas."
 
 #: apps/core/models.py
 msgid "Enter a time zone name such as Europe/Rome."
@@ -5903,7 +5911,8 @@ msgstr "No se encontró ningún elemento."
 
 #: apps/manager/templates/manager/shop/ai_provider.html
 msgid "No key is saved. Without one the platform default applies."
-msgstr "No hay ninguna clave guardada. Sin clave se aplica el valor predeterminado de la plataforma."
+msgstr ""
+"No hay ninguna clave guardada. Sin clave se aplica el valor predeterminado de la plataforma."
 
 #: apps/manager/templates/manager/platform/fitment_scheme.html
 msgid "No level yet."
@@ -11249,7 +11258,8 @@ msgstr "El mapa muestra el punto escrito."
 
 #: apps/manager/forms.py
 msgid "The model name as the provider writes it, for example the current small model."
-msgstr "El nombre del modelo tal como lo escribe el proveedor, por ejemplo el modelo pequeño actual."
+msgstr ""
+"El nombre del modelo tal como lo escribe el proveedor, por ejemplo el modelo pequeño actual."
 
 #: apps/ingest/models.py
 msgid "The model of the provider to use."
@@ -16172,7 +16182,9 @@ msgstr "Su factura ya está emitida"
 msgid ""
 "Your key for this provider. It is stored encrypted and never shown again. Leave it empty to keep "
 "the key you saved before."
-msgstr "Su clave para este proveedor. Se guarda cifrada y ya no se muestra. Déjela vacía para conservar la clave guardada antes."
+msgstr ""
+"Su clave para este proveedor. Se guarda cifrada y ya no se muestra. Déjela vacía para conservar la"
+" clave guardada antes."
 
 #: apps/compliance/forms.py
 msgid "Your name. Required, except for a report of child sexual abuse material."

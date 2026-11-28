@@ -436,3 +436,9 @@ class AIProviderForm(NFCForm):
         ),
     )
     remove_key = forms.BooleanField(label=_("Remove the saved key"), required=False)
+
+    def clean(self) -> dict[str, Any]:
+        data: dict[str, Any] = super().clean() or {}
+        if data.get("api_key") and data.get("remove_key"):
+            self.add_error("remove_key", _("Enter a new key or remove the saved one, not both."))
+        return data

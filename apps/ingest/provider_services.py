@@ -79,6 +79,9 @@ def save_provider(
     if errors:
         raise ValidationError(errors)
     with transaction.atomic():
+        # Lock the vendor first: two first saves cannot both see "no row" (a lock on a missing
+        # row would hold nothing), so the unique constraint never turns into a 500.
+        Vendor.objects.select_for_update().get(pk=vendor.pk)
         row = VendorAIProvider.objects.select_for_update().filter(vendor=vendor).first()
         before = _snapshot(vendor, row)
         had_key = bool(row and row.has_key)

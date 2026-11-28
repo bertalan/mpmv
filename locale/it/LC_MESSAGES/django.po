@@ -564,7 +564,9 @@ msgstr "una quantità più alta richiede l’accettazione del cliente"
 
 #: apps/manager/templates/manager/shop/ai_provider.html
 msgid "A key is saved. For your safety it is never shown again; enter a new one to replace it."
-msgstr "Una chiave è salvata. Per sicurezza non viene più mostrata; ne inserisca una nuova per sostituirla."
+msgstr ""
+"Una chiave è salvata. Per sicurezza non viene più mostrata; ne inserisca una nuova per "
+"sostituirla."
 
 #: apps/compliance/templates/email/compliance/termination_notice/body.html
 #: apps/compliance/templates/email/compliance/termination_notice/body.txt
@@ -2599,7 +2601,9 @@ msgstr ""
 msgid ""
 "Choose the service that writes the texts of your own products, and give it your own key. We send "
 "it product data only, never customer data. Every text waits for your review before it is shown."
-msgstr "Scelga il servizio che scrive i testi dei Suoi prodotti e gli dia la Sua chiave. Inviamo solo dati di prodotto, mai dati dei clienti. Ogni testo attende la Sua revisione prima di essere mostrato."
+msgstr ""
+"Scelga il servizio che scrive i testi dei Suoi prodotti e gli dia la Sua chiave. Inviamo solo dati"
+" di prodotto, mai dati dei clienti. Ogni testo attende la Sua revisione prima di essere mostrato."
 
 #: apps/cms/blocks.py
 msgid "Choose the shop the card leads to. A card to a shop that is not open is left out."
@@ -3631,6 +3635,10 @@ msgstr "Finisce alle"
 #: themes/base/templates/components/gallery.html themes/ride/templates/components/gallery.html
 msgid "Enlarge"
 msgstr "Ingrandisci"
+
+#: apps/manager/forms.py
+msgid "Enter a new key or remove the saved one, not both."
+msgstr "Inserisca una nuova chiave oppure rimuova quella salvata, non entrambe le cose."
 
 #: apps/core/models.py
 msgid "Enter a time zone name such as Europe/Rome."
@@ -16165,7 +16173,9 @@ msgstr "La Sua fattura è già emessa"
 msgid ""
 "Your key for this provider. It is stored encrypted and never shown again. Leave it empty to keep "
 "the key you saved before."
-msgstr "La Sua chiave per questo fornitore. È salvata cifrata e non viene più mostrata. La lasci vuota per mantenere la chiave salvata in precedenza."
+msgstr ""
+"La Sua chiave per questo fornitore. È salvata cifrata e non viene più mostrata. La lasci vuota per"
+" mantenere la chiave salvata in precedenza."
 
 #: apps/compliance/forms.py
 msgid "Your name. Required, except for a report of child sexual abuse material."
