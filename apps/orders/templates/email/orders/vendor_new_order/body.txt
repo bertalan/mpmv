@@ -4,6 +4,8 @@
 
 {% endif %}{% for line in lines %}- {{ line.title }}{% if line.variant %} ({{ line.variant }}){% endif %} x {{ line.quantity }}: {{ line.total }} EUR
 {% endfor %}
-{% translate "Ship to:" %}
+{% if dispatch_on %}{% blocktranslate %}Your shop is closed: the buyer was told that the package will be dispatched from {{ dispatch_on }}.{% endblocktranslate %}
+
+{% endif %}{% translate "Ship to:" %}
 {% for part in ship_to %}{{ part }}
 {% endfor %}

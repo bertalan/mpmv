@@ -64,6 +64,7 @@ VENDOR_FACING_EMAILS = (
     "/vendor_package_cancelled/",
     "/vendor_amendment_applied/",
     "/vendor_order_cancelled_notice/",
+    "/vendor_new_order/",
     "/_invoice_notice",
 )
 

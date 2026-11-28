@@ -781,8 +781,10 @@ def closure_notice(vendor_id, today: date) -> ClosureNotice | None   # merged pe
   templates use the `shipping` template tag library (`{% load dispatch %}`) inside theme
   templates, which adds no Python import to `vendors` or `catalog`. The notice is a `role="region"`
   landmark with a heading (not an alert: it does not interrupt) and does not rely on colour.
-- **Checkout.** `cart.build_checkout` (ORD.3) asks `vendor_closed_periods` for the vendors in the
-  cart (today to 180 days ahead) and passes each package's periods to `earliest_dispatch_date`.
+- **Checkout.** `cart.build_checkout` (ORD.3) reads the closures of the vendors in the cart once
+  (`closure_outlooks`) and gives each package its dispatch date through `earliest_dispatch_date`.
+  The look-ahead follows the chain of closures that holds the day to its end, capped at ten years,
+  and the notice and the dispatch date come from the same rules, so they never disagree.
   The delivery estimate counts from the dispatch date (the method's indicative delivery time of
   SHP.12 and any extra days of a special area of SHP.14 on top). Ordering stays possible, with no
   extra confirmation step.

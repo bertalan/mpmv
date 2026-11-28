@@ -789,9 +789,10 @@ def requirement_rules(purpose: str = engine.PAYOUT) -> list[engine.Requirement]:
     return [row.as_rule() for row in rows]
 
 
-def business_today() -> dt.date:
-    """Today's calendar day in the business time zone (the day the no-TIN list is dated by)."""
-    return timezone.localdate(timezone.now(), business_tz())
+def business_today(at: dt.datetime | None = None) -> dt.date:
+    """Today's calendar day in the business time zone (the day the no-TIN list is dated by), or
+    the day of the instant `at` there (a checkout built for a given `now`)."""
+    return timezone.localdate(at or timezone.now(), business_tz())
 
 
 def no_tin_countries(on: dt.date | None = None) -> frozenset[str]:

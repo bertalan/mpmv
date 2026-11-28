@@ -27,6 +27,7 @@ from .engine import (
     BandSnap,
     ClosedPeriod,
     ClosureNotice,
+    ClosureOutlook,
     ClosureRule,
     Destination,
     MethodSnap,
@@ -37,7 +38,7 @@ from .engine import (
     SpecialAreaSnap,
     VendorPackage,
     ZoneSnap,
-    closure_notice_for,
+    closure_outlook,
     expand_closures,
 )
 from .engine import quote_shipping as engine_quote_shipping
@@ -392,13 +393,13 @@ def vendor_closed_periods(
     }
 
 
-def closure_notices(vendor_ids: Iterable[int], today: dt.date) -> dict[int, ClosureNotice | None]:
-    """The neutral notice of each vendor on `today` (None for none), in one query whatever the
+def closure_outlooks(vendor_ids: Iterable[int], today: dt.date) -> dict[int, ClosureOutlook]:
+    """The notice and the dispatch date of each vendor on `today`, in one query whatever the
     number of vendors. `today` is the date in the business time zone
     (`apps.vendors.services.business_today()`): storefront, product page, cart and checkout must
     all pass the same one."""
     return {
-        vendor_id: closure_notice_for(
+        vendor_id: closure_outlook(
             [
                 (ClosureRule(c.start_date, c.end_date, c.repeats_yearly), c.notice_days)
                 for c in closures
@@ -407,6 +408,12 @@ def closure_notices(vendor_ids: Iterable[int], today: dt.date) -> dict[int, Clos
         )
         for vendor_id, closures in _closure_rows(vendor_ids).items()
     }
+
+
+def closure_notices(vendor_ids: Iterable[int], today: dt.date) -> dict[int, ClosureNotice | None]:
+    """The neutral notice of each vendor on `today` (None for none), in one query (see
+    `closure_outlooks`)."""
+    return {vendor_id: o.notice for vendor_id, o in closure_outlooks(vendor_ids, today).items()}
 
 
 def closure_notice(vendor_id: int, today: dt.date) -> ClosureNotice | None:

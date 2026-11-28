@@ -3757,6 +3757,14 @@ msgstr "Löschanträge"
 msgid "Error"
 msgstr "Fehler"
 
+#: apps/orders/ui/present.py
+msgid "estimated delivery from %(first)s to %(last)s"
+msgstr "voraussichtliche Lieferung vom %(first)s bis %(last)s"
+
+#: apps/orders/ui/present.py
+msgid "estimated delivery on %(day)s"
+msgstr "voraussichtliche Lieferung am %(day)s"
+
 #: apps/events/templates/events/admin/review.html apps/manager/templates/manager/shop/events.html
 msgid "Event"
 msgstr "Veranstaltung"
@@ -12445,6 +12453,11 @@ msgstr ""
 "Der Verkäufer teilt dir mit, wie du die Ware zurücksendest. Bewahre diese Nachricht als Nachweis "
 "deines Widerrufs auf."
 
+#: apps/orders/templates/email/orders/order_confirmation/body.html
+#: apps/orders/templates/email/orders/order_confirmation/body.txt
+msgid "The seller's shop is closed: your package will be dispatched from %(dispatch_on)s."
+msgstr "Der Shop des Verkäufers ist geschlossen: Dein Paket wird ab dem %(dispatch_on)s versandt."
+
 #: apps/vendors/models.py
 msgid "The seller."
 msgstr "Der Verkäufer."
@@ -16479,6 +16492,14 @@ msgstr ""
 "Ihr Shop hat keine Telefonnummer. Wer an Verbraucher verkauft, muss eine angeben: Käufer sehen sie"
 " in der Widerrufsbelehrung und in der Bestellbestätigung. Bitte senden Sie sie an das Team der "
 "Plattform; bis dahin können Sie keine Produkte veröffentlichen."
+
+#: apps/orders/templates/email/orders/vendor_new_order/body.html
+#: apps/orders/templates/email/orders/vendor_new_order/body.txt
+msgid ""
+"Your shop is closed: the buyer was told that the package will be dispatched from %(dispatch_on)s."
+msgstr ""
+"Ihr Shop ist geschlossen: Dem Käufer wurde mitgeteilt, dass das Paket ab dem %(dispatch_on)s "
+"versandt wird."
 
 #: apps/manager/event_views.py
 msgid "Your shop is not active yet, so events cannot be changed."

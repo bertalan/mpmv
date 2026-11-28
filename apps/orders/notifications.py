@@ -21,12 +21,15 @@ from decimal import Decimal
 from typing import Any
 
 from django.conf import settings
+from django.utils import formats, timezone, translation
 
+from apps.core.services import email_language
 from apps.core.services import enqueue_email as _enqueue_email
 from apps.vendors import services as vendor_services
 
 from . import engine, legal
 from .models import Order, OrderLine, PrivacyStatus, VendorOrder
+from .tz import business_tz
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +105,16 @@ def _vendor_name(sub: VendorOrder) -> str:
     return str(sub.vendor_snapshot.get("display_name") or sub.vendor.display_name)
 
 
+def _dispatch_on(order: Order, sub: VendorOrder, language: str) -> str:
+    """VEN.20: the dispatch date the checkout gave (the snapshot, never the vendor's schedule),
+    in the email's language, when a closure moved it past the order day; empty otherwise."""
+    day = sub.expected_dispatch_on
+    if day is None or day <= timezone.localdate(order.created_at, business_tz()):
+        return ""
+    with translation.override(email_language(language)):
+        return str(formats.date_format(day, "DATE_FORMAT"))
+
+
 def notify_order_placed(order: Order) -> None:
     """Customer: order received."""
     if not _sendable(order):
@@ -151,6 +164,7 @@ def notify_order_paid(order: Order) -> None:
                 "vendor_name": _vendor_name(sub),
                 "vehicle_line": _vehicle(order),
                 "lines": _lines(sub),
+                "dispatch_on": _dispatch_on(order, sub, language),
                 "shipping": _money(sub.shipping_net + sub.shipping_tax_amount),
                 "total": _money(sub.gross_total),
                 # CMP.41: the seller's name, address, phone and email; the withdrawal
@@ -172,6 +186,7 @@ def notify_order_paid(order: Order) -> None:
                     "vendor_name": _vendor_name(sub),
                     "vehicle_line": _vehicle(order, settings.LANGUAGE_CODE),
                     "lines": _lines(sub),
+                    "dispatch_on": _dispatch_on(order, sub, _vendor_language(sub)),
                     "ship_to": _ship_to(order),
                     "total": _money(sub.gross_total),
                 },
