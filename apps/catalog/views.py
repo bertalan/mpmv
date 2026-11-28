@@ -30,7 +30,7 @@ from wagtail.views import serve
 
 from apps.core import text as core_text
 from apps.core import translations
-from apps.core.i18n import hreflang_alternates
+from apps.core.i18n import FALLBACK_ATTR, hreflang_alternates
 from apps.core.money import CURRENCY
 from apps.core.site_url import absolute_url
 from apps.vendors import services as vendors_services
@@ -175,6 +175,8 @@ def _listing(
     source = translations.source_language()
 
     canonical_url = absolute(language, params)
+    if anchor.is_fallback(language):
+        setattr(request, FALLBACK_ATTR, source)  # the layout's notice (I18N.22)
     if anchor.is_fallback(language) and source in anchor.paths:
         source_params = in_language(source) or listings.ListingParams(page=params.page)
         canonical_url = absolute(source, source_params)
@@ -289,6 +291,8 @@ def product_detail(request: HttpRequest, segment: str, slug: str) -> HttpRespons
     if request.path_info != location:
         query = request.META.get("QUERY_STRING", "")
         return HttpResponsePermanentRedirect(listings.join_query(location, query))
+    if page.is_fallback:
+        setattr(request, FALLBACK_ATTR, page.shown)  # the layout's notice (I18N.22)
     alternates = (
         hreflang_alternates(
             {lang: absolute_url(request, path) for lang, path in page.paths.items()}

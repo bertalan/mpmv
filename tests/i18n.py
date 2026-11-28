@@ -78,3 +78,14 @@ def localized(path: str, lang: str | None = None) -> str:
             first = slugs.segment_for(segments, lang)
             break
     return f"{language_prefix(lang)}/{first}/{rest}"
+
+
+def fallback_notice(shown_in: str, language: str) -> str:
+    """The HTML-escaped "Not yet available in this language; shown in {endonym}" notice, as a
+    page in `language` shows it for text in `shown_in` (the endonym is the language's own)."""
+    with translation.override(language):
+        text = translation.gettext("Not yet available in this language; shown in %(endonym)s")
+        endonym = translation.get_language_info(shown_in)["name_local"]
+    from django.utils.html import escape
+
+    return escape(text % {"endonym": endonym})

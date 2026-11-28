@@ -7,11 +7,7 @@ from wagtail.models import Page
 from wagtail.views import serve
 
 from apps.catalog import services as catalog_services
-from apps.core.i18n import primary_language
-
-# Set on the request when a page is shown in place of its missing translation: the language of
-# the text actually shown. The layout reads it (`{% language_fallback_notice %}`).
-FALLBACK_ATTR = "language_fallback"
+from apps.core.i18n import FALLBACK_ATTR, primary_language
 
 
 def home(request: HttpRequest) -> HttpResponseBase:

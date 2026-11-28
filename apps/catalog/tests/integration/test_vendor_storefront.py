@@ -13,9 +13,6 @@ import pytest
 from django.db import connection
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
-from django.utils import translation
-from django.utils.html import escape
-from django.utils.translation import gettext
 
 from apps.catalog.models import Product
 from apps.catalog.tests.factories import CategoryFactory, CategoryTranslationFactory
@@ -24,7 +21,7 @@ from apps.core.i18n import primary_language
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorTranslationFactory
-from tests.i18n import localized, other_language
+from tests.i18n import fallback_notice, localized, other_language
 
 pytestmark = pytest.mark.django_db
 
@@ -92,8 +89,7 @@ def test_a_language_without_a_text_falls_back_to_the_source_with_a_notice(
     vendor.translations.filter(language=other_language()).delete()
     html = client.get(f"{prefix(other_language())}/shop/{vendor.slug}/").content.decode()
     assert "Our story in English." in html
-    with translation.override(other_language()):
-        assert escape(gettext("This page is not available in your language yet.")) in html
+    assert fallback_notice(primary_language(), other_language()) in html
 
 
 def test_a_draft_text_never_shows(client: Client) -> None:

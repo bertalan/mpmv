@@ -171,6 +171,7 @@ def language_menu(languages: Any, current_language: object = "") -> dict[str, An
                 "label": str(_field(language, "name_local") or _field(language, "name") or code),
                 "url": _field(language, "url") or "",
                 "available": _field(language, "available"),
+                "notice": _field(language, "notice"),
                 "current": bool(_field(language, "current")) or code == current_language,
                 "flag": static(path) if path else "",
             }

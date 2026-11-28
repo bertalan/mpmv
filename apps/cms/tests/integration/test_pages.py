@@ -148,11 +148,14 @@ def test_switching_language_on_a_static_page_follows_the_translated_slug(
     assert f"<h1>{seed_text(other_language()).about.title}</h1>" in response.content.decode()
 
 
-def test_a_page_without_translation_switches_to_the_other_languages_home(
+def test_a_page_without_translation_stays_on_the_page_in_the_other_language(
     client: Client, seeded: SeedReport
 ) -> None:
     home = Site.objects.get(is_default_site=True).root_page
     StandardPageFactory.create(title="Only in English", parent=home)
     html = client.get("/only-in-english/?page=2").content.decode()
-    assert f'name="next" value="{language_prefix(other_language())}/?page=2"' in html
+    # I18N.22: the same page under the other prefix (the fallback), with the query kept.
+    assert (
+        f'name="next" value="{language_prefix(other_language())}/only-in-english/?page=2"' in html
+    )
     assert 'name="next" value="/only-in-english/?page=2"' in html
