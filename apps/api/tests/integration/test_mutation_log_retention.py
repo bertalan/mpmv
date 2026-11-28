@@ -152,12 +152,13 @@ def test_the_purge_deletes_in_batches_each_in_its_own_transaction() -> None:
     recent = ApiMutationLogFactory.create()
     with (
         mock.patch("apps.api.services.MUTATION_LOG_BATCH_SIZE", 2),
-        mock.patch("apps.api.services.transaction.atomic", wraps=transaction.atomic) as atomic,
+        mock.patch("apps.api.services.transaction") as txn,
     ):
+        txn.atomic.side_effect = transaction.atomic  # the real savepoint, counted
         assert purge_mutation_log() == 5
     # 5 rows in batches of 2: three batches that delete (2, 2, 1); the last one is short, so the
-    # loop ends without a fourth look.
-    assert atomic.call_count == 3
+    # loop ends without a fourth look. Each batch is its own atomic block.
+    assert txn.atomic.call_count == 3
     assert list(ApiMutationLog.objects.values_list("pk", flat=True)) == [recent.pk]
 
 
