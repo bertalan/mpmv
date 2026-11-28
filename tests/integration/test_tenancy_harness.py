@@ -166,13 +166,11 @@ def test_vendor_b_is_seeded_with_every_vendor_owned_model(cross_tenant: CrossTen
 
 
 def test_a_seeded_model_without_a_public_id_and_not_listed_is_caught() -> None:
-    class Unlisted(models.Model):  # noqa: DJ008
-        class Meta:
-            app_label = "vendors"
-            managed = False
+    class Unlisted:  # a plain class: a model here would join the app registry for good
+        pass
 
     with pytest.raises(AssertionError, match="CHILD_ROWS"):
-        check_seeded_identifiers([Unlisted()], ())
+        check_seeded_identifiers([Unlisted()], ())  # type: ignore[list-item]
 
 
 def test_a_list_of_vendor_data_wrongly_declared_without_vendor_data_is_caught(
