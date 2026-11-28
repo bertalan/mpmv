@@ -188,3 +188,10 @@ def test_a_vendor_profile_save_and_a_status_change_purge() -> None:
     before = generation()
     change_status(vendor, engine.SUSPENDED, ctx=ctx)
     assert generation() != before
+
+
+def test_the_seo_app_registers_the_page_cache_as_a_purge_listener() -> None:
+    from apps.core import public_cache
+    from apps.seo import signals
+
+    assert signals.purge_on_request in public_cache._listeners

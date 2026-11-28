@@ -59,9 +59,3 @@ def test_registering_the_same_listener_twice_runs_it_once(
     with django_capture_on_commit_callbacks(execute=True):
         public_cache.purge_public_pages("x")
     assert seen == ["x"]
-
-
-def test_the_seo_app_registers_the_page_cache_as_a_listener() -> None:
-    from apps.seo import signals
-
-    assert signals.purge_on_request in public_cache._listeners

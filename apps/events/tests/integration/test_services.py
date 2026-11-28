@@ -861,10 +861,12 @@ def test_a_vendor_members_staff_flag_does_not_open_the_admin_or_other_vendors(
 
 @pytest.fixture
 def purges(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    from django.db import transaction
+
     from apps.core import public_cache
 
     seen: list[str] = []
-    monkeypatch.setattr(public_cache.transaction, "on_commit", lambda f, **_k: f())
+    monkeypatch.setattr(transaction, "on_commit", lambda f, **_k: f())
     monkeypatch.setattr(public_cache, "_listeners", [seen.append])
     return seen
 
