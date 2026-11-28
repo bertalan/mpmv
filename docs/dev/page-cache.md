@@ -59,7 +59,7 @@ Never read from or stored in the cache:
 | `Authorization` header | API style access |
 | path under `PRIVATE_PATHS` (`/admin/`, `/manager/`, `/account/`, ...) | previews and private areas |
 
-Also not stored: a response with `Vary: Cookie` (the row and wagtail-cache), a page that extends the
+Also not stored: a response with `Vary: *` or a `Vary` on any header but `Accept-Language` (the row and wagtail-cache), a page that extends the
 CSP for its own request (the video block sets `request.mpmv_video_embed`; a hit would lose the
 frame origins and block the embed), a response with `Cache-Control: private`, `no-store`, `no-cache` or `max-age=0`,
 a page with a view restriction on it or an ancestor (a `before_serve_page` hook,
