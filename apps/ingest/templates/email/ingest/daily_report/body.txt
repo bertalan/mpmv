@@ -1,0 +1,20 @@
+{% load i18n %}{% blocktranslate %}Ingest report for {{ day }}{% endblocktranslate %}
+
+{% translate "Runs" %}: {{ runs_total }} ({% translate "failed" %}: {{ runs_failed }})
+{% translate "Items seen" %}: {{ totals.seen }}, {% translate "updated" %}: {{ totals.updated }}, {% translate "unchanged" %}: {{ totals.unchanged }}, {% translate "skipped" %}: {{ totals.skipped }}, {% translate "errors" %}: {{ totals.errors }}
+{% if error_runs %}
+{% translate "Runs with errors" %}:
+{% for run in error_runs %}- {{ run.source }} ({{ run.kind }}, {{ run.status }}): {{ run.error_text }}
+{% endfor %}{% endif %}
+{% translate "Review items opened today" %}:
+{% for kind, count in opened_by_kind.items %}- {{ kind }}: {{ count }}
+{% endfor %}
+{% translate "Review items still open" %}: {{ open_total }} ({% translate "blocking" %}: {{ open_blocking }})
+{% translate "Stale review items" %}: {{ stale_open }}
+{% translate "Items missing from the feed" %}: {{ missing_items }}
+
+{% translate "Identity anomalies" %}: {{ anomaly_count }}
+{% for anomaly in anomalies %}- {{ anomaly.kind }}: {{ anomaly.vendor }}, {{ anomaly.sku }} {{ anomaly.detail }}
+{% endfor %}{% if unavailable %}
+{% translate "Sources that could not be read" %}: {{ unavailable|join:", " }}
+{% endif %}

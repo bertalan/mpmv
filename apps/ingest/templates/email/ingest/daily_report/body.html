@@ -1,0 +1,18 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+<h1>{% blocktranslate %}Ingest report for {{ day }}{% endblocktranslate %}</h1>
+<p>{% translate "Runs" %}: {{ runs_total }} ({% translate "failed" %}: {{ runs_failed }})<br>
+{% translate "Items seen" %}: {{ totals.seen }}, {% translate "updated" %}: {{ totals.updated }}, {% translate "unchanged" %}: {{ totals.unchanged }}, {% translate "skipped" %}: {{ totals.skipped }}, {% translate "errors" %}: {{ totals.errors }}</p>
+{% if error_runs %}<h2>{% translate "Runs with errors" %}</h2>
+<ul>{% for run in error_runs %}<li>{{ run.source }} ({{ run.kind }}, {{ run.status }}): {{ run.error_text }}</li>{% endfor %}</ul>{% endif %}
+<h2>{% translate "Review items opened today" %}</h2>
+<ul>{% for kind, count in opened_by_kind.items %}<li>{{ kind }}: {{ count }}</li>{% endfor %}</ul>
+<p>{% translate "Review items still open" %}: {{ open_total }} ({% translate "blocking" %}: {{ open_blocking }})<br>
+{% translate "Stale review items" %}: {{ stale_open }}<br>
+{% translate "Items missing from the feed" %}: {{ missing_items }}</p>
+<h2>{% translate "Identity anomalies" %}: {{ anomaly_count }}</h2>
+<ul>{% for anomaly in anomalies %}<li>{{ anomaly.kind }}: {{ anomaly.vendor }}, {{ anomaly.sku }} {{ anomaly.detail }}</li>{% endfor %}</ul>
+{% if unavailable %}<p>{% translate "Sources that could not be read" %}: {{ unavailable|join:", " }}</p>{% endif %}
+</body>
+</html>

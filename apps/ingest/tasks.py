@@ -1,14 +1,15 @@
 """Background jobs of the ingest app (ADR-0004, docs/dev/background-jobs.md)."""
 
+import datetime as dt
 import logging
 
 from django.utils import timezone
 
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
-from apps.core.tasks import NO_RETRY, locked, periodic, task
+from apps.core.tasks import NO_RETRY, business_tz, locked, periodic, task
 
-from . import sync
+from . import reports, sync
 from .models import ImportRun, SupplierSource
 
 logger = logging.getLogger(__name__)
@@ -66,3 +67,23 @@ def price_sync(timestamp: int) -> None:  # `timestamp` is required by the schedu
     A change above 15 percent, a sale and stale data open a review item and write nothing; a
     source writes only with its per-source write flag, otherwise the run is a dry run."""
     _report("price_sync", ImportRun.Kind.PRICE)
+
+
+@periodic("10 0 * * *")
+@locked()
+@task("ingest.daily_report", retry=NO_RETRY)
+def daily_report(timestamp: int) -> None:  # `timestamp` is the scheduled time
+    """Every night: email staff the report of the previous business day, whole (ING.10).
+
+    It runs just after business midnight (Rome time, which follows the daylight saving changes)
+    and covers the day that just ended from its first to its last minute, a 23 or 25 hour day on
+    a time change. Never raises; a second run for the same day sends nothing."""
+    local = dt.datetime.fromtimestamp(timestamp, tz=business_tz())
+    day = local.date() - dt.timedelta(days=1)
+    ctx = AuditContext(actor_label="system:ingest-daily-report", source=AuditLog.Source.TASK)
+    try:
+        sent = reports.send_daily_report(day, ctx=ctx)
+    except Exception:
+        logger.exception("ingest.daily_report for %s failed", day)
+        return
+    logger.info("ingest.daily_report for %s: sent=%s", day, sent)

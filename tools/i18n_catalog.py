@@ -67,6 +67,7 @@ SCOPES = (
     "apps/events/templates/email",  # the event moderation emails (EVT.11)
     "apps/catalog/templates/email",  # brand rejected notice to the vendor (I18N.20 3c)
     "apps/core/templates/email",  # the operations alert to staff (I18N.20 3c)
+    "apps/ingest/templates/email",  # the ingest daily report to staff (ING.10)
     "apps/orders/customer_views.py",  # the customer area labels (ORD.7)
     "apps/compliance/forms.py",  # WithdrawalLookupForm (CMP.6): its help texts are translated
     "apps/compliance/views.py",  # withdrawal and notice errors, the form PDF 503 (I18N.20)

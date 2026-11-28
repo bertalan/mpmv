@@ -1,0 +1,14 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<h1>Ingest report for {{ report.day }}</h1>
+<form method="get"><label>Day <input type="date" name="day" value="{{ report.day }}"></label> <button>Show</button></form>
+<p>Runs: {{ report.runs_total }} (failed: {{ report.runs_failed }}). Items seen {{ report.totals.seen }}, updated {{ report.totals.updated }}, unchanged {{ report.totals.unchanged }}, skipped {{ report.totals.skipped }}, errors {{ report.totals.errors }}.</p>
+{% if report.error_runs %}<h2>Runs with errors</h2>
+<ul>{% for run in report.error_runs %}<li>{{ run.source }} ({{ run.kind }}, {{ run.status }}): {{ run.error_text }}</li>{% endfor %}</ul>{% endif %}
+<h2>Review items opened today</h2>
+<ul>{% for kind, count in report.opened_by_kind.items %}<li>{{ kind }}: {{ count }}</li>{% endfor %}</ul>
+<p>Still open: {{ report.open_total }} (blocking: {{ report.open_blocking }}). Stale: {{ report.stale_open }}. Missing from the feed: {{ report.missing_items }}.</p>
+<h2>Identity anomalies: {{ report.anomalies|length }}</h2>
+<ul>{% for a in report.anomalies %}<li>{{ a.kind }}: {{ a.vendor }}, {{ a.sku }} {{ a.detail }}</li>{% endfor %}</ul>
+{% if report.unavailable %}<p>Sources that could not be read: {{ report.unavailable|join:", " }}</p>{% endif %}
+{% endblock %}
