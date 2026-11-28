@@ -54,6 +54,11 @@ class TextPolicy:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "max_lengths", MappingProxyType(dict(self.max_lengths)))
+        for name in ("languages", "required", "banned_terms"):  # a list or a str must not slip in
+            value = getattr(self, name)
+            if isinstance(value, str):
+                raise TypeError(f"TextPolicy.{name} is a tuple of strings, not one string")
+            object.__setattr__(self, name, tuple(value))
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,6 +97,9 @@ class EnrichmentOutput:
     provider: str
     model: str
     prompt_version: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "raw", MappingProxyType(dict(self.raw)))
 
 
 @runtime_checkable
