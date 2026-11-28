@@ -127,9 +127,17 @@ stays stale until its 300 s lifetime ends.
 Signals are connected per content model, never without a `sender`: a sender-less `post_delete`
 receiver makes Django load every row before a delete and changes unrelated SQL.
 
-Things that change a page without one of these calls **rely on the lifetime** (300 s): snippets,
-menus and the footer, products and categories shown in a block, images replaced in place,
-translations edited without publishing.
+**A shown price is never stale** (lane-a decision, 2026-11-28; full-cache drop for now, the hit rate
+is measured on the STAGE soak). `apps.core.public_cache.purge_on_change(model, reason)` connects a
+per-model `post_save` and `post_delete` that calls `purge_public_pages` (after the commit). It is
+wired in each app's `ready()` so the direction stays catalog, tax, vendors, core to the registry,
+never to `seo`: `Product` and `Variant` (price, sale, name, stock), `TaxRate` and
+`VendorTaxProfile`, `Vendor` (`save_vendor`, `delete_vendor`, `set_business_only` and the profile)
+and `VendorFeatureFlag`, and the Wagtail image (`MediaImage`) and document models. There is no
+separate offer model: an offer is a sale price on a product or variant.
+
+Things that change a page without one of these calls **rely on the lifetime** (300 s): categories
+and translations edited without publishing.
 
 ## Not here yet
 

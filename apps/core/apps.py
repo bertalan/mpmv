@@ -42,6 +42,7 @@ class CoreConfig(AppConfig):
 
     def ready(self) -> None:
         from django.conf import settings
+        from wagtail.documents import get_document_model
 
         from .checks import (
             check_admin_network_for_deploy,
@@ -66,6 +67,12 @@ class CoreConfig(AppConfig):
             check_language_settings,
             check_language_state,
         )
+        from .models import MediaImage
+        from .public_cache import purge_on_change
+
+        # SEO.6 2b: a replaced image or document changes the pages that show it.
+        purge_on_change(MediaImage, "image")
+        purge_on_change(get_document_model(), "document")
 
         checks.register(translation_models)
         checks.register(check_audit_policy, checks.Tags.security)

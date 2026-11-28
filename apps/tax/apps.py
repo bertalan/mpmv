@@ -22,4 +22,11 @@ class TaxConfig(AppConfig):
     }
 
     def ready(self) -> None:
+        from apps.core.public_cache import purge_on_change
+
         from . import signals  # noqa: F401  (connects the TAX.13 VAT number re-check)
+        from .models import TaxRate, VendorTaxProfile
+
+        # SEO.6 2b: a gross price shown to a visitor follows the rate and the vendor's regime.
+        purge_on_change(TaxRate, "tax rate")
+        purge_on_change(VendorTaxProfile, "vendor tax profile")

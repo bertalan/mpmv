@@ -36,8 +36,16 @@ class VendorsConfig(AppConfig):
     def ready(self) -> None:
         from django.core import checks
 
+        from apps.core.public_cache import purge_on_change
+
         from . import services
         from .checks import check_self_certification_texts
+        from .models import Vendor, VendorFeatureFlag
+
+        # SEO.6 2b: save_vendor, delete_vendor, set_business_only and the vendor flags all end in
+        # a row save or delete; the storefront and every product page of the vendor change.
+        purge_on_change(Vendor, "vendor")
+        purge_on_change(VendorFeatureFlag, "vendor flag")
 
         checks.register(check_self_certification_texts)  # CMP.25 texts, I18N.19 review gate
 
