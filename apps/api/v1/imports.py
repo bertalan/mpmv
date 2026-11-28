@@ -155,8 +155,6 @@ def set_stock(request: HttpRequest, payload: StockIn, dry_run: DryRun = False) -
             detail="A SKU is given more than once in the batch; send one row per SKU.",
             skus=duplicates,
         )
-    if any(item is None for item in services.match_skus(vendor, skus).values()):
-        raise _not_found()
     rows = [
         services.SkuRow(
             row.sku,
@@ -168,6 +166,10 @@ def set_stock(request: HttpRequest, payload: StockIn, dry_run: DryRun = False) -
     with transaction.atomic():
         # A vendor suspended since the key was authenticated writes nothing (CORE.14).
         ensure_vendor_can_write(vendor)
+        # Checked inside the transaction: a SKU renamed or deleted by a concurrent write cannot
+        # slip between this check and the write.
+        if any(item is None for item in services.match_skus(vendor, skus).values()):
+            raise _not_found()
         changes: ChangeSet = services.update_by_sku(
             vendor, rows, ctx=audit_context(request), dry_run=dry_run
         )
