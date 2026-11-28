@@ -22,7 +22,7 @@ from apps.api.auth import api_client_of
 from apps.api.v1.catalog import ProductIn
 from apps.api.v1.errors import ApiProblem
 from apps.catalog import services
-from apps.catalog.engine import MAX_STOCK, SKU_MAX_LENGTH
+from apps.catalog.engine import MAX_STOCK, SKU_MAX_LENGTH, sku_match_key
 from apps.core.changeset import ChangeSet
 from apps.vendors.models import Vendor
 from apps.vendors.services import ensure_vendor_can_write
@@ -113,7 +113,7 @@ def upsert_products(
             {
                 "index": index,
                 "sku": item.sku,
-                "outcome": "refused" if index in refused else outcome[item.sku],
+                "outcome": "refused" if index in refused else outcome.get(item.sku, "refused"),
             }
             for index, item in enumerate(payload.items)
         ],
@@ -147,6 +147,15 @@ def set_stock(request: HttpRequest, payload: StockIn, dry_run: DryRun = False) -
     or nothing: a SKU the vendor does not have, another vendor's included, answers 404."""
     vendor = _own_vendor(request)
     skus = [row.sku for row in payload.items]
+    keys = [sku_match_key(sku) for sku in skus]
+    duplicates = sorted({sku for sku, key in zip(skus, keys, strict=True) if keys.count(key) > 1})
+    if duplicates:
+        raise ApiProblem(
+            400,
+            code="duplicate_sku",
+            detail="A SKU is given more than once in the batch; send one row per SKU.",
+            skus=duplicates,
+        )
     if any(item is None for item in services.match_skus(vendor, skus).values()):
         raise _not_found()
     rows = [
