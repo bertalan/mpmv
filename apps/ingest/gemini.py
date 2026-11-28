@@ -31,7 +31,7 @@ PROMPT_VERSION = "gemini-v1"
 ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
 MAX_RESPONSE_BYTES = 1_000_000
-MODEL_NAME = re.compile(r"^[a-z0-9][a-z0-9.\-]*$")  # no "/" or "?" can change the path
+MODEL_NAME = re.compile(r"[a-z0-9][a-z0-9.\-]*")  # use `fullmatch`: no "/" or "?", no final "\n"
 RETRY_DELAYS = (1.0, 3.0)  # seconds before the 2nd and 3rd attempt, on 429 and 5xx only
 
 Transport = Callable[[str, Mapping[str, Any], Mapping[str, str], float], Any]
@@ -87,6 +87,9 @@ def build_prompt(facts: ProductFacts, lang: str, policy: TextPolicy) -> str:
         },
         ensure_ascii=False,
     )
+    # Supplier text cannot close the block: `<`, `>` and `&` leave as JSON escapes (still valid
+    # JSON for the model), so `</product_data>` inside the data is not a tag.
+    data = data.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
     return (
         f"Write product texts in language '{lang}' (British English if English) for a shop.\n"
         f"Answer with one JSON object with exactly these keys: {', '.join(TEXT_FIELDS)}.\n"
@@ -113,7 +116,7 @@ class GeminiEnricher:
     ) -> None:
         if not api_key:
             raise ProviderError("no API key configured")
-        if not MODEL_NAME.match(model):
+        if not MODEL_NAME.fullmatch(model):
             raise ProviderError("invalid model name")
         self._sleep = sleep
         self._api_key = api_key
@@ -161,7 +164,10 @@ class GeminiEnricher:
 
 
 def get_enricher() -> TextEnricher:
-    """The enricher chosen by ``settings.INGEST_ENRICHER`` (default ``fake``)."""
+    """The enricher chosen by ``settings.INGEST_ENRICHER`` (default ``fake``).
+
+    A real provider retries with pauses (``RETRY_DELAYS``, up to a few seconds in the calling
+    thread): run it only inside a background job, never in a request."""
     choice = settings.INGEST_ENRICHER
     if choice == "fake":
         return FakeEnricher()
