@@ -1373,10 +1373,6 @@ API_OPERATIONS: dict[str, Access] = {
         "Sets net prices of the caller's own vendor's SKUs only; another vendor's SKU gets 404 "
         "and nothing is written. A platform key is refused. Shows only the ChangeSet."
     ),
-    "POST /api/v1/import/media": NoVendorData(
-        "Attaches an upload to the caller's own vendor's SKU only; another vendor's SKU gets 404. "
-        "A platform key is refused. Shows only the ChangeSet."
-    ),
     # CAT.15
     "GET /api/v1/catalog/products/{public_id}/other-sellers": VendorScoped(
         make=lambda vendor: ProductFactory.create(vendor=vendor)
