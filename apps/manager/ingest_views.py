@@ -12,6 +12,7 @@ from typing import Any, Final
 from django import forms
 from django.contrib import messages
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
@@ -123,14 +124,15 @@ class SourceNewView(WriteGate, ManagerView):
             )
             report = onboarding.run_sample(source, data["sample"].read())
             if create:
-                source, _changes = onboarding.create_source(
-                    data["vendor"],
-                    code=data["code"],
-                    adapter_code=data["adapter_code"],
-                    decimal=data["decimal"],
-                    ctx=ctx,
-                )
-                onboarding.record_sample(source, report, ctx=ctx)
+                with transaction.atomic():  # the source and its sample result, or neither
+                    source, _changes = onboarding.create_source(
+                        data["vendor"],
+                        code=data["code"],
+                        adapter_code=data["adapter_code"],
+                        decimal=data["decimal"],
+                        ctx=ctx,
+                    )
+                    onboarding.record_sample(source, report, ctx=ctx)
         except ValidationError as error:
             for name, problems in error.message_dict.items():
                 form.add_error(name if name in form.fields else None, problems)
