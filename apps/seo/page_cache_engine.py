@@ -43,12 +43,21 @@ class KeyParts:
     generation: str
 
 
+def normalise_host(host: str) -> str:
+    """Lower case, no port: `ALLOWED_HOSTS` ignores the port, so `Shop:8443` and `shop` are one
+    site and must not be two entries (a flood of variants would evict real pages)."""
+    host = host.lower()
+    if host.startswith("["):  # IPv6 literal
+        return host.split("]", 1)[0] + "]"
+    return host.split(":", 1)[0]
+
+
 def cache_key(parts: KeyParts) -> str:
     raw = "\x00".join(
         (
             parts.generation,
             parts.scheme,
-            parts.host.lower(),
+            normalise_host(parts.host),
             parts.path,
             parts.language,
             "noindex" if parts.noindex else "index",
@@ -77,6 +86,10 @@ def request_bypass_reason(
         return "cookie"
     if any(path.startswith(prefix) for prefix in PRIVATE_PATHS):
         return "private area"
+    if "//" in path:
+        # Wagtail routing ignores empty path parts: `/a//b/` and `/a/b/` are the same page, so
+        # such a variant would be a second entry for it (key-space flooding).
+        return "non-canonical path"
     return None
 
 
@@ -90,6 +103,8 @@ def response_skip_reason(
     session_modified: bool,
     nonce_used: bool,
     csrf_used: bool,
+    vary: str,
+    csp_extended: bool,
     body: bytes,
     max_bytes: int,
 ) -> str | None:
@@ -108,6 +123,12 @@ def response_skip_reason(
         return "nonce"
     if csrf_used or _CSRF_FIELD in body:
         return "csrf"
+    if "cookie" in vary.lower():
+        return "vary cookie"
+    if csp_extended:
+        # A per-request CSP extension (the video block's frame origins) is not stored with the
+        # page: a hit would lose it and block the embed.
+        return "csp extension"
     if _UNSTORABLE.search(cache_control):
         return "cache-control"
     if len(body) > max_bytes:

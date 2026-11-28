@@ -61,7 +61,8 @@ class PageCacheMiddleware:
         )
         if reason:
             response = self.get_response(request)
-            response["X-Page-Cache"] = "BYPASS"
+            if reason not in ("private area", "authorization"):  # no hint about private routes
+                response["X-Page-Cache"] = "BYPASS"
             return response
         key = page_cache.try_key(request)  # before the render: see `page_cache.try_key`
         if key is None:
@@ -117,6 +118,10 @@ class PageCacheMiddleware:
             session_modified=bool(getattr(session, "modified", False)),
             nonce_used=bool(nonce),  # a LazyNonce is falsy until it has been generated
             csrf_used=bool(request.META.get("CSRF_COOKIE_NEEDS_UPDATE")),
+            vary=response.get("Vary", ""),
+            csp_extended=bool(
+                getattr(request, "mpmv_video_embed", False) or hasattr(response, "_csp_config")
+            ),
             body=bytes(content),
             max_bytes=settings.PAGE_CACHE_MAX_BYTES,
         )
