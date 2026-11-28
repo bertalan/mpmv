@@ -262,6 +262,7 @@ class CountryWarningLanguages(Model):   # platform data: country -> accepted war
 | Carts, preferences, logs | GDPR 6(1)(b) and (f) | While the account exists; logs per the operations retention setting | Deleted on erasure, together with saved addresses and payment methods |
 | Contract evidence (vendor contracts, signatures, timestamp tokens) | GDPR 17(3)(e); limitation period | Whole relationship plus 10 years (proposed default) | Files deleted by the retention job |
 | CMP.12 records (art. 242a facilitated supplies) | VAT directive art. 242a; Reg. 282/2011 art. 54c | 10 years from the end of the year of the transaction | Deleted or anonymised by the retention job; outside erasure |
+| API mutation log (key id, vendor, endpoint, method, status, time, IP address; no body, token or personal data) | GDPR 6(1)(f), security and accountability of the API | 12 months from the call (owner decision Q-14, CORE.29) | Deleted by the nightly job `api.purge_mutation_log`; outside erasure, which it does not hold |
 | Payment data | GDPR 6(1)(b) and (c) | Stripe holds the card; we keep the payment reference per the order snapshot, and the issuer or IP country only as location evidence for the order period | Anonymised or deleted with the order |
 
 ### CMP.5 — DSA and P2B `[P1]`

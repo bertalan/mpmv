@@ -57,6 +57,17 @@ VENDOR_GRANTABLE_SCOPES: Final = frozenset(
 MUTATING_METHODS: Final = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
 
+def months_before(moment: dt.datetime, months: int) -> dt.datetime:
+    """`moment` shifted back by whole calendar months; a missing day falls to the month's last
+    day (31 March minus one month is 28 February, or 29 in a leap year). Used by the retention
+    cutoff of the API mutation log (CORE.29)."""
+    index = moment.year * 12 + (moment.month - 1) - months
+    year, month = divmod(index, 12)
+    month += 1
+    last_day = (dt.date(year + (month == 12), month % 12 + 1, 1) - dt.timedelta(days=1)).day
+    return moment.replace(year=year, month=month, day=min(moment.day, last_day))
+
+
 def is_write(method: str) -> bool:
     return method.upper() in MUTATING_METHODS
 

@@ -89,9 +89,11 @@ def test_the_wagtail_login_form_is_locked_out_like_the_django_admin_one(
 def test_the_wagtail_login_answers_a_locked_and_an_unknown_account_alike(
     client: Client, staff: User, password: str
 ) -> None:
+    nobody = "nobody@example.com"
+    _fail(client, WAGTAIL_LOGIN, nobody, ACCOUNT_LOCKOUT.free_attempts, ip=OTHER_IP)
     unknown = client.post(
         WAGTAIL_LOGIN,
-        {"username": "nobody@example.com", "password": secrets.token_urlsafe(16)},
+        {"username": nobody, "password": secrets.token_urlsafe(16)},
         REMOTE_ADDR=IP,
     )
     _fail(client, WAGTAIL_LOGIN, staff.email, ACCOUNT_LOCKOUT.free_attempts, ip=OTHER_IP)
@@ -101,6 +103,7 @@ def test_the_wagtail_login_answers_a_locked_and_an_unknown_account_alike(
     assert unknown.status_code == locked.status_code == 200
     errors = [r.context["form"].non_field_errors() for r in (unknown, locked)]
     assert errors[0] == errors[1]
+    assert errors[0]  # both are told to wait (CORE.29), alike
 
 
 def test_a_successful_login_does_not_reset_the_ip_counter(

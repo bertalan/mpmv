@@ -23,3 +23,6 @@ DEBUG = True
 # OPS.5: the technical admin from this machine only (empty would deny everybody).
 ADMIN_ALLOWED_NETWORKS = ["127.0.0.1/32", "::1/128"]
 ALLOW_SEED = True  # `make seed` (ARC.10)
+
+# The API documentation is open locally (CORE.29).
+API_DOCS_PUBLIC = True

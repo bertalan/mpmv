@@ -7,14 +7,18 @@ login here), generic errors (no user enumeration), AuditLog on lockout, Turnstil
 import datetime as dt
 import secrets
 from collections.abc import Iterator
+from unittest import mock
 
 import pytest
 from django.contrib.auth import authenticate
 from django.test import Client, override_settings
+from django.urls import reverse
 from django.utils import timezone, translation
+from django.utils.translation import ngettext
 
 from apps.accounts.models import User
 from apps.accounts.services import (
+    ACCOUNT_KEY_PREFIX,
     ACCOUNT_LOCKOUT,
     IP_LOCKOUT,
     login_retry_after,
@@ -180,13 +184,89 @@ def test_locked_wrong_and_unknown_accounts_get_the_same_generic_error(
     unknown = _error_page(client, "nobody@example.com", secrets.token_urlsafe(16))
     _fail(client, staff.email, ACCOUNT_LOCKOUT.free_attempts)
     locked = _error_page(client, staff.email, password)
-    for page in (wrong, unknown, locked):
+    for page in (wrong, unknown):
         assert translated(GENERIC_ERROR) % {"username": _username_label()} in page
+    assert translated(GENERIC_ERROR) % {"username": _username_label()} not in locked
 
 
 def test_unknown_emails_are_locked_exactly_like_real_ones(client: Client) -> None:
     _fail(client, "nobody@example.com", ACCOUNT_LOCKOUT.free_attempts)
     assert login_retry_after("nobody@example.com", None) > dt.timedelta(0)
+
+
+# --- The waiting time (CORE.29, owner decision Q-12)
+
+
+def _wait_message(minutes: int) -> str:
+    with translation.override(primary_language()):
+        return ngettext(
+            "Too many attempts. Please try again in %(minutes)s minute.",
+            "Too many attempts. Please try again in %(minutes)s minutes.",
+            minutes,
+        ) % {"minutes": minutes}
+
+
+@pytest.mark.parametrize("language", ["it", "de", "fr", "es"])
+def test_the_waiting_text_plural_is_translated_through_the_compiled_catalog(language: str) -> None:
+    singular = "Too many attempts. Please try again in %(minutes)s minute."
+    plural = "Too many attempts. Please try again in %(minutes)s minutes."
+    with translation.override(language):
+        one = ngettext(singular, plural, 1)
+        many = ngettext(singular, plural, 5)
+    assert one != singular
+    assert many != plural
+    assert one != many
+    assert "%(minutes)s" in one
+    assert "%(minutes)s" in many
+
+
+def test_a_locked_login_shows_the_waiting_time_the_same_for_known_and_unknown_emails(
+    client: Client, staff: User, password: str
+) -> None:
+    _fail(client, staff.email, ACCOUNT_LOCKOUT.free_attempts)
+    _fail(client, "nobody@example.com", ACCOUNT_LOCKOUT.free_attempts)
+    known = _error_page(client, staff.email, password)
+    unknown = _error_page(client, "nobody@example.com", password)
+    assert _wait_message(1) in known
+    assert _wait_message(1) in unknown
+
+
+def test_the_waiting_time_is_rounded_up_to_whole_minutes(client: Client, staff: User) -> None:
+    _fail(client, staff.email, ACCOUNT_LOCKOUT.free_attempts)
+    account = Throttle.objects.get(key=f"{ACCOUNT_KEY_PREFIX}{staff.email}")
+    assert account.locked_until is not None
+    for seconds, minutes in ((59, 1), (60, 1), (61, 2), (90, 2), (120, 2), (121, 3)):
+        # A frozen distance: shift the lock so that exactly `seconds` remain at the request.
+        remaining = dt.timedelta(seconds=seconds)
+        with mock.patch("django.utils.timezone.now", return_value=account.locked_until - remaining):
+            assert _wait_message(minutes) in _error_page(client, staff.email, "x")
+
+
+def test_a_locked_unknown_email_and_a_locked_known_one_answer_alike(
+    client: Client, staff: User, password: str
+) -> None:
+    _fail(client, staff.email, ACCOUNT_LOCKOUT.free_attempts)
+    _fail(client, "nobody@example.com", ACCOUNT_LOCKOUT.free_attempts)
+    a = client.post(LOGIN_URL, {"username": staff.email, "password": password}, REMOTE_ADDR=IP)
+    b = client.post(
+        LOGIN_URL, {"username": "nobody@example.com", "password": password}, REMOTE_ADDR=IP
+    )
+    assert a.status_code == b.status_code == 200
+
+
+def test_the_manager_login_shows_the_waiting_time_too(
+    client: Client, staff: User, password: str
+) -> None:
+    for _ in range(ACCOUNT_LOCKOUT.free_attempts):
+        client.post(
+            reverse("login"),
+            {"username": staff.email, "password": secrets.token_urlsafe(16)},
+            REMOTE_ADDR=IP,
+        )
+    page = client.post(
+        reverse("login"), {"username": staff.email, "password": password}, REMOTE_ADDR=IP
+    ).content.decode()
+    assert _wait_message(1) in page
 
 
 # --- Per-IP progressive lockout

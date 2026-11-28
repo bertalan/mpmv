@@ -220,8 +220,14 @@ PUBLIC: dict[str, str] = {
     "admin:login": SIGN_IN,
     "admin:logout": "Sign-out: without a session it only redirects to the admin home.",
     "api-v1:api-root": "API root: links only.",
-    "api-v1:openapi-json": "API description, the same for every caller.",
-    "api-v1:openapi-view": "Interactive API documentation page.",
+    "api-v1:openapi-json": (
+        "API description, the same for every caller; on LIVE only for a valid key or staff, "
+        "else 404 (CORE.29)."
+    ),
+    "api-v1:openapi-view": (
+        "Interactive API documentation page; on LIVE only for a valid key or staff, else 404 "
+        "(CORE.29)."
+    ),
     "events_resource": "Public event ICS download and RSS/ICS feeds (EVT.6, EVT.9): a published "
     "event's calendar file; rate limited per IP and path (30 a minute, then 429).",
     "wagtail_serve": PUBLIC_CMS,

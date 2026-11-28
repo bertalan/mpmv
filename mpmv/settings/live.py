@@ -48,3 +48,6 @@ STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": "apps.cms.staticfiles.StaticFilesStorage"},
 }
+
+# The API documentation is for key holders and staff only (CORE.29); STAGE reopens it.
+API_DOCS_PUBLIC = False

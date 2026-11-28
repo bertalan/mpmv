@@ -19,3 +19,18 @@ def purge_refused_keys(timestamp: int) -> None:
     """
     deleted = services.purge_expired_refused_keys()
     logger.info("api.purge_refused_keys deleted %d expired rows", deleted)
+
+
+@periodic("12 4 * * *")
+@locked()
+@task("api.purge_mutation_log", retry=NO_RETRY)
+def purge_mutation_log(timestamp: int) -> None:
+    """Every night: delete the API mutation log rows older than 12 months (CORE.29, Q-14)."""
+    try:
+        deleted = services.purge_mutation_log()
+    except Exception:
+        # Never raise out of the job: the next night retries the same cutoff, and a failure
+        # must not stop the worker's other jobs. The log is the alert (OPS.6).
+        logger.exception("api.purge_mutation_log failed; rows past their retention remain")
+        return
+    logger.info("api.purge_mutation_log deleted %d rows past their retention", deleted)

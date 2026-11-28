@@ -128,6 +128,9 @@ arrives from `127.0.0.1`. A published port would put Podman's port forwarder in 
 replaces the client address with the container's own. Certificates still come from Let's Encrypt:
 Caddy answers HTTP-01 challenges on the port-80 sockets and TLS-ALPN-01 on the port-443 ones.
 
+The API documentation (Swagger and `openapi.json`) stays open on STAGE only while STAGE runs
+`mpmv.settings.stage`; under the LIVE settings it answers 404 except to a key or a staff session.
+
 ### First-time host setup
 
 As the deploy user, on a host with the recommended Podman (5 or later, with its quadlet generator):
