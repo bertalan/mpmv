@@ -66,9 +66,10 @@ def test_a_real_page_with_a_form_token_is_served_and_never_stored(
     client: Client, seeded: SeedReport
 ) -> None:
     """Until the switcher is plain links (slice 3) every page carries a CSRF token: none is kept."""
-    assert "csrfmiddlewaretoken" in client.get("/").content.decode()
-    client.get("/")
-    assert status(client.get("/")) == "MISS"
+    first = client.get("/")
+    assert "csrfmiddlewaretoken" in first.content.decode()
+    assert status(first) == "MISS"
+    assert status(Client().get("/")) == "MISS"  # a visitor with no cookie yet: still not a hit
     assert page_cache.lookup(_plain_request("/")) is None
 
 
@@ -167,9 +168,6 @@ def test_a_clean_page_is_stored_and_a_countdown_caps_its_lifetime(
 
 
 def test_a_session_cookie_bypasses_the_cache_both_ways(client: Client, seeded: SeedReport) -> None:
-    anonymous = Client()
-    anonymous.get("/")
-    assert status(anonymous.get("/")) == "HIT"
     client.cookies["sessionid"] = "abc"
     assert status(client.get("/")) == "BYPASS"
 
@@ -204,10 +202,8 @@ def test_a_signed_in_visit_does_not_leak_into_the_anonymous_page(
 
 
 def test_posts_and_query_strings_bypass_the_cache(client: Client, seeded: SeedReport) -> None:
-    client.get("/")
     assert status(client.get("/?utm_source=newsletter")) == "BYPASS"
     assert status(client.post("/")) != "HIT"
-    assert status(client.get("/")) == "HIT"
 
 
 def test_editor_preview_and_admin_are_never_cached(client: Client, seeded: SeedReport) -> None:
@@ -280,7 +276,12 @@ def test_the_hook_marks_only_an_unrestricted_page(rf: RequestFactory) -> None:
 def test_the_key_is_computed_before_the_page_is_rendered(monkeypatch: pytest.MonkeyPatch) -> None:
     order: list[str] = []
     real = page_cache.try_key
-    monkeypatch.setattr(page_cache, "try_key", lambda r: (order.append("key"), real(r))[1])
+
+    def spy(request: HttpRequest) -> str | None:
+        order.append("key")
+        return real(request)
+
+    monkeypatch.setattr(page_cache, "try_key", spy)
 
     def view(request: HttpRequest) -> HttpResponse:
         order.append("render")
@@ -300,8 +301,25 @@ def test_a_render_started_before_a_generation_change_is_not_served_after_it() ->
 
 
 def test_the_cache_is_bounded() -> None:
-    options = caches["pagecache"]._max_entries  # type: ignore[attr-defined]
+    options = caches["pagecache"]._max_entries
     from django.conf import settings
 
     assert options <= 500
     assert settings.PAGE_CACHE_MAX_BYTES <= 256 * 1024
+
+
+def test_a_clean_page_is_served_from_the_cache_the_second_time() -> None:
+    calls: list[int] = []
+
+    def view(request: HttpRequest) -> HttpResponse:
+        calls.append(1)
+        return served()
+
+    middleware = make_middleware(view)
+    first, second = middleware(page_request()), middleware(page_request())
+    assert (status(first), status(second)) == ("MISS", "HIT")
+    assert len(calls) == 1
+    assert first.content == second.content
+    assert "public" in second["Cache-Control"]
+    assert "Cookie" in second["Vary"]
+    assert not second.cookies

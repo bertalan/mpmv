@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+from typing import Any
 
 import dj_database_url
 import django_stubs_ext
@@ -135,6 +136,9 @@ MIDDLEWARE = [
     "apps.fitment.middleware.GarageSignOutMiddleware",  # FIT.6: the garage cookie at sign-out
     "django.middleware.locale.LocaleMiddleware",
     "apps.core.middleware.LanguageRedirectMiddleware",  # retired language prefixes (I18N.15)
+    # SEO.6: anonymous CMS pages from the cache. After Locale (the key has the language), before
+    # CSRF, authentication and messages (a hit costs no query and holds nothing per request).
+    "apps.seo.middleware.PageCacheMiddleware",
     # OPS.5: the Django admin answers the normal 404 outside the networks; before CommonMiddleware
     # so `/django-admin` gets no slash redirect, after Locale and Theme for the normal 404 page.
     "apps.core.middleware.AdminNetworkAllowlistMiddleware",
@@ -540,6 +544,28 @@ STATICFILES_FINDERS = [
 ]
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+# Anonymous page cache (SEO.6, docs/dev/page-cache.md), OFF unless MPMV_PAGE_CACHE=1. Cached HTML
+# never sits in a web-served folder (MEDIA_ROOT, STATIC_ROOT): own directory `var/page-cache`
+# (git-ignored). Files are shared by every gunicorn worker and the task worker, so a global purge
+# reaches every process without Redis (ADR-0001). The production volume is part of slice 3.
+CACHES: dict[str, dict[str, Any]] = {
+    "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
+    "pagecache": {
+        "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
+        "LOCATION": env_str("MPMV_PAGE_CACHE_DIR", "") or str(BASE_DIR / "var" / "page-cache"),
+        "OPTIONS": {"MAX_ENTRIES": 500, "CULL_FREQUENCY": 4},
+    },
+}
+PAGE_CACHE_ENABLED = env_bool("MPMV_PAGE_CACHE", default=False)
+# Safety net for content that changes without a purge (slice 2 wires the purges).
+PAGE_CACHE_SECONDS = env_int("MPMV_PAGE_CACHE_SECONDS", 300)
+PAGE_CACHE_MAX_BYTES = 256 * 1024  # 500 entries of at most 256 KiB: about 128 MiB worst case
+# Only the Wagtail page tree is cached.
+PAGE_CACHE_URL_NAMES = ("home", "wagtail_serve")
+# Besides the session and CSRF cookies: flash messages, the consent choice (SEO.5) and the garage
+# (FIT.12): a visitor with one of them never reads or fills the cache.
+PAGE_CACHE_BYPASS_COOKIES = ("messages", "mpmv_consent", "mpmv_garage")
 
 # HTTP hardening shared by every environment (SEC.1, spec 12 SEC.3). Transport-only settings
 # (HSTS, HTTPS redirect, Secure cookies) live in live.py, since dev runs over plain HTTP.
