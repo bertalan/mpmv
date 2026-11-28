@@ -1,3 +1,4 @@
+import datetime
 import io
 
 import pytest
@@ -111,3 +112,18 @@ def test_float_cell_is_not_an_ambiguous_separator() -> None:
         _book([["Ref", "Item", "Net"], ["B-1", "Pan", 1.234]])
     )
     assert res.rows[0].product.price == "1.23"
+
+
+def test_date_cell_in_the_price_column_is_a_bad_price() -> None:
+    res = XlsxAdapter(COLUMNS, vendor_id=1).parse(
+        _book(
+            [
+                ["Ref", "Item", "Net"],
+                ["B-1", "Pan", datetime.date(2024, 1, 5)],
+                ["B-2", "Pot", datetime.datetime(2024, 1, 5, 10, 30)],
+                ["B-3", "Lid", 3],
+            ]
+        )
+    )
+    assert [r.product.sku for r in res.rows] == ["B-3"]
+    assert [(e.row, e.code) for e in res.errors] == [(1, "bad_price"), (2, "bad_price")]

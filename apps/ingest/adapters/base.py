@@ -203,6 +203,9 @@ def build_row(
         value = values.get(name)
         return "" if value is None else str(value).strip()
 
+    for name, value in values.items():
+        if value is not None and len(str(value)) > FIELD_MAX_CHARS:
+            return RowError(row_no, "field_too_long", f"The {name} is longer than allowed.")
     for name in REQUIRED_FIELDS:
         if not text(name):
             return RowError(row_no, f"missing_{name}", f"The {name} is empty.")
