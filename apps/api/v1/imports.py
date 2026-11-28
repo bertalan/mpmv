@@ -6,24 +6,33 @@ naming another vendor or a SKU the vendor does not have answers 404, as for a re
 not exist. `?dry_run=true` returns the ChangeSet and writes nothing. Batches are capped at
 `MAX_ITEMS` rows; the request body size and the per-key rate limit are the API-wide ones.
 
+Prices are net `Decimal` amounts (EUR, VAT excluded; the tax position stays with the tax app) set
+through the audited price services, all or nothing. Media is a multipart upload attached through
+`catalog.media.upload_image` (licence and author required); fetching a URL is a follow-up that
+needs the SSRF-guarded client.
+
 Rows of an upsert are independent (partial apply, no all-or-nothing mode): a refused row is
 listed in `errors` and in `rows` (index and SKU) and the others apply.
 Stock is all or nothing: one unknown SKU answers 404 and nothing is written.
 """
 
+import datetime as dt
+from decimal import Decimal
 from typing import Any, Literal
 
 from django.db import transaction
 from django.http import HttpRequest
-from ninja import Router, Schema
+from ninja import File, Form, Router, Schema, Status, UploadedFile
 from pydantic import Field
 
 from apps.api.auth import api_client_of
 from apps.api.v1.catalog import ProductIn
 from apps.api.v1.errors import ApiProblem
-from apps.catalog import services
+from apps.catalog import media, services
 from apps.catalog.engine import MAX_STOCK, SKU_MAX_LENGTH
+from apps.catalog.models import Variant
 from apps.core.changeset import ChangeSet
+from apps.core.models import ImageLicence
 from apps.vendors.models import Vendor
 from apps.vendors.services import ensure_vendor_can_write
 
@@ -164,3 +173,118 @@ def set_stock(request: HttpRequest, payload: StockIn, dry_run: DryRun = False) -
             vendor, rows, ctx=audit_context(request), dry_run=dry_run
         )
     return changeset_out(changes, dry_run=dry_run)
+
+
+class PriceRowIn(Schema):
+    sku: PlainText = Field(min_length=1, max_length=SKU_MAX_LENGTH)
+    price_net: Decimal | None = Field(
+        description="Net price, EUR, 2 decimals, not negative; for a variant, its own override "
+        "(null clears it). Null on a product is allowed only when it is not for sale."
+    )
+    sale_price_net: Decimal | None = Field(None, description="Products only.")
+    sale_from: dt.datetime | None = Field(None, description="Products only.")
+    sale_to: dt.datetime | None = Field(None, description="Products only.")
+
+
+class PricesIn(Schema):
+    items: list[PriceRowIn] = Field(min_length=1, max_length=MAX_ITEMS)
+
+
+@router.put(
+    "/prices",
+    response=ChangeSetOut,
+    auth=ApiKey("catalog:write"),
+    summary="Set net prices by SKU",
+)
+def set_prices(request: HttpRequest, payload: PricesIn, dry_run: DryRun = False) -> dict[str, Any]:
+    """Set the net price (and the optional sale) of products, or the price override of variants,
+    by SKU. All or nothing: a SKU the vendor does not have, another vendor's included, answers
+    404; an invalid price answers 422; in both cases nothing is written."""
+    vendor = _own_vendor(request)
+    matches = services.match_skus(vendor, [row.sku for row in payload.items])
+    if any(item is None for item in matches.values()):
+        raise _not_found()
+    ctx = audit_context(request)
+    changes = ChangeSet()
+    with transaction.atomic():
+        ensure_vendor_can_write(vendor)
+        for row in payload.items:
+            item = matches[row.sku]
+            if item is None:  # pragma: no cover - refused above
+                raise _not_found()
+            if isinstance(item, Variant):
+                if row.sale_price_net is not None or row.sale_from or row.sale_to:
+                    raise ApiProblem(
+                        422,
+                        code="validation_error",
+                        detail="A variant has no sale of its own.",
+                        errors=[{"loc": ["body", "items"], "msg": row.sku, "type": "invalid"}],
+                    )
+                done = services.set_variant_price(
+                    item, price_net_override=row.price_net, ctx=ctx, dry_run=dry_run
+                )
+            else:
+                done = services.set_product_price(
+                    item,
+                    price_net=row.price_net,
+                    sale_price_net=row.sale_price_net,
+                    sale_from=row.sale_from,
+                    sale_to=row.sale_to,
+                    ctx=ctx,
+                    dry_run=dry_run,
+                )
+            changes.changes.extend(done.changes)
+    return changeset_out(changes, dry_run=dry_run)
+
+
+class MediaForm(Schema):
+    sku: PlainText = Field(min_length=1, max_length=SKU_MAX_LENGTH)
+    title: PlainText = Field(min_length=1, max_length=255)
+    author: PlainText = Field(min_length=1, max_length=255)
+    licence: PlainText = Field(description="Code of an entry of the image licence allow list.")
+    language: PlainText | None = Field(None, description="Dedicated to this language; or all.")
+    alt_text: PlainText = Field("", max_length=255)
+
+
+@router.post(
+    "/media",
+    response={200: ChangeSetOut, 201: ChangeSetOut},
+    auth=ApiKey("catalog:write"),
+    summary="Attach an uploaded image to a product or variant by SKU",
+)
+def attach_media(
+    request: HttpRequest,
+    data: Form[MediaForm],
+    file: File[UploadedFile],
+    dry_run: DryRun = False,
+) -> Status[dict[str, Any]]:
+    """Add an image (multipart `file`) to the gallery of the product or variant with this SKU.
+    The file is checked like every image upload (type, size, pixels). 201 when added; 200 with
+    the ChangeSet on `?dry_run=true`."""
+    vendor = _own_vendor(request)
+    item = services.match_skus(vendor, [data.sku])[data.sku]
+    if item is None:
+        raise _not_found()
+    licence = ImageLicence.objects.filter(code=data.licence).first()
+    if licence is None:
+        raise ApiProblem(
+            422,
+            code="validation_error",
+            detail="The request is not valid.",
+            errors=[{"loc": ["body", "licence"], "msg": "Unknown licence.", "type": "invalid"}],
+        )
+    product, variant = (item.product, item) if isinstance(item, Variant) else (item, None)
+    changes = media.upload_image(
+        product,
+        file=file,
+        title=data.title,
+        licence=licence,
+        author=data.author,
+        ctx=audit_context(request),
+        variant=variant,
+        language=data.language,
+        alt_text=data.alt_text,
+        dry_run=dry_run,
+        by_vendor_key=True,
+    )
+    return Status(200 if dry_run else 201, changeset_out(changes, dry_run=dry_run))

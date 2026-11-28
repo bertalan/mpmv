@@ -96,13 +96,19 @@ def _check_language(language: str | None) -> None:
 PIPELINE_SOURCES = (AuditLog.Source.SYSTEM, AuditLog.Source.TASK, AuditLog.Source.COMMAND)
 
 
-def _authorise(vendor: Vendor, ctx: AuditContext) -> None:
+def _authorise(vendor: Vendor, ctx: AuditContext, *, by_vendor_key: bool = False) -> None:
     """The actor of `ctx` must be a member of `vendor` allowed to manage products, or platform
     staff; a pipeline (`PIPELINE_SOURCES`, no actor) is trusted. Adapters (the Manager, the
     API, the admin) build `ctx` from the signed-in user and so pass; they still do their own
     request-level checks. Platform staff also need the catalog write right (CAT.30). Raises
-    PermissionDenied."""
+    PermissionDenied.
+
+    `by_vendor_key` is for the import API (ING.12): the caller authenticated with the API key of
+    `vendor` and the adapter reached the product through the key's own scope (CORE.3), so no
+    person is checked. Only the API source may pass it."""
     require_catalog_editor(ctx)
+    if by_vendor_key and ctx.actor_id is None and ctx.source == AuditLog.Source.API:
+        return
     if ctx.actor_id is None:
         if ctx.source in PIPELINE_SOURCES:
             return
@@ -137,6 +143,7 @@ def upload_image(
     caption: str = "",
     ai_origin: str = ai_labels.AI_NONE,
     dry_run: bool = False,
+    by_vendor_key: bool = False,
 ) -> ChangeSet:
     """Add an uploaded image to the product's gallery (or `variant`'s own), with renditions.
 
@@ -145,7 +152,7 @@ def upload_image(
     in one gallery and language is refused. `alt_text` and `caption` are in the source language.
     Returns the `ChangeSet`; the new row is `ProductImage.objects.filter(product=...)`'s latest.
     """
-    _authorise(product.vendor, ctx)
+    _authorise(product.vendor, ctx, by_vendor_key=by_vendor_key)
     _check_language(language)
     _check_ai_origin(ai_origin)
     if variant is not None and variant.product_id != product.pk:

@@ -1,4 +1,4 @@
-"""ING.12 slice 2: import API prices (net, by SKU) and media (upload), scoped to the key's vendor."""
+"""ING.12 slice 2: import API prices (net, by SKU) and media upload, scoped to the key's vendor."""
 
 import io
 from typing import Any
