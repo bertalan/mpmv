@@ -4,18 +4,14 @@ Only product data goes out (``ProductFacts``), never customer data. The key trav
 never in the URL, and never appears in an error, a log line or the archive.
 """
 
-import http.client
 import json
 import re
 import time
-import urllib.error
-import urllib.request
 from collections.abc import Callable, Mapping
 from typing import Any
 
 from django.conf import settings
-
-from apps.core.outbound import open_url
+from django.views.decorators.debug import sensitive_variables
 
 from .enrichment import (
     TEXT_FIELDS,
@@ -26,51 +22,18 @@ from .enrichment import (
     TextEnricher,
     TextPolicy,
 )
+from .provider_http import (
+    RETRY_DELAYS,
+    KeyHolder,
+    RetryableProviderError,
+    Transport,
+    http_post_json,
+)
 
 PROMPT_VERSION = "gemini-v1"
 ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
-MAX_RESPONSE_BYTES = 1_000_000
 MODEL_NAME = re.compile(r"[a-z0-9][a-z0-9.\-]*")  # use `fullmatch`: no "/" or "?", no final "\n"
-RETRY_DELAYS = (1.0, 3.0)  # seconds before the 2nd and 3rd attempt, on 429 and 5xx only
-
-Transport = Callable[[str, Mapping[str, Any], Mapping[str, str], float], Any]
-
-
-class RetryableProviderError(ProviderError):
-    """A rate limit or a server error: worth another try after a pause."""
-
-
-def http_post_json(
-    url: str, payload: Mapping[str, Any], headers: Mapping[str, str], timeout: float
-) -> Any:
-    """POST ``payload`` as JSON and return the decoded answer. Errors name the failure only.
-
-    TODO(MIG.12): move to ``apps/core/safe_http.py`` once it is on main.
-    """
-    request = urllib.request.Request(  # noqa: S310 (fixed https endpoint)
-        url,
-        data=json.dumps(payload).encode(),
-        headers={"Content-Type": "application/json", **headers},
-        method="POST",
-    )
-    try:
-        with open_url(request, timeout=timeout) as response:  # never follows a redirect
-            body = response.read(MAX_RESPONSE_BYTES + 1)
-    except urllib.error.HTTPError as exc:
-        if exc.code == 429 or exc.code >= 500:
-            raise RetryableProviderError(f"HTTP {exc.code}") from None
-        raise ProviderError(f"HTTP {exc.code}") from None
-    except (OSError, http.client.HTTPException) as exc:  # sockets, timeouts, IncompleteRead...
-        raise ProviderError(type(exc).__name__) from None  # never str(exc): it can hold the body
-    except Exception as exc:
-        raise ProviderError(type(exc).__name__) from None
-    if len(body) > MAX_RESPONSE_BYTES:
-        raise ProviderError("response too large")
-    try:
-        return json.loads(body)
-    except ValueError:
-        raise ProviderError("invalid JSON") from None
 
 
 def build_prompt(facts: ProductFacts, lang: str, policy: TextPolicy) -> str:
@@ -101,7 +64,7 @@ def build_prompt(facts: ProductFacts, lang: str, policy: TextPolicy) -> str:
     )
 
 
-class GeminiEnricher:
+class GeminiEnricher(KeyHolder):
     provider = "gemini"
     prompt_version = PROMPT_VERSION
 
@@ -124,6 +87,7 @@ class GeminiEnricher:
         self._transport = transport
         self._timeout = timeout
 
+    @sensitive_variables()  # the frame holds the API key
     def _call(self, payload: Mapping[str, Any]) -> Any:
         """One request, retried on a rate limit or a server error (bounded, with a pause)."""
         for attempt in range(len(RETRY_DELAYS) + 1):

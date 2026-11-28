@@ -10,14 +10,10 @@ import pytest
 from django.test import override_settings
 
 from apps.ingest import enrich_engine as eng
-from apps.ingest import gemini
+from apps.ingest import gemini, provider_http
 from apps.ingest.enrichment import FakeEnricher, ProductFacts, ProviderError, TextPolicy
-from apps.ingest.gemini import (
-    GeminiEnricher,
-    RetryableProviderError,
-    get_enricher,
-    http_post_json,
-)
+from apps.ingest.gemini import GeminiEnricher, get_enricher
+from apps.ingest.provider_http import RetryableProviderError, http_post_json
 
 FACTS = ProductFacts(sku="SKU-1", title="Ceramic mug", attributes={"colour": "black"})
 POLICY = TextPolicy()
@@ -124,7 +120,7 @@ def test_http_errors_become_provider_errors_without_url(monkeypatch: pytest.Monk
     def boom(request: object, *, timeout: float) -> object:
         raise urllib.error.HTTPError("https://secret.example/?key=abc", 503, "x", None, None)  # type: ignore[arg-type]
 
-    monkeypatch.setattr("apps.ingest.gemini.open_url", boom)
+    monkeypatch.setattr("apps.ingest.provider_http.open_url", boom)
     with pytest.raises(ProviderError) as info:
         http_post_json("https://x.example/", {}, {}, 1.0)
     assert str(info.value) == "HTTP 503"
@@ -160,15 +156,15 @@ def test_every_transport_failure_becomes_a_provider_error(
     def boom(request: object, *, timeout: float) -> object:
         raise error
 
-    monkeypatch.setattr("apps.ingest.gemini.open_url", boom)
+    monkeypatch.setattr("apps.ingest.provider_http.open_url", boom)
     with pytest.raises(ProviderError) as info:
         http_post_json("https://x.example/", {}, {}, 1.0)
     assert "secret" not in str(info.value)
 
 
 def test_a_huge_response_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
-    big = _Response(b"x" * (gemini.MAX_RESPONSE_BYTES + 5))
-    monkeypatch.setattr("apps.ingest.gemini.open_url", lambda request, *, timeout: big)
+    big = _Response(b"x" * (provider_http.MAX_RESPONSE_BYTES + 5))
+    monkeypatch.setattr("apps.ingest.provider_http.open_url", lambda request, *, timeout: big)
     with pytest.raises(ProviderError, match="too large"):
         http_post_json("https://x.example/", {}, {}, 1.0)
 
@@ -182,13 +178,13 @@ def test_429_and_5xx_are_retryable_and_4xx_is_not(monkeypatch: pytest.MonkeyPatc
 
         return boom
 
-    monkeypatch.setattr("apps.ingest.gemini.open_url", make(429))
+    monkeypatch.setattr("apps.ingest.provider_http.open_url", make(429))
     with pytest.raises(RetryableProviderError):
         http_post_json("https://x.example/", {}, {}, 1.0)
-    monkeypatch.setattr("apps.ingest.gemini.open_url", make(503))
+    monkeypatch.setattr("apps.ingest.provider_http.open_url", make(503))
     with pytest.raises(RetryableProviderError):
         http_post_json("https://x.example/", {}, {}, 1.0)
-    monkeypatch.setattr("apps.ingest.gemini.open_url", make(400))
+    monkeypatch.setattr("apps.ingest.provider_http.open_url", make(400))
     with pytest.raises(ProviderError) as info:
         http_post_json("https://x.example/", {}, {}, 1.0)
     assert not isinstance(info.value, RetryableProviderError)
@@ -208,7 +204,7 @@ def test_retry_with_backoff_then_success() -> None:
         FACTS, "en", POLICY
     )
     assert out.raw["title"] == "Ceramic mug"
-    assert sleeps == [gemini.RETRY_DELAYS[0]]
+    assert sleeps == [provider_http.RETRY_DELAYS[0]]
 
 
 def test_retries_are_bounded() -> None:
@@ -223,7 +219,7 @@ def test_retries_are_bounded() -> None:
         GeminiEnricher(KEY, "m", transport=transport, sleep=sleeps.append).describe(
             FACTS, "en", POLICY
         )
-    assert len(calls) == len(gemini.RETRY_DELAYS) + 1
+    assert len(calls) == len(provider_http.RETRY_DELAYS) + 1
 
 
 def test_supplier_text_is_delimited_as_data() -> None:
