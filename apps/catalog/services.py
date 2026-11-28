@@ -46,7 +46,7 @@ from apps.core.services import (
     save_audited,
 )
 from apps.core.sitemap_version import bump_sitemap_version
-from apps.core.text import ascii_int, nfc_deep
+from apps.core.text import ascii_int, nfc, nfc_deep
 from apps.vendors import services as vendors_services
 from apps.vendors.models import Vendor, VendorTranslation
 from apps.vendors.scoping import VendorScopedQuerySet, is_platform_staff
@@ -3009,7 +3009,10 @@ def _fill_redirect(redirect: Redirect, row: Mapping[str, str]) -> None:
     """Set every field of `redirect` from a map row (missing columns: the defaults)."""
 
     def cell(name: str) -> str:
-        return (row.get(name) or "").strip()
+        # Only the free-text note is NFC (I18N.10); the target and code are identifiers and
+        # URL paths that must match byte for byte.
+        text = (row.get(name) or "").strip()
+        return str(nfc(text)) if name == "note" else text
 
     code = cell("code") or str(Redirect.Code.MOVED)
     if code not in {str(value) for value in Redirect.Code.values}:

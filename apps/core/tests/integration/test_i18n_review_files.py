@@ -1,6 +1,7 @@
 """Export and re-import of translatable texts for native-speaker review (I18N.13)."""
 
 import hashlib
+import unicodedata
 from pathlib import Path
 
 import polib
@@ -545,3 +546,25 @@ def test_existing_file_modes_are_kept_and_new_files_are_0644(locale: Path, tmp_p
     created = locale / fresh / "LC_MESSAGES"
     assert (created / "django.po").stat().st_mode & 0o777 == 0o644
     assert (created / "django.mo").stat().st_mode & 0o777 == 0o644
+
+
+def test_a_decomposed_reviewer_text_is_stored_in_nfc_from_xlsx(
+    locale: Path, tmp_path: Path
+) -> None:
+    decomposed = unicodedata.normalize("NFD", "Kontäkt für Sie")
+    path = _export(locale, tmp_path)
+    _edit(path, {"Contact us": decomposed})
+    report = _import(locale, path)
+    assert not report.errors
+    assert _catalog(locale)["Contact us"] == unicodedata.normalize("NFC", decomposed)
+
+
+def test_a_decomposed_reviewer_text_is_stored_in_nfc_from_po(locale: Path, tmp_path: Path) -> None:
+    decomposed = unicodedata.normalize("NFD", "Kontäkt für Sie")
+    path = export_catalog(lang="de", scope="all", fmt="po", out_dir=tmp_path, locale_dir=locale)
+    po = polib.pofile(str(path))
+    po.find("Contact us").msgstr = decomposed
+    po.save()
+    report = _import(locale, path)
+    assert not report.errors
+    assert _catalog(locale)["Contact us"] == unicodedata.normalize("NFC", decomposed)

@@ -29,14 +29,14 @@ from django.http import HttpRequest, HttpResponse
 from django.template.response import TemplateResponse
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
-from wagtail.admin.panels import FieldPanel, FieldRowPanel, InlinePanel
+from wagtail.admin.panels import FieldPanel, FieldRowPanel
 from wagtail.contrib.forms.forms import FormBuilder
 from wagtail.contrib.forms.models import AbstractForm, AbstractFormField
 from wagtail.fields import RichTextField
 
 from apps.accounts.captcha import captcha_passes
 from apps.core.http import client_ip
-from apps.core.nfc_forms import NFCFormMixin, NFCPageForm
+from apps.core.nfc_forms import NFCFormMixin, NFCInlinePanel, NFCPageForm
 from apps.core.public_forms import Protection, public_form
 from apps.core.services import consume_rate_limit
 from apps.core.throttling import ip_bucket
@@ -134,7 +134,7 @@ class FormPage(AbstractForm):  # type: ignore[misc]
     content_panels: ClassVar[list[Any]] = [
         *AbstractForm.content_panels,
         FieldPanel("intro"),
-        InlinePanel("form_fields", label=_("Form fields")),
+        NFCInlinePanel("form_fields", label=_("Form fields")),
         FieldPanel("thank_you_text"),
         FieldRowPanel([FieldPanel("submit_label"), FieldPanel("retention_days")]),
     ]

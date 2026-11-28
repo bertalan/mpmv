@@ -10,6 +10,7 @@ whose target is not public is left out.
 
 import datetime as dt
 import json
+import unicodedata
 from typing import Any
 
 import pytest
@@ -26,7 +27,7 @@ from apps.accounts.tests.mfa import verified_login
 from apps.catalog.models import Product
 from apps.catalog.tests.factories import ProductFactory, ProductTranslationFactory
 from apps.cms.models import BlogAuthor, BlogIndexPage, BlogPostPage, HomePage
-from apps.cms.services import ArticleData, SeedReport, import_article
+from apps.cms.services import ArticleData, SeedReport, import_article, nfc_article
 from apps.cms.tests.factories import (
     BlogAuthorFactory,
     BlogIndexPageFactory,
@@ -94,6 +95,15 @@ def _html(path: str) -> BeautifulSoup:
 
 
 # --- Import (Done when: "Migrated article published")
+
+
+def test_the_article_normaliser_leaves_the_slug_byte_exact() -> None:
+    """The slug is an identifier and a URL part (I18N.10): only the prose fields are NFC."""
+    slug = unicodedata.normalize("NFD", "caf\u00e9")
+    title = unicodedata.normalize("NFD", "Caf\u00e9")
+    article = nfc_article(_legacy_article(slug=slug, title=title))
+    assert article.slug == slug
+    assert article.title == unicodedata.normalize("NFC", title)
 
 
 def test_a_migrated_article_is_published_with_its_date_and_author(blog: BlogIndexPage) -> None:
@@ -329,3 +339,29 @@ def test_the_worker_applies_the_schedules_every_five_minutes(blog: BlogIndexPage
     tasks.publish_scheduled.func(timestamp=0)
 
     assert BlogPostPage.objects.get().expired
+
+
+def test_an_imported_article_is_stored_in_nfc(blog: BlogIndexPage) -> None:
+    def nfd(text: str) -> str:
+        return unicodedata.normalize("NFD", text)
+
+    article = _legacy_article(title=nfd("Café"), summary=nfd("Più"), author=nfd("Zoë"))
+    import_article(blog, article)
+
+    post = BlogPostPage.objects.get(slug="a-visit-to-the-workshop")
+    assert post.title == unicodedata.normalize("NFC", "Café")
+    assert post.summary == unicodedata.normalize("NFC", "Più")
+    assert post.author is not None
+    assert post.author.name == unicodedata.normalize("NFC", "Zoë")
+
+
+def test_an_imported_article_body_keeps_urls_exact_and_text_in_nfc(blog: BlogIndexPage) -> None:
+    url = "https://example.org/café?q=é"  # raw non-ASCII, mixed forms: stays as given
+    heading = unicodedata.normalize("NFD", "Café")
+    body = [("cta", {"heading": heading, "link": {"url": url, "label": heading}})]
+    import_article(blog, _legacy_article(body=body))
+
+    post = BlogPostPage.objects.get(slug="a-visit-to-the-workshop")
+    raw = post.body.get_prep_value()[0]["value"]
+    assert raw["heading"] == unicodedata.normalize("NFC", heading)
+    assert raw["link"]["url"] == url

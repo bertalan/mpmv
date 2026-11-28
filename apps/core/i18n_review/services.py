@@ -24,6 +24,7 @@ from openpyxl.utils.exceptions import InvalidFileException
 from openpyxl.worksheet.worksheet import Worksheet
 
 from apps.core.audit import AuditContext, record
+from apps.core.text import nfc
 
 from . import engine
 from .engine import Rule
@@ -550,7 +551,7 @@ def _read_xlsx(path: Path) -> tuple[str, str, list[_Edit]]:
             form = -1
         keys.append((row, (msgid, ctx, form)))
         expected = engine.checksum(ctx, msgid, form, english, current)
-        reviewer = _text(v[C_REVIEWER]).strip()
+        reviewer = str(nfc(_text(v[C_REVIEWER]).strip()))
         error = None if _text(v[C_SUM]) == expected else Rule.CHECKSUM
         if error is None and (_is_formula(cells, C_REVIEWER) or _is_formula(cells, C_NOTES)):
             error = Rule.FORMULA
@@ -585,7 +586,7 @@ def _read_po(path: Path, locale_dir: Path) -> tuple[str, str, list[_Edit]]:
         )
         theirs = {f: text for f, _, text in _forms(e)}
         for form, english, current in _forms(known):
-            text = theirs.get(form, "").strip()
+            text = str(nfc(theirs.get(form, "").strip()))
             if not text or text == current:
                 continue
             base = engine.checksum(ctx, e.msgid, form, english, current)

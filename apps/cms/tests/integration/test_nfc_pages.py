@@ -25,7 +25,7 @@ from apps.cms.models import (
     VendorRecruitmentPage,
 )
 from apps.cms.tests.factories import HomePageFactory, StandardPageFactory
-from apps.core.nfc_forms import NFCFormMixin, nfc_block_data, nfc_stream_value
+from apps.core.nfc_forms import NFCFormMixin, NFCInlinePanel, nfc_block_data, nfc_stream_value
 
 pytestmark = pytest.mark.django_db
 
@@ -185,3 +185,25 @@ def test_a_url_and_ids_in_a_block_stay_byte_exact() -> None:
 def test_snippet_stream_fields_are_nfc() -> None:
     form_class = get_edit_handler(BlogAuthor).get_form_class()
     assert issubclass(form_class, NFCFormMixin)
+
+
+def test_no_page_or_snippet_model_uses_a_plain_inline_panel() -> None:
+    """Every InlinePanel on a page or snippet model is an NFCInlinePanel (I18N.10)."""
+    from wagtail.admin.panels import InlinePanel
+    from wagtail.models import Page, get_page_models
+    from wagtail.snippets.models import get_snippet_models
+
+    def panels(node: Any) -> Any:
+        yield node
+        for child in getattr(node, "children", []):
+            yield from panels(child)
+
+    found: list[tuple[Any, InlinePanel]] = []
+    for model in [*get_page_models(), *get_snippet_models()]:
+        handler = model.get_edit_handler() if issubclass(model, Page) else get_edit_handler(model)
+        found += [(model, p) for p in panels(handler) if isinstance(p, InlinePanel)]
+
+    assert FormPage in {model for model, _ in found}
+    assert found  # the walk really descends: FormPage has one
+    plain = [(m.__name__, p.relation_name) for m, p in found if not isinstance(p, NFCInlinePanel)]
+    assert plain == []
