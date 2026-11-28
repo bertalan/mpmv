@@ -144,6 +144,10 @@ def test_a_plain_html_page_is_stored() -> None:
         {"nonce_used": True},
         {"vary": "Cookie"},
         {"vary": "Accept-Language, cookie"},
+        {"vary": "*"},
+        {"vary": "Accept-Language, *"},
+        {"vary": "User-Agent"},
+        {"vary": "Accept-Encoding"},
         {"csp_extended": True},
         {"csrf_used": True},
         {"body": b'<form><input name="csrfmiddlewaretoken" value="x"></form>'},
@@ -219,3 +223,16 @@ def test_the_host_is_normalised_in_the_key() -> None:
     assert engine.normalise_host("Shop.Example:8443") == "shop.example"
     assert engine.normalise_host("[::1]:8000") == "[::1]"
     assert engine.normalise_host("shop.example") == "shop.example"
+
+
+def test_the_bypass_cookies_follow_the_garage_and_consent_constants() -> None:
+    """A renamed cookie would stop bypassing the cache and serve consented markup to everyone."""
+    from django.conf import settings
+
+    from apps.fitment.garage import COOKIE_NAME as GARAGE_COOKIE
+    from apps.seo.engine import COOKIE_NAME as CONSENT_COOKIE
+    from apps.seo.middleware import PageCacheMiddleware
+
+    bypass = PageCacheMiddleware._bypass_cookies()
+    assert {GARAGE_COOKIE, CONSENT_COOKIE, settings.SESSION_COOKIE_NAME} <= bypass
+    assert settings.CSRF_COOKIE_NAME in bypass

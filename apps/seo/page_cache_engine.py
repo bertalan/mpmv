@@ -23,6 +23,9 @@ _NONCE_ATTR = re.compile(rb"\snonce\s*=", re.IGNORECASE)
 _CSRF_FIELD = b"csrfmiddlewaretoken"
 _COUNTDOWN_TARGET = re.compile(rb'data-target="([^"]+)"')
 _DIRECTIVE = re.compile(r"\b(max-age|s-maxage)=(\d+)", re.IGNORECASE)
+# The only headers a stored page may vary on: the language is in the key. Anything else (Cookie,
+# User-Agent, `*`) would make one stored copy wrong for some visitors.
+KEYED_VARY = frozenset({"accept-language"})
 _UNSTORABLE = re.compile(r"\b(private|no-store|no-cache|max-age=0|s-maxage=0)\b", re.IGNORECASE)
 
 
@@ -123,8 +126,9 @@ def response_skip_reason(
         return "nonce"
     if csrf_used or _CSRF_FIELD in body:
         return "csrf"
-    if "cookie" in vary.lower():
-        return "vary cookie"
+    vary_names = {name.strip().lower() for name in vary.split(",") if name.strip()}
+    if not vary_names <= KEYED_VARY:
+        return "vary"  # `*`, Cookie or any header the key does not hold
     if csp_extended:
         # A per-request CSP extension (the video block's frame origins) is not stored with the
         # page: a hit would lose it and block the embed.
