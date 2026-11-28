@@ -212,17 +212,19 @@ def test_the_service_refuses_a_save_without_a_passkey_confirmation() -> None:
 
 def test_dry_run_changes_and_audits_nothing() -> None:
     vendor = VendorFactory.create()
+    key = secrets.token_urlsafe(24)
     changes = svc.save_provider(
         vendor,
         provider="claude",
         model="m-1",
-        api_key=secrets.token_urlsafe(24),
+        api_key=key,
         actor=owner_of(vendor),
         ctx=CTX,
         passkey_confirmed=True,
         dry_run=True,
     )
     assert not changes.is_empty
+    assert key not in json.dumps(changes.to_dict())
     assert not VendorAIProvider.objects.exists()
     assert not AuditLog.objects.filter(action__startswith="ingest.provider").exists()
 
