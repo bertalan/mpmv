@@ -53,10 +53,16 @@ class CatalogConfig(AppConfig):
     }
 
     def ready(self) -> None:
+        from apps.core.public_cache import purge_on_change
         from apps.vendors.services import consumer_phone_publish_messages
 
         from . import signals  # noqa: F401  (connects the CAT.14 upsell guard)
+        from .models import Product, Variant
         from .publishing import register_publication_check
+
+        # SEO.6 2b: a shown price (and the name, stock, sale) must never be stale.
+        purge_on_change(Product, "product")
+        purge_on_change(Variant, "variant")
 
         # CMP.41 follow-up (owner decision 2026-11-19): a seller to consumers needs a phone
         # before its products go live. The rule is the vendors app's; the catalog registers it.

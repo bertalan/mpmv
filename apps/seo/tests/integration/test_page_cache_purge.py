@@ -165,9 +165,10 @@ def test_a_closure_dry_run_purges_nothing() -> None:
     from apps.vendors.tests.factories import VendorFactory
 
     ctx = AuditContext(actor_id=1, actor_label="vendor:owner", source="vendor_area", ip="127.0.0.1")
+    vendor = VendorFactory.create()  # creating a vendor purges (SEO.6 2b): before the baseline
     before = generation()
     add_closure(
-        VendorFactory.create(),
+        vendor,
         dt.date(2027, 8, 1),
         dt.date(2027, 8, 15),
         ctx=ctx,
