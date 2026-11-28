@@ -435,6 +435,15 @@ def manager_vendor(vendor: Vendor) -> Vendor:
     return vendor
 
 
+def ai_provider_row(vendor: Vendor) -> VendorAIProvider:
+    """A provider choice with a model name of its own, the one field the page shows (ING.14)."""
+    return VendorAIProviderFactory.create(vendor=vendor, model=f"model-{secrets.token_hex(6)}")
+
+
+def ai_provider_model(row: models.Model) -> str:
+    return str(row.model)  # type: ignore[attr-defined]
+
+
 def ledger_entry_with_ref(vendor: Vendor) -> LedgerEntry:
     """A sale with a unique provider reference, the field the VEN.9 pages show (CORE.3)."""
     return LedgerEntryFactory.create(vendor=vendor, external_ref=f"tr_{secrets.token_hex(8)}")
@@ -738,7 +747,8 @@ ENDPOINTS: dict[str, Access] = {
     "manager:shop:return_policy": VendorScopedList(
         make=manager_vendor, identify=vendor_display_name
     ),
-    "manager:shop:ai_provider": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
+    # The page shows the shop's own provider model; the key is write-only and never listed.
+    "manager:shop:ai_provider": VendorScopedList(make=ai_provider_row, identify=ai_provider_model),
     "manager:shop:termination": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     # The statements of reasons of the selected shop (DSA art. 17); another shop's are never listed.
     "manager:shop:statements": VendorScopedList(

@@ -13876,6 +13876,10 @@ msgstr ""
 " se excluye de los mapas del sitio y de llms.txt. Déjela sin marcar para una página pública "
 "normal."
 
+#: apps/manager/forms.py
+msgid "Tick this to delete the key you saved. Texts are no longer written for you."
+msgstr "Marque esta casilla para eliminar la clave guardada. Los textos ya no se redactarán por usted."
+
 #: apps/orders/ui/forms.py
 msgid ""
 "Tick this to enter your company and VAT number. A valid EU VAT number can remove the VAT on a "

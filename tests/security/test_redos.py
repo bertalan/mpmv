@@ -78,6 +78,11 @@ DYNAMIC: dict[str, tuple[str, list[tuple[str, int, str]]]] = {
             (r"lt\.?\s*(\d+)(?:\s*[/-]\s*(\d+))?", 0, "search"),
         ],
     ),
+    "apps/ingest/enrich_engine.py:47": (
+        "an escaped literal term (spaces become \\s+) between two lookarounds; input is a "
+        "product text",
+        [(r"(?<![^\W_])eco\s+friendly(?![^\W_])", 0, "search")],
+    ),
     "apps/themes/csp_lint.py:27": (
         "fixed template with a literal component name; trusted input (the repository's templates)",
         [(r"\sdata-bs-toggle\s*=\s*[\"']?\s*collapse\b", _IGNORECASE, "search")],

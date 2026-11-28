@@ -13872,6 +13872,10 @@ msgstr ""
 "Spunta questa casella per chiedere ai motori di ricerca di ignorare questa pagina. La pagina resta"
 " fuori anche dalle sitemap e da llms.txt. Lasciala senza spunta per una normale pagina pubblica."
 
+#: apps/manager/forms.py
+msgid "Tick this to delete the key you saved. Texts are no longer written for you."
+msgstr "Spunti questa casella per eliminare la chiave salvata. I testi non verranno più scritti per Lei."
+
 #: apps/orders/ui/forms.py
 msgid ""
 "Tick this to enter your company and VAT number. A valid EU VAT number can remove the VAT on a "
