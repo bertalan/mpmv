@@ -773,7 +773,7 @@ msgstr "un reembolso al cliente"
 msgid "a refund to the customer by platform staff"
 msgstr "un reembolso al cliente por parte del personal de la plataforma"
 
-#: apps/manager/ingest_views.py
+#: apps/ingest/onboarding.py
 msgid "A sample was read without errors with the current mapping"
 msgstr "Se leyó una muestra sin errores con la asignación actual"
 
@@ -2586,6 +2586,10 @@ msgstr "Elija cómo confirmará su identidad después de la contraseña."
 #: apps/manager/ingest_views.py
 msgid "Choose it when the prices use a separator that is easy to misread."
 msgstr "Elíjalo cuando los precios usen un separador fácil de malinterpretar."
+
+#: apps/ingest/onboarding.py
+msgid "Choose one of the listed adapters."
+msgstr "Elija uno de los adaptadores de la lista."
 
 #: apps/orders/ui/present.py
 msgid "Choose one of the shipping options."
@@ -10336,7 +10340,7 @@ msgstr ""
 "La paleta de colores de todo el sitio. Déjala vacía para usar los colores del tema (Rojo para "
 "ride)."
 
-#: apps/manager/ingest_views.py
+#: apps/ingest/onboarding.py
 msgid "The columns for the SKU and the title are mapped"
 msgstr "Las columnas de SKU y título están asignadas"
 
@@ -10655,6 +10659,10 @@ msgid ""
 msgstr ""
 "El día a partir del cual rige este texto, por ejemplo 2026-12-01. No puede ser anterior a la fecha"
 " de la versión anterior. Obligatorio."
+
+#: apps/ingest/onboarding.py
+msgid "The decimal separator is a comma or a point."
+msgstr "El separador decimal es la coma o el punto."
 
 #: apps/manager/notice_views.py
 msgid "The decision is recorded and the notifier is told."
@@ -12645,7 +12653,7 @@ msgstr ""
 "El slug '%(slug)s' está reservado para las páginas de ayuda del sitio y no puede usarse para una "
 "página situada directamente bajo la página de inicio. Elige otro slug."
 
-#: apps/manager/ingest_views.py
+#: apps/ingest/onboarding.py
 msgid "The source is active"
 msgstr "La fuente está activa"
 
@@ -12943,7 +12951,7 @@ msgstr "La traducción se ha guardado como borrador. Envíela cuando esté lista
 msgid "The two passwords do not match."
 msgstr "Las dos contraseñas no coinciden."
 
-#: apps/manager/ingest_views.py
+#: apps/ingest/onboarding.py
 msgid "The type of file is one we can read"
 msgstr "El tipo de archivo es uno que sabemos leer"
 
@@ -13011,7 +13019,7 @@ msgstr ""
 " los bienes que cumplen los requisitos, Libros para los libros con el régimen especial. Si no está"
 " seguro de cuál se aplica, consulte a su asesor fiscal."
 
-#: apps/manager/ingest_views.py
+#: apps/ingest/onboarding.py
 msgid "The vendor is active"
 msgstr "El vendedor está activo"
 
@@ -13765,6 +13773,10 @@ msgstr "Este envío es demasiado grande."
 #: apps/manager/termination_views.py
 msgid "This vendor already has a notice of termination."
 msgstr "Este vendedor ya tiene un preaviso de baja."
+
+#: apps/ingest/onboarding.py
+msgid "This vendor already has a source with this name."
+msgstr "Este vendedor ya tiene una fuente con este nombre."
 
 #: apps/orders/ui/present.py
 msgid "This vendor does not ship to your address."

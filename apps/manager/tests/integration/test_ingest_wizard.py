@@ -186,3 +186,23 @@ def test_a_long_column_name_is_cut_in_the_kept_headers() -> None:
     ctx = AuditContext(actor_label="t", source=AuditLog.Source.SYSTEM)
     onboarding.record_sample(source, report, ctx=ctx)
     assert len(source.config["sample"]["headers"][0]) == onboarding.MAX_HEADER_CHARS
+
+
+def test_create_source_refusals_are_translated() -> None:
+    """The refusal texts go through gettext (formal register in the catalogs)."""
+    from django.core.exceptions import ValidationError
+    from django.utils import translation
+
+    vendor = VendorFactory.create()
+    ctx = AuditContext(actor_label="t", source=AuditLog.Source.SYSTEM)
+    with translation.override("it"), pytest.raises(ValidationError) as caught:
+        onboarding.create_source(vendor, code="x", adapter_code="nope", ctx=ctx)
+    assert "nope" not in str(caught.value)
+    assert caught.value.message_dict["adapter_code"] != ["Choose one of the listed adapters."]
+
+
+def test_a_checklist_item_has_a_label_not_only_a_key() -> None:
+    source = SupplierSourceFactory.create(vendor=VendorFactory.create())
+    for item in onboarding.checklist(source):
+        assert item.label
+        assert item.label != item.key

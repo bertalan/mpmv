@@ -181,9 +181,7 @@ class SourceChecklistView(_SourceView):
         source = self.source()
         items = onboarding.checklist(source)
         context["source"] = source
-        context["items"] = [
-            {"key": item.key, "ok": item.ok, "label": CHECK_LABELS[item.key]} for item in items
-        ]
+        context["items"] = [{"key": item.key, "ok": item.ok, "label": item.label} for item in items]
         context["ready"] = all(i.ok for i in items if i.key != "source_active")
         context["can_write"] = writer(SECTION)(self.manager)
         context.setdefault("form", SampleForm())
@@ -272,12 +270,3 @@ class SourceMappingView(_SourceView):
             for h in report.headers
         ]
         return self.render_to_response(self.get_context_data(columns=columns))
-
-
-CHECK_LABELS: Final = {
-    "vendor_active": gettext_lazy("The vendor is active"),
-    "adapter_known": gettext_lazy("The type of file is one we can read"),
-    "mapping_complete": gettext_lazy("The columns for the SKU and the title are mapped"),
-    "sample_clean": gettext_lazy("A sample was read without errors with the current mapping"),
-    "source_active": gettext_lazy("The source is active"),
-}

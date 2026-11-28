@@ -15,6 +15,8 @@ from typing import Any, Final
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
+from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy
 
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
@@ -123,11 +125,11 @@ def create_source(
 ) -> tuple[SupplierSource, ChangeSet]:
     """A new, inactive source. Active and write-enabled stay off until the checklist is met."""
     if adapter_code not in ADAPTERS:
-        raise ValidationError({"adapter_code": "Choose one of the listed adapters."})
+        raise ValidationError({"adapter_code": _("Choose one of the listed adapters.")})
     if decimal and decimal not in DECIMALS:
-        raise ValidationError({"decimal": "The decimal separator is a comma or a point."})
+        raise ValidationError({"decimal": _("The decimal separator is a comma or a point.")})
     if SupplierSource.objects.filter(vendor=vendor, code=code).exists():
-        raise ValidationError({"code": "This vendor already has a source with this name."})
+        raise ValidationError({"code": _("This vendor already has a source with this name.")})
     source = SupplierSource(
         vendor=vendor,
         code=code,
@@ -157,10 +159,24 @@ def record_sample(
     return services.save_source(source, ctx=ctx, dry_run=dry_run)
 
 
+CHECK_LABELS: Final = {
+    "vendor_active": gettext_lazy("The vendor is active"),
+    "adapter_known": gettext_lazy("The type of file is one we can read"),
+    "mapping_complete": gettext_lazy("The columns for the SKU and the title are mapped"),
+    "sample_clean": gettext_lazy("A sample was read without errors with the current mapping"),
+    "source_active": gettext_lazy("The source is active"),
+}
+
+
 @dataclass(frozen=True)
 class CheckItem:
     key: str
     ok: bool
+
+    @property
+    def label(self) -> str:
+        """What the item says, in the language of the request (the key is internal)."""
+        return str(CHECK_LABELS[self.key])
 
 
 def checklist(source: SupplierSource) -> list[CheckItem]:
